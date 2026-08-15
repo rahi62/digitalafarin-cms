@@ -160,7 +160,7 @@ class EditorialWorkflowTests(TestCase):
             format="json",
         )
         self.assertEqual(restored.status_code, 200, restored.data)
-        self.assertEqual(restored.data["parent"], str(parent.id))
-        self.assertEqual(restored.data["categories"], [str(category.id)])
-        self.assertEqual(restored.data["tags"], [str(tag.id)])
+        self.assertEqual(str(restored.data["parent"]), str(parent.id))
+        self.assertEqual([str(value) for value in restored.data["categories"]], [str(category.id)])
+        self.assertEqual([str(value) for value in restored.data["tags"]], [str(tag.id)])
         self.assertTrue(restored.data["is_featured"])
