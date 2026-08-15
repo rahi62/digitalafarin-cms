@@ -1,0 +1,1 @@
+import {createCmsClient} from "@digitalafarin/cms-next";export const cms=createCmsClient({baseUrl:process.env.CMS_API_URL||"http://localhost:8000/api/cms/v1",site:process.env.CMS_SITE||"demo.local",revalidate:60});

@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.env
+media/
+staticfiles/
+# Node
+node_modules/
+.next/
+dist/
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+*.egg-info/
+build/

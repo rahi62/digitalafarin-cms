@@ -1,0 +1,2 @@
+recursive-include src/digitalafarin_cms/apps */migrations/*.py
+recursive-include src/digitalafarin_cms/apps */management/commands/*.py

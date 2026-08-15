@@ -1,0 +1,56 @@
+{
+  "name": "@digitalafarin/cms-next",
+  "version": "0.2.0",
+  "description": "Next.js SDK for DigitalAfarin Headless CMS + SEO",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "next": ">=15 <18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pack:check": "npm pack --dry-run"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/digitalafarin/digitalafarin-cms.git",
+    "directory": "packages/cms-next"
+  },
+  "homepage": "https://github.com/digitalafarin/digitalafarin-cms",
+  "bugs": {
+    "url": "https://github.com/digitalafarin/digitalafarin-cms/issues"
+  },
+  "author": "DigitalAfarin",
+  "keywords": [
+    "digitalafarin",
+    "cms",
+    "headless",
+    "seo"
+  ],
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "@types/node": "^22.0.0"
+  }
+}

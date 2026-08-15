@@ -1,0 +1,79 @@
+import type { ResolvedPage } from "./types.js";
+
+export type CmsClientOptions = {
+  baseUrl: string;
+  site: string;
+  token?: string;
+  revalidate?: number;
+};
+
+export type CmsClientEnvOptions = Partial<CmsClientOptions>;
+
+type NextRequestInit = RequestInit & {
+  next?: { revalidate?: number };
+};
+
+function normalizeBaseUrl(value: string) {
+  if (!value) throw new Error("CMS baseUrl is required");
+  return value.replace(/\/$/, "");
+}
+
+export function createCmsClient(options: CmsClientOptions) {
+  const base = normalizeBaseUrl(options.baseUrl);
+  if (!options.site) throw new Error("CMS site is required");
+
+  async function request<T = unknown>(path: string, init: NextRequestInit = {}): Promise<T> {
+    const headers = new Headers(init.headers);
+    if (options.token) headers.set("Authorization", `Bearer ${options.token}`);
+
+    const requestInit: NextRequestInit = { ...init, headers };
+    if (typeof options.revalidate === "number") {
+      requestInit.next = { ...(init.next || {}), revalidate: options.revalidate };
+    }
+
+    const res = await fetch(`${base}${path}`, requestInit);
+    if (!res.ok) {
+      throw new Error(`CMS request failed: ${res.status} ${await res.text()}`);
+    }
+    return res.json() as Promise<T>;
+  }
+
+  return {
+    resolve: (path: string) =>
+      request<ResolvedPage>(
+        `/content/resolve/?site=${encodeURIComponent(options.site)}&path=${encodeURIComponent(path)}`,
+      ),
+    getMenu: (key: string) =>
+      request<unknown>(
+        `/content/menus/?site__domain=${encodeURIComponent(options.site)}&search=${encodeURIComponent(key)}`,
+      ),
+    getEntries: (params: Record<string, string | number | boolean | null | undefined> = {}) => {
+      const qs = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) qs.set(key, String(value));
+      });
+      return request<unknown>(`/content/entries/?${qs.toString()}`);
+    },
+    getSitemapUrl: () => `${base}/content/sitemap/?site=${encodeURIComponent(options.site)}`,
+    getRobotsUrl: () => `${base}/content/robots/?site=${encodeURIComponent(options.site)}`,
+    resolveRedirect: (path: string) =>
+      request<{ match: boolean; type?: number; destination?: string | null }>(
+        `/seo/redirect-resolve/?site=${encodeURIComponent(options.site)}&path=${encodeURIComponent(path)}`,
+      ),
+    request,
+  };
+}
+
+export function createCmsClientFromEnv(overrides: CmsClientEnvOptions = {}) {
+  const baseUrl = overrides.baseUrl || process.env.DIGITALAFARIN_CMS_URL;
+  const site = overrides.site || process.env.DIGITALAFARIN_CMS_SITE;
+  if (!baseUrl || !site) {
+    throw new Error("Set DIGITALAFARIN_CMS_URL and DIGITALAFARIN_CMS_SITE");
+  }
+  return createCmsClient({
+    baseUrl,
+    site,
+    revalidate: overrides.revalidate,
+    token: overrides.token,
+  });
+}

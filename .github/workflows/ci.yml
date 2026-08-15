@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-django build twine
+          python -m pip install -e "./packages/cms-django[all]"
+      - name: Run Django package tests
+        env:
+          DJANGO_SETTINGS_MODULE: tests.settings
+          PYTHONPATH: packages/cms-django
+        run: python -m pytest packages/cms-django/tests -q
+      - name: Build Python distributions
+        if: matrix.python-version == '3.13'
+        run: python -m build packages/cms-django --outdir dist/python
+      - name: Validate Python distributions
+        if: matrix.python-version == '3.13'
+        run: python -m twine check dist/python/*
+
+  node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - run: npm install --ignore-scripts
+      - run: npm run check:versions
+      - run: npm --workspace packages/cms-next run build
+      - run: npm --workspace packages/cms-next run typecheck
+      - run: npm --workspace apps/admin run typecheck
+      - name: Inspect npm package contents
+        run: |
+          npm --workspace packages/cms-next run pack:check
+          npm --workspace packages/cms-cli run pack:check

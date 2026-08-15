@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "digitalafarin-cms"
+version = "0.2.0"
+description = "Headless CMS and SEO platform for Django REST Framework and Next.js"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{name = "DigitalAfarin"}]
+keywords = ["django", "drf", "cms", "seo", "headless", "nextjs"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Framework :: Django",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Internet :: WWW/HTTP :: Dynamic Content :: Content Management System",
+]
+dependencies = [
+  "Django>=5.2,<6.1",
+  "djangorestframework>=3.15,<4",
+  "djangorestframework-simplejwt>=5.5,<6",
+  "django-filter>=25.1,<26",
+  "celery>=5.5,<6",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.2,<4"]
+redis = ["redis>=6,<7"]
+all = ["psycopg[binary]>=3.2,<4", "redis>=6,<7"]
+
+[project.urls]
+Homepage = "https://github.com/digitalafarin/digitalafarin-cms"
+Repository = "https://github.com/digitalafarin/digitalafarin-cms"
+Issues = "https://github.com/digitalafarin/digitalafarin-cms/issues"
+Documentation = "https://github.com/digitalafarin/digitalafarin-cms#readme"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["digitalafarin_cms*"]
+
+[tool.setuptools.package-data]
+"digitalafarin_cms" = ["apps/*/migrations/*.py", "apps/*/management/commands/*.py"]

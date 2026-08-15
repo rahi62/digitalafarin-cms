@@ -1,0 +1,37 @@
+name: Bug report
+description: Report a reproducible Community Edition bug
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - digitalafarin-cms
+        - @digitalafarin/cms-next
+        - @digitalafarin/cms-cli
+        - Admin UI
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
