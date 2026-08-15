@@ -22,6 +22,39 @@ def allowed_organization_ids(user):
     )
 
 
+def organization_role(user, organization_id):
+    """Return the user's role for one organization, or 'superuser'/None."""
+    if not getattr(user, "is_authenticated", False):
+        return None
+    if getattr(user, "is_superuser", False):
+        return "superuser"
+    if organization_id is None:
+        return None
+
+    from digitalafarin_cms.apps.sites.models import Membership
+
+    return (
+        Membership.objects.filter(
+            organization_id=organization_id,
+            user=user,
+            organization__is_active=True,
+        )
+        .values_list("role", flat=True)
+        .first()
+    )
+
+
+def user_has_organization_role(user, organization_id, roles) -> bool:
+    role = organization_role(user, organization_id)
+    return role == "superuser" or role in set(roles)
+
+
+def ensure_organization_roles(user, organization_id, roles, message=None) -> None:
+    if user_has_organization_role(user, organization_id, roles):
+        return
+    raise PermissionDenied(message or "Your role does not allow this action.")
+
+
 def ensure_organization_access(user, organization_id) -> None:
     if organization_id is None or getattr(user, "is_superuser", False):
         return
