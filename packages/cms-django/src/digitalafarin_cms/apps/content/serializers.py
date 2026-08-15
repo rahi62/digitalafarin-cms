@@ -4,6 +4,21 @@ from rest_framework import serializers
 from .models import ContentTypeDefinition, ContentEntry, ContentRevision, Category, Tag, ReusableBlock, Menu, MenuItem
 
 
+def would_create_parent_cycle(instance, parent):
+    if instance is None or parent is None:
+        return False
+    current = parent
+    seen = set()
+    while current is not None:
+        if current.pk == instance.pk:
+            return True
+        if current.pk in seen:
+            return True
+        seen.add(current.pk)
+        current = getattr(current, "parent", None)
+    return False
+
+
 class ContentTypeSerializer(serializers.ModelSerializer):
     ALLOWED_FIELD_TYPES = {
         "text", "textarea", "number", "boolean", "date", "datetime",
@@ -55,8 +70,8 @@ class CategorySerializer(serializers.ModelSerializer):
         parent = attrs.get("parent", getattr(self.instance, "parent", None))
         if site and parent and parent.site_id != site.id:
             raise serializers.ValidationError({"parent": "Parent category must belong to the same site."})
-        if self.instance and parent and parent.pk == self.instance.pk:
-            raise serializers.ValidationError({"parent": "A category cannot be its own parent."})
+        if would_create_parent_cycle(self.instance, parent):
+            raise serializers.ValidationError({"parent": "Category hierarchy cannot contain a cycle."})
         return attrs
 
 
@@ -92,6 +107,8 @@ class ContentEntrySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"content_type":"Content type must belong to the same site."})
         if site and parent and parent.site_id != site.id:
             raise serializers.ValidationError({"parent":"Parent entry must belong to the same site."})
+        if would_create_parent_cycle(self.instance, parent):
+            raise serializers.ValidationError({"parent": "Content hierarchy cannot contain a cycle."})
         if site and categories is not None and any(item.site_id != site.id for item in categories):
             raise serializers.ValidationError({"categories":"All categories must belong to the same site."})
         if site and tags is not None and any(item.site_id != site.id for item in tags):
@@ -123,8 +140,8 @@ class MenuItemSerializer(serializers.ModelSerializer):
         parent = attrs.get("parent", getattr(self.instance, "parent", None))
         if menu and parent and parent.menu_id != menu.id:
             raise serializers.ValidationError({"parent": "Parent menu item must belong to the same menu."})
-        if self.instance and parent and parent.pk == self.instance.pk:
-            raise serializers.ValidationError({"parent": "A menu item cannot be its own parent."})
+        if would_create_parent_cycle(self.instance, parent):
+            raise serializers.ValidationError({"parent": "Menu hierarchy cannot contain a cycle."})
         return attrs
 
 
