@@ -1,13 +1,13 @@
 # انتشار عمومی DigitalAfarin CMS
 
-این فایل برای انتشار مخزن `digitalafarin/digitalafarin-cms` آماده شده است. اگر نام GitHub owner یا repository را تغییر دادی، قبل از انتشار فیلدهای `repository.url` در هر دو `package.json` را نیز دقیقاً با همان Repository هماهنگ کن.
+این فایل برای انتشار مخزن `rahi62/digitalafarin-cms` آماده شده است. اگر نام GitHub owner یا repository را تغییر دادی، قبل از انتشار فیلدهای `repository.url` در هر دو `package.json` را نیز دقیقاً با همان Repository هماهنگ کن.
 
 ## 1. ساخت GitHub Repository
 
 Repository عمومی زیر را بساز:
 
 ```text
-digitalafarin/digitalafarin-cms
+rahi62/digitalafarin-cms
 ```
 
 سپس سورس را push کن:
@@ -17,7 +17,7 @@ git init
 git add .
 git commit -m "chore: prepare public community release"
 git branch -M main
-git remote add origin https://github.com/digitalafarin/digitalafarin-cms.git
+git remote add origin https://github.com/rahi62/digitalafarin-cms.git
 git push -u origin main
 ```
 

@@ -3,7 +3,7 @@
 این Repository برای نام فرضی زیر آماده شده است:
 
 ```text
-GitHub: digitalafarin/digitalafarin-cms
+GitHub: rahi62/digitalafarin-cms
 PyPI: digitalafarin-cms
 npm: @digitalafarin/cms-next
 npm: @digitalafarin/cms-cli
@@ -20,7 +20,7 @@ git init
 git add .
 git commit -m "chore: public community release candidate"
 git branch -M main
-git remote add origin https://github.com/digitalafarin/digitalafarin-cms.git
+git remote add origin https://github.com/rahi62/digitalafarin-cms.git
 git push -u origin main
 ```
 

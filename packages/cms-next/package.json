@@ -35,12 +35,12 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/digitalafarin/digitalafarin-cms.git",
+    "url": "https://github.com/rahi62/digitalafarin-cms.git",
     "directory": "packages/cms-next"
   },
-  "homepage": "https://github.com/digitalafarin/digitalafarin-cms",
+  "homepage": "https://github.com/rahi62/digitalafarin-cms",
   "bugs": {
-    "url": "https://github.com/digitalafarin/digitalafarin-cms/issues"
+    "url": "https://github.com/rahi62/digitalafarin-cms/issues"
   },
   "author": "DigitalAfarin",
   "keywords": [
