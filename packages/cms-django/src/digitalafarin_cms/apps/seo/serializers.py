@@ -10,6 +10,7 @@ class SeoMetaSerializer(serializers.ModelSerializer):
 
 
 class SchemaMarkupSerializer(serializers.ModelSerializer):
+    entry_title = serializers.CharField(source="entry.title", read_only=True)
     class Meta:
         model = SchemaMarkup
         fields = "__all__"
@@ -62,7 +63,9 @@ class RedirectSerializer(serializers.ModelSerializer):
 
 class InternalLinkSuggestionSerializer(serializers.ModelSerializer):
     source_title = serializers.CharField(source="source_entry.title", read_only=True)
+    source_path = serializers.CharField(source="source_entry.path", read_only=True)
     target_title = serializers.CharField(source="target_entry.title", read_only=True)
+    target_path = serializers.CharField(source="target_entry.path", read_only=True)
     class Meta:
         model = InternalLinkSuggestion
         fields = "__all__"
