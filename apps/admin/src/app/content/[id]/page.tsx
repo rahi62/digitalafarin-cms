@@ -9,6 +9,7 @@ import PageHeader from "@/components/PageHeader";
 import RevisionPanel from "@/components/RevisionPanel";
 import SchemaBuilder from "@/components/SchemaBuilder";
 import SeoPanel from "@/components/SeoPanel";
+import TaxonomyFields from "@/components/TaxonomyFields";
 import { apiFetch } from "@/lib/api";
 
 type ContentType = { id: string; name: string; slug: string; schema: ContentTypeSchema };
@@ -24,7 +25,13 @@ export default function EditContent() {
     let cancelled = false;
     apiFetch<any>(`/content/entries/${id}/`).then(async (d) => {
       if (cancelled) return;
-      setF({ ...d, custom_fields: d.custom_fields || {}, blocks: (d.blocks || []) as ContentBlock[] });
+      setF({
+        ...d,
+        categories: d.categories || [],
+        tags: d.tags || [],
+        custom_fields: d.custom_fields || {},
+        blocks: (d.blocks || []) as ContentBlock[],
+      });
       try {
         const type = await apiFetch<ContentType>(`/content/types/${d.content_type}/`);
         if (!cancelled) setContentType(type);
@@ -36,6 +43,16 @@ export default function EditContent() {
     });
     return () => { cancelled = true; };
   }, [id]);
+
+  function normalizeEntry(entry: any) {
+    return {
+      ...entry,
+      categories: entry.categories || [],
+      tags: entry.tags || [],
+      custom_fields: entry.custom_fields || {},
+      blocks: (entry.blocks || []) as ContentBlock[],
+    };
+  }
 
   function payload() {
     const body = { ...f };
@@ -50,7 +67,7 @@ export default function EditContent() {
 
   async function saveEntry(showMessage = true) {
     const saved = await apiFetch<any>(`/content/entries/${id}/`, { method: "PUT", body: JSON.stringify(payload()) });
-    setF({ ...saved, custom_fields: saved.custom_fields || {}, blocks: (saved.blocks || []) as ContentBlock[] });
+    setF(normalizeEntry(saved));
     if (showMessage) setMsg("ذخیره شد");
     return saved;
   }
@@ -68,7 +85,7 @@ export default function EditContent() {
     try {
       await saveEntry(false);
       const published = await apiFetch<any>(`/content/entries/${id}/publish/`, { method: "POST", body: "{}" });
-      setF({ ...published, custom_fields: published.custom_fields || {}, blocks: (published.blocks || []) as ContentBlock[] });
+      setF(normalizeEntry(published));
       setMsg("منتشر شد");
     } catch (err: any) {
       setMsg(err.message);
@@ -134,6 +151,14 @@ export default function EditContent() {
             </select>
           </div>
 
+          <TaxonomyFields
+            siteId={f.site}
+            categories={f.categories || []}
+            tags={f.tags || []}
+            onCategoriesChange={(categories) => setF({ ...f, categories })}
+            onTagsChange={(tags) => setF({ ...f, tags })}
+          />
+
           <CustomFieldsEditor
             schema={contentType?.schema}
             value={f.custom_fields || {}}
@@ -155,7 +180,7 @@ export default function EditContent() {
       <RevisionPanel
         entryId={id}
         current={f}
-        onRestored={(entry) => setF({ ...entry, custom_fields: entry.custom_fields || {}, blocks: (entry.blocks || []) as ContentBlock[] })}
+        onRestored={(entry) => setF(normalizeEntry(entry))}
       />
     </>
   );
