@@ -14,28 +14,63 @@ export default function EditContent() {
   const { id } = useParams<{ id: string }>();
   const [f, setF] = useState<any>(null);
   const [msg, setMsg] = useState("");
+  const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
     apiFetch<any>(`/content/entries/${id}/`).then((d) => setF({ ...d, blocks: (d.blocks || []) as ContentBlock[] }));
   }, [id]);
 
+  function payload() {
+    const body = { ...f };
+    delete body.author;
+    delete body.author_name;
+    delete body.content_type_slug;
+    delete body.created_at;
+    delete body.updated_at;
+    delete body.published_at;
+    return body;
+  }
+
+  async function saveEntry(showMessage = true) {
+    const saved = await apiFetch<any>(`/content/entries/${id}/`, { method: "PUT", body: JSON.stringify(payload()) });
+    setF({ ...saved, blocks: (saved.blocks || []) as ContentBlock[] });
+    if (showMessage) setMsg("ذخیره شد");
+    return saved;
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     try {
-      const body = { ...f };
-      delete body.author_name;
-      delete body.content_type_slug;
-      await apiFetch(`/content/entries/${id}/`, { method: "PUT", body: JSON.stringify(body) });
-      setMsg("ذخیره شد");
+      await saveEntry(true);
     } catch (err: any) {
       setMsg(err.message);
     }
   }
 
   async function publish() {
-    await apiFetch(`/content/entries/${id}/publish/`, { method: "POST", body: "{}" });
-    setF({ ...f, status: "published" });
-    setMsg("منتشر شد");
+    try {
+      await saveEntry(false);
+      const published = await apiFetch<any>(`/content/entries/${id}/publish/`, { method: "POST", body: "{}" });
+      setF({ ...published, blocks: (published.blocks || []) as ContentBlock[] });
+      setMsg("منتشر شد");
+    } catch (err: any) {
+      setMsg(err.message);
+    }
+  }
+
+  async function preview() {
+    setPreviewing(true);
+    setMsg("");
+    try {
+      await saveEntry(false);
+      const data = await apiFetch<{ frontend_url: string; expires_in: number }>(`/content/entries/${id}/preview/`, { method: "POST", body: "{}" });
+      window.open(data.frontend_url, "_blank", "noopener,noreferrer");
+      setMsg(`پیش‌نمایش امن برای ${Math.round(data.expires_in / 60)} دقیقه ساخته شد`);
+    } catch (err: any) {
+      setMsg(err.message);
+    } finally {
+      setPreviewing(false);
+    }
   }
 
   if (!f) return <div>در حال بارگذاری...</div>;
@@ -45,10 +80,15 @@ export default function EditContent() {
       <PageHeader
         title={`ویرایش: ${f.title}`}
         description={f.path}
-        action={<button className="btn secondary" onClick={publish}>انتشار</button>}
+        action={
+          <div className="editorHeaderActions">
+            <button type="button" className="btn secondary" onClick={preview} disabled={previewing}>{previewing ? "در حال ساخت..." : "پیش‌نمایش"}</button>
+            <button type="button" className="btn secondary" onClick={publish}>انتشار</button>
+          </div>
+        }
       />
       <form className="form" onSubmit={submit}>
-        {msg && <div className={msg.includes("شد") ? "notice" : "error"}>{msg}</div>}
+        {msg && <div className={msg.includes("شد") || msg.includes("ساخته") ? "notice" : "error"}>{msg}</div>}
         <div className="formGrid">
           <div className="field">
             <label>عنوان</label>
