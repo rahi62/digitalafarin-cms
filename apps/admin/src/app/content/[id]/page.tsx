@@ -1,3 +1,84 @@
 "use client";
-import {FormEvent,useEffect,useState} from "react";import {useParams} from "next/navigation";import PageHeader from "@/components/PageHeader";import {apiFetch} from "@/lib/api";
-export default function EditContent(){const {id}=useParams<{id:string}>();const [f,setF]=useState<any>(null),[msg,setMsg]=useState("");useEffect(()=>{apiFetch<any>(`/content/entries/${id}/`).then(d=>setF({...d,blocks:JSON.stringify(d.blocks,null,2)}))},[id]);async function submit(e:FormEvent){e.preventDefault();try{const body={...f,blocks:JSON.parse(f.blocks)};delete body.author_name;delete body.content_type_slug;await apiFetch(`/content/entries/${id}/`,{method:"PUT",body:JSON.stringify(body)});setMsg("ذخیره شد") }catch(err:any){setMsg(err.message)}}async function publish(){await apiFetch(`/content/entries/${id}/publish/`,{method:"POST",body:"{}"});setF({...f,status:"published"});setMsg("منتشر شد")};if(!f)return <div>در حال بارگذاری...</div>;return <><PageHeader title={`ویرایش: ${f.title}`} description={f.path} action={<button className="btn secondary" onClick={publish}>انتشار</button>}/><form className="form" onSubmit={submit}>{msg&&<div className={msg.includes("شد")?"notice":"error"}>{msg}</div>}<div className="formGrid"><div className="field"><label>عنوان</label><input value={f.title} onChange={e=>setF({...f,title:e.target.value})}/></div><div className="field"><label>Slug</label><input value={f.slug} onChange={e=>setF({...f,slug:e.target.value})}/></div><div className="field full"><label>Path</label><input dir="ltr" value={f.path} onChange={e=>setF({...f,path:e.target.value})}/></div><div className="field full"><label>خلاصه</label><textarea style={{fontFamily:"inherit",direction:"rtl",textAlign:"right"}} value={f.excerpt} onChange={e=>setF({...f,excerpt:e.target.value})}/></div><div className="field"><label>وضعیت</label><select value={f.status} onChange={e=>setF({...f,status:e.target.value})}><option value="draft">Draft</option><option value="review">Review</option><option value="scheduled">Scheduled</option><option value="published">Published</option><option value="archived">Archived</option></select></div><div className="field full"><label>Blocks JSON</label><textarea style={{minHeight:320}} value={f.blocks} onChange={e=>setF({...f,blocks:e.target.value})}/></div></div><div className="actions"><button className="btn">ذخیره تغییرات</button></div></form></>}
+
+import { FormEvent, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import BlockEditor, { ContentBlock } from "@/components/BlockEditor";
+import PageHeader from "@/components/PageHeader";
+import { apiFetch } from "@/lib/api";
+
+export default function EditContent() {
+  const { id } = useParams<{ id: string }>();
+  const [f, setF] = useState<any>(null);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    apiFetch<any>(`/content/entries/${id}/`).then((d) => setF({ ...d, blocks: (d.blocks || []) as ContentBlock[] }));
+  }, [id]);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    try {
+      const body = { ...f };
+      delete body.author_name;
+      delete body.content_type_slug;
+      await apiFetch(`/content/entries/${id}/`, { method: "PUT", body: JSON.stringify(body) });
+      setMsg("ذخیره شد");
+    } catch (err: any) {
+      setMsg(err.message);
+    }
+  }
+
+  async function publish() {
+    await apiFetch(`/content/entries/${id}/publish/`, { method: "POST", body: "{}" });
+    setF({ ...f, status: "published" });
+    setMsg("منتشر شد");
+  }
+
+  if (!f) return <div>در حال بارگذاری...</div>;
+
+  return (
+    <>
+      <PageHeader
+        title={`ویرایش: ${f.title}`}
+        description={f.path}
+        action={<button className="btn secondary" onClick={publish}>انتشار</button>}
+      />
+      <form className="form" onSubmit={submit}>
+        {msg && <div className={msg.includes("شد") ? "notice" : "error"}>{msg}</div>}
+        <div className="formGrid">
+          <div className="field">
+            <label>عنوان</label>
+            <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
+          </div>
+          <div className="field">
+            <label>Slug</label>
+            <input value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value })} />
+          </div>
+          <div className="field full">
+            <label>Path</label>
+            <input dir="ltr" value={f.path} onChange={(e) => setF({ ...f, path: e.target.value })} />
+          </div>
+          <div className="field full">
+            <label>خلاصه</label>
+            <textarea style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right" }} value={f.excerpt} onChange={(e) => setF({ ...f, excerpt: e.target.value })} />
+          </div>
+          <div className="field">
+            <label>وضعیت</label>
+            <select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
+              <option value="draft">Draft</option>
+              <option value="review">Review</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="published">Published</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+          <div className="field full">
+            <label>محتوا</label>
+            <BlockEditor value={f.blocks || []} onChange={(blocks) => setF({ ...f, blocks })} />
+          </div>
+        </div>
+        <div className="actions"><button className="btn">ذخیره تغییرات</button></div>
+      </form>
+    </>
+  );
+}
