@@ -1,4 +1,4 @@
-import type { ResolvedPage } from "./types.js";
+import type { CmsMenu, ResolvedPage } from "./types.js";
 
 export type CmsClientOptions = {
   baseUrl: string;
@@ -52,10 +52,10 @@ export function createCmsClient(options: CmsClientOptions) {
         resolveOptions.previewToken ? { cache: "no-store" } : {},
       );
     },
-    getMenu: (key: string) =>
-      request<unknown>(
-        `/content/menus/?site__domain=${encodeURIComponent(options.site)}&search=${encodeURIComponent(key)}`,
-      ),
+    getMenu: (key: string) => {
+      const qs = new URLSearchParams({ site: options.site, key });
+      return request<CmsMenu>(`/content/menu-resolve/?${qs.toString()}`);
+    },
     getEntries: (params: Record<string, string | number | boolean | null | undefined> = {}) => {
       const qs = new URLSearchParams();
       Object.entries(params).forEach(([key, value]) => {
