@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import BlockEditor, { ContentBlock } from "@/components/BlockEditor";
 import PageHeader from "@/components/PageHeader";
+import SeoPanel from "@/components/SeoPanel";
 import { apiFetch } from "@/lib/api";
 
 export default function EditContent() {
@@ -79,6 +80,8 @@ export default function EditContent() {
         </div>
         <div className="actions"><button className="btn">ذخیره تغییرات</button></div>
       </form>
+
+      <SeoPanel entryId={id} pageTitle={f.title} pagePath={f.path} />
     </>
   );
 }
