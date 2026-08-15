@@ -46,7 +46,8 @@ export default function InternalLinksPanel({ entryId }: { entryId: string }) {
         method: "POST",
         body: JSON.stringify({ source_entry: entryId }),
       });
-      setRows(data.results);
+      const refreshed = await apiFetch<Paginated<Suggestion>>(`/seo/internal-links/?source_entry=${encodeURIComponent(entryId)}`);
+      setRows(refreshed.results);
       setMessage(`${data.count} پیشنهاد لینک داخلی ساخته شد`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "خطا در تولید پیشنهادها");
