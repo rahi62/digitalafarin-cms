@@ -47,6 +47,11 @@ const emptyMeta = (entryId: string): SeoMeta => ({
   analysis: {},
 });
 
+function writablePayload(meta: SeoMeta, entryId: string) {
+  const { id: _id, seo_score: _score, analysis: _analysis, ...writable } = meta;
+  return { ...writable, entry: entryId };
+}
+
 const labels: Record<string, string> = {
   keyword_in_title: "کلمه کلیدی در عنوان صفحه",
   keyword_in_description: "کلمه کلیدی در Meta Description",
@@ -101,9 +106,7 @@ export default function SeoPanel({ entryId, pageTitle, pagePath }: Props) {
     setSaving(true);
     setMessage("");
     try {
-      const payload = { ...meta, entry: entryId };
-      delete payload.analysis;
-      delete payload.seo_score;
+      const payload = writablePayload(meta, entryId);
       const result = meta.id
         ? await apiFetch<SeoMeta>(`/seo/meta/${meta.id}/`, { method: "PUT", body: JSON.stringify(payload) })
         : await apiFetch<SeoMeta>("/seo/meta/", { method: "POST", body: JSON.stringify(payload) });
@@ -122,7 +125,7 @@ export default function SeoPanel({ entryId, pageTitle, pagePath }: Props) {
     if (!id) {
       const created = await apiFetch<SeoMeta>("/seo/meta/", {
         method: "POST",
-        body: JSON.stringify({ ...emptyMeta(entryId), ...meta, entry: entryId }),
+        body: JSON.stringify(writablePayload(meta, entryId)),
       });
       id = created.id;
       setMeta((current) => ({ ...current, ...created }));
