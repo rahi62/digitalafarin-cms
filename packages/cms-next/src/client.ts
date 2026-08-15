@@ -1,4 +1,4 @@
-import type { CmsMenu, ResolvedPage } from "./types.js";
+import type { CmsMenu, CmsSiteContext, ResolvedPage } from "./types.js";
 
 export type CmsClientOptions = {
   baseUrl: string;
@@ -43,15 +43,25 @@ export function createCmsClient(options: CmsClientOptions) {
     return res.json() as Promise<T>;
   }
 
+  function getSiteContext(init: NextRequestInit = {}) {
+    return request<CmsSiteContext>(
+      `/site-context/?site=${encodeURIComponent(options.site)}`,
+      init,
+    );
+  }
+
   return {
-    resolve: (path: string, resolveOptions: ResolveOptions = {}) => {
+    resolve: async (path: string, resolveOptions: ResolveOptions = {}) => {
       const qs = new URLSearchParams({ site: options.site, path });
       if (resolveOptions.previewToken) qs.set("preview", resolveOptions.previewToken);
-      return request<ResolvedPage>(
-        `/content/resolve/?${qs.toString()}`,
-        resolveOptions.previewToken ? { cache: "no-store" } : {},
-      );
+      const pageInit: NextRequestInit = resolveOptions.previewToken ? { cache: "no-store" } : {};
+      const [page, siteContext] = await Promise.all([
+        request<ResolvedPage>(`/content/resolve/?${qs.toString()}`, pageInit),
+        getSiteContext(),
+      ]);
+      return { ...page, site: { ...page.site, ...siteContext } } as ResolvedPage;
     },
+    getSiteContext,
     getMenu: (key: string) => {
       const qs = new URLSearchParams({ site: options.site, key });
       return request<CmsMenu>(`/content/menu-resolve/?${qs.toString()}`);
