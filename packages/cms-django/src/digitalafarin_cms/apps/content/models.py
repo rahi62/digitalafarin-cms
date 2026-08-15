@@ -55,7 +55,8 @@ class ContentEntry(UUIDTimeStampedModel):
     def publish(self):
         self.status=self.Status.PUBLISHED
         self.published_at=self.published_at or timezone.now()
-        self.save(update_fields=["status","published_at","updated_at"])
+        self.scheduled_at=None
+        self.save(update_fields=["status","published_at","scheduled_at","updated_at"])
 
 class ContentRevision(UUIDTimeStampedModel):
     entry=models.ForeignKey(ContentEntry,on_delete=models.CASCADE,related_name="revisions")
