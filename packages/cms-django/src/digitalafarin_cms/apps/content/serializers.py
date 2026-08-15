@@ -52,6 +52,7 @@ class ContentEntrySerializer(serializers.ModelSerializer):
             if missing: raise serializers.ValidationError({"custom_fields":f"Missing required fields: {', '.join(missing)}"})
         return attrs
 class ContentRevisionSerializer(serializers.ModelSerializer):
+    created_by_name=serializers.CharField(source="created_by.username",read_only=True)
     class Meta: model=ContentRevision; fields="__all__"
 class ReusableBlockSerializer(serializers.ModelSerializer):
     class Meta: model=ReusableBlock; fields="__all__"
