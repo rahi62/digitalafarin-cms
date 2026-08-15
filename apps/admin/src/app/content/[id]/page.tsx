@@ -3,7 +3,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import BlockEditor, { ContentBlock } from "@/components/BlockEditor";
+import InternalLinksPanel from "@/components/InternalLinksPanel";
 import PageHeader from "@/components/PageHeader";
+import SchemaBuilder from "@/components/SchemaBuilder";
 import SeoPanel from "@/components/SeoPanel";
 import { apiFetch } from "@/lib/api";
 
@@ -82,6 +84,8 @@ export default function EditContent() {
       </form>
 
       <SeoPanel entryId={id} pageTitle={f.title} pagePath={f.path} />
+      <SchemaBuilder entryId={id} pageTitle={f.title} pagePath={f.path} blocks={f.blocks || []} />
+      <InternalLinksPanel entryId={id} />
     </>
   );
 }
