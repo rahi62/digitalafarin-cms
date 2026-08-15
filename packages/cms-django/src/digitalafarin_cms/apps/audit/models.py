@@ -49,8 +49,8 @@ class AuditPage(UUIDTimeStampedModel):
         ]
         ordering = ["url"]
         indexes = [
-            models.Index(fields=["run", "status_code"]),
-            models.Index(fields=["run", "is_indexable"]),
+            models.Index(fields=["run", "status_code"], name="audit_pg_run_status_idx"),
+            models.Index(fields=["run", "is_indexable"], name="audit_pg_run_index_idx"),
         ]
 
 
@@ -77,6 +77,6 @@ class AuditIssue(UUIDTimeStampedModel):
 
     class Meta:
         indexes = [
-            models.Index(fields=["run", "severity"]),
-            models.Index(fields=["run", "code"]),
+            models.Index(fields=["run", "severity"], name="audit_issue_severity_idx"),
+            models.Index(fields=["run", "code"], name="audit_issue_code_idx"),
         ]
