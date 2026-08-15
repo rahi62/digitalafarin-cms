@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import BlockEditor, { ContentBlock } from "@/components/BlockEditor";
 import CustomFieldsEditor, { ContentTypeSchema, customFieldDefaults } from "@/components/CustomFieldsEditor";
 import PageHeader from "@/components/PageHeader";
+import TaxonomyFields from "@/components/TaxonomyFields";
 import { apiFetch, Paginated } from "@/lib/api";
 
 type Site = { id: string; name: string };
@@ -21,6 +22,8 @@ export default function NewContent() {
     path: "/",
     excerpt: "",
     status: "draft",
+    categories: [],
+    tags: [],
     custom_fields: {},
     blocks: [{ id: "p-1", type: "paragraph", data: { text: "" } }] as ContentBlock[],
   });
@@ -69,13 +72,13 @@ export default function NewContent() {
 
   return (
     <>
-      <PageHeader title="محتوای جدید" description="ساخت Entry با Visual Block Editor و Custom Fields" />
+      <PageHeader title="محتوای جدید" description="ساخت Entry با Visual Block Editor، Custom Fields و Taxonomies" />
       <form className="form" onSubmit={submit}>
         {msg && <div className="error">{msg}</div>}
         <div className="formGrid">
           <div className="field">
             <label>سایت</label>
-            <select value={f.site} onChange={(e) => setF({ ...f, site: e.target.value, content_type: "", custom_fields: {} })}>
+            <select value={f.site} onChange={(e) => setF({ ...f, site: e.target.value, content_type: "", categories: [], tags: [], custom_fields: {} })}>
               {sites.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
             </select>
           </div>
@@ -110,6 +113,14 @@ export default function NewContent() {
               <option value="published">Published</option>
             </select>
           </div>
+
+          <TaxonomyFields
+            siteId={f.site}
+            categories={f.categories || []}
+            tags={f.tags || []}
+            onCategoriesChange={(categories) => setF({ ...f, categories })}
+            onTagsChange={(tags) => setF({ ...f, tags })}
+          />
 
           <CustomFieldsEditor
             schema={selectedType?.schema}
