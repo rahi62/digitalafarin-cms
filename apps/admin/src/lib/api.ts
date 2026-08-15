@@ -19,6 +19,8 @@ export async function apiFetch<T=any>(path:string, options:RequestInit={}):Promi
   const res=await fetch(`${API_URL}${path}`,{...options,headers,cache:"no-store"});
   if(res.status===401 && typeof window!=="undefined") { clearTokens(); window.location.href="/login"; throw new Error("Unauthorized"); }
   if(!res.ok){ let message=`API error ${res.status}`; try{const e=await res.json(); message=e.detail || JSON.stringify(e);}catch{} throw new Error(message); }
-  return res.json();
+  if(res.status===204) return undefined as T;
+  const body=await res.text();
+  return (body ? JSON.parse(body) : undefined) as T;
 }
 export type Paginated<T>={count:number;next:string|null;previous:string|null;results:T[]};

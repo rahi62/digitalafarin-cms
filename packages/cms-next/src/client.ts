@@ -8,6 +8,7 @@ export type CmsClientOptions = {
 };
 
 export type CmsClientEnvOptions = Partial<CmsClientOptions>;
+export type ResolveOptions = { previewToken?: string };
 
 type NextRequestInit = RequestInit & {
   next?: { revalidate?: number };
@@ -27,7 +28,11 @@ export function createCmsClient(options: CmsClientOptions) {
     if (options.token) headers.set("Authorization", `Bearer ${options.token}`);
 
     const requestInit: NextRequestInit = { ...init, headers };
-    if (typeof options.revalidate === "number") {
+    if (
+      typeof options.revalidate === "number" &&
+      init.cache !== "no-store" &&
+      typeof init.next?.revalidate !== "number"
+    ) {
       requestInit.next = { ...(init.next || {}), revalidate: options.revalidate };
     }
 
@@ -39,10 +44,14 @@ export function createCmsClient(options: CmsClientOptions) {
   }
 
   return {
-    resolve: (path: string) =>
-      request<ResolvedPage>(
-        `/content/resolve/?site=${encodeURIComponent(options.site)}&path=${encodeURIComponent(path)}`,
-      ),
+    resolve: (path: string, resolveOptions: ResolveOptions = {}) => {
+      const qs = new URLSearchParams({ site: options.site, path });
+      if (resolveOptions.previewToken) qs.set("preview", resolveOptions.previewToken);
+      return request<ResolvedPage>(
+        `/content/resolve/?${qs.toString()}`,
+        resolveOptions.previewToken ? { cache: "no-store" } : {},
+      );
+    },
     getMenu: (key: string) =>
       request<unknown>(
         `/content/menus/?site__domain=${encodeURIComponent(options.site)}&search=${encodeURIComponent(key)}`,

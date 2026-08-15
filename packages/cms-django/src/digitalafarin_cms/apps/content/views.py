@@ -1,3 +1,7 @@
+from urllib.parse import urlencode
+
+from django.conf import settings
+from django.core import signing
 from django.http import HttpResponse
 from xml.sax.saxutils import escape as xml_escape
 from rest_framework import viewsets
@@ -12,6 +16,24 @@ from digitalafarin_cms.apps.sites.models import Site
 from .models import Category, ContentEntry, ContentRevision, ContentTypeDefinition, Menu, ReusableBlock, Tag
 from .serializers import CategorySerializer, ContentEntrySerializer, ContentRevisionSerializer, ContentTypeSerializer, MenuSerializer, ReusableBlockSerializer, TagSerializer
 from .services import create_revision
+
+
+PREVIEW_SALT = "digitalafarin-cms-preview"
+
+
+def preview_max_age():
+    return int(getattr(settings, "DIGITALAFARIN_CMS_PREVIEW_MAX_AGE", 900))
+
+
+def frontend_base_for(site):
+    configured = (site.settings or {}).get("frontend_url", "").strip()
+    if configured:
+        return configured.rstrip("/")
+    domain = site.domain.strip().rstrip("/")
+    if domain.startswith(("http://", "https://")):
+        return domain
+    scheme = "http" if domain.startswith(("localhost", "127.0.0.1")) else "https"
+    return f"{scheme}://{domain}"
 
 
 class ContentTypeViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
@@ -67,6 +89,23 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         create_revision(entry, request.user, "Published")
         return Response(self.get_serializer(entry).data)
 
+    @action(detail=True, methods=["post"], url_path="preview")
+    def preview(self, request, pk=None):
+        entry = self.get_object()
+        token = signing.dumps(
+            {"entry_id": str(entry.pk), "site_id": str(entry.site_id)},
+            salt=PREVIEW_SALT,
+            compress=True,
+        )
+        query = urlencode({"cms_preview": token})
+        return Response({
+            "token": token,
+            "expires_in": preview_max_age(),
+            "site": entry.site.domain,
+            "path": entry.path,
+            "frontend_url": f"{frontend_base_for(entry.site)}{entry.path}?{query}",
+        })
+
     @action(detail=True, methods=["post"])
     def restore_revision(self, request, pk=None):
         entry = self.get_object()
@@ -111,20 +150,40 @@ class MenuViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 def resolve_path(request):
     domain = request.query_params.get("site")
     path = request.query_params.get("path", "/")
+    preview_token = request.query_params.get("preview", "")
     if not domain:
         return Response({"detail": "site query parameter is required"}, status=400)
     try:
         site = Site.objects.get(domain=domain, is_active=True)
     except Site.DoesNotExist:
         return Response({"detail": "Site not found"}, status=404)
-    try:
-        entry = ContentEntry.objects.select_related("content_type", "author").prefetch_related("categories", "tags").get(
-            site=site,
-            path=path,
-            status=ContentEntry.Status.PUBLISHED,
-        )
-    except ContentEntry.DoesNotExist:
-        return Response({"detail": "Content not found"}, status=404)
+
+    if preview_token:
+        try:
+            payload = signing.loads(preview_token, salt=PREVIEW_SALT, max_age=preview_max_age())
+        except signing.SignatureExpired:
+            return Response({"detail": "Preview token expired"}, status=403)
+        except signing.BadSignature:
+            return Response({"detail": "Invalid preview token"}, status=403)
+        if str(payload.get("site_id")) != str(site.pk):
+            return Response({"detail": "Preview token does not match this site"}, status=403)
+        try:
+            entry = ContentEntry.objects.select_related("content_type", "author").prefetch_related("categories", "tags").get(
+                pk=payload.get("entry_id"),
+                site=site,
+                path=path,
+            )
+        except ContentEntry.DoesNotExist:
+            return Response({"detail": "Preview content not found"}, status=404)
+    else:
+        try:
+            entry = ContentEntry.objects.select_related("content_type", "author").prefetch_related("categories", "tags").get(
+                site=site,
+                path=path,
+                status=ContentEntry.Status.PUBLISHED,
+            )
+        except ContentEntry.DoesNotExist:
+            return Response({"detail": "Content not found"}, status=404)
 
     seo = SeoMeta.objects.filter(entry=entry).first()
     schemas = SchemaMarkup.objects.filter(entry=entry, is_active=True)
@@ -141,6 +200,7 @@ def resolve_path(request):
         current = current.parent
 
     return Response({
+        "preview": bool(preview_token),
         "site": {"name": site.name, "domain": site.domain, "language": site.default_language},
         "content": ContentEntrySerializer(entry).data,
         "blocks": entry.blocks,

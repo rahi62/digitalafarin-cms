@@ -1,3 +1,4 @@
+import json
 import re
 
 from rest_framework import viewsets
@@ -5,7 +6,12 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from digitalafarin_cms.apps.common.tenancy import TenantScopedViewSetMixin
+from digitalafarin_cms.apps.common.tenancy import (
+    TenantScopedViewSetMixin,
+    allowed_organization_ids,
+    ensure_organization_write_access,
+)
+from digitalafarin_cms.apps.content.models import ContentEntry
 from digitalafarin_cms.apps.sites.models import Site
 from .models import InternalLinkSuggestion, Keyword, KeywordCluster, KeywordMapping, Redirect, SchemaMarkup, SeoMeta
 from .serializers import InternalLinkSuggestionSerializer, KeywordClusterSerializer, KeywordMappingSerializer, KeywordSerializer, RedirectSerializer, SchemaMarkupSerializer, SeoMetaSerializer
@@ -127,10 +133,105 @@ class RedirectViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 
 class InternalLinkSuggestionViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = InternalLinkSuggestion.objects.select_related("source_entry", "target_entry").all()
+    queryset = InternalLinkSuggestion.objects.select_related(
+        "source_entry", "source_entry__site", "target_entry", "target_entry__site"
+    ).all()
     serializer_class = InternalLinkSuggestionSerializer
     filterset_fields = ["source_entry", "target_entry", "status"]
     tenant_filter = "source_entry__site__organization_id"
+
+    @action(detail=False, methods=["post"], url_path="generate")
+    def generate(self, request):
+        source_id = request.data.get("source_entry")
+        if not source_id:
+            return Response({"detail": "source_entry is required"}, status=400)
+
+        source_queryset = ContentEntry.objects.select_related("site", "site__organization")
+        allowed = allowed_organization_ids(request.user)
+        if allowed is not None:
+            source_queryset = source_queryset.filter(site__organization_id__in=allowed)
+        try:
+            source = source_queryset.get(pk=source_id)
+        except ContentEntry.DoesNotExist:
+            return Response({"detail": "Source entry not found"}, status=404)
+
+        ensure_organization_write_access(request.user, source.site.organization_id)
+
+        def flatten(value):
+            if isinstance(value, dict):
+                return " ".join(flatten(v) for v in value.values())
+            if isinstance(value, list):
+                return " ".join(flatten(v) for v in value)
+            return str(value) if value is not None else ""
+
+        source_text = " ".join([source.title, source.excerpt, flatten(source.blocks)]).lower()
+        source_terms = {
+            token
+            for token in re.findall(r"\w+", source_text, flags=re.UNICODE)
+            if len(token) >= 3 and not token.isdigit()
+        }
+        source_json = json.dumps(source.blocks, ensure_ascii=False).lower()
+
+        blocked_targets = set(
+            InternalLinkSuggestion.objects.filter(source_entry=source)
+            .exclude(status="suggested")
+            .values_list("target_entry_id", flat=True)
+        )
+        InternalLinkSuggestion.objects.filter(source_entry=source, status="suggested").delete()
+
+        candidates = (
+            ContentEntry.objects.filter(site=source.site, status=ContentEntry.Status.PUBLISHED)
+            .exclude(pk=source.pk)
+            .select_related("seo_meta")
+        )
+        ranked = []
+        for target in candidates:
+            if target.pk in blocked_targets:
+                continue
+            target_path = (target.path or "").lower()
+            if target_path and target_path in source_json:
+                continue
+
+            title_phrase = (target.title or "").strip().lower()
+            target_meta = getattr(target, "seo_meta", None)
+            focus_phrase = ((target_meta.focus_keyword if target_meta else "") or "").strip().lower()
+            target_terms = {
+                token
+                for token in re.findall(r"\w+", " ".join([title_phrase, focus_phrase]), flags=re.UNICODE)
+                if len(token) >= 3 and not token.isdigit()
+            }
+            overlap = len(source_terms & target_terms)
+            coverage = overlap / max(len(target_terms), 1)
+
+            score = 0
+            exact_title = bool(title_phrase and title_phrase in source_text)
+            exact_focus = bool(focus_phrase and focus_phrase in source_text)
+            if exact_title:
+                score = max(score, 96)
+            if exact_focus:
+                score = max(score, 92)
+            if overlap:
+                score = max(score, min(85, round(25 + coverage * 60)))
+            if score < 40:
+                continue
+
+            anchor = focus_phrase if exact_focus else target.title
+            ranked.append((score, target, anchor))
+
+        ranked.sort(key=lambda item: (-item[0], item[1].title.lower()))
+        suggestions = [
+            InternalLinkSuggestion(
+                source_entry=source,
+                target_entry=target,
+                anchor_text=anchor,
+                score=score,
+                status="suggested",
+            )
+            for score, target, anchor in ranked[:10]
+        ]
+        InternalLinkSuggestion.objects.bulk_create(suggestions)
+        serialized = InternalLinkSuggestionSerializer(suggestions, many=True).data
+        return Response({"count": len(serialized), "results": serialized})
 
 
 @api_view(["GET"])
