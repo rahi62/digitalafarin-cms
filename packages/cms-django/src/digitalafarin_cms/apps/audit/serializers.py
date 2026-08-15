@@ -31,7 +31,13 @@ class AuditPageSerializer(serializers.ModelSerializer):
     class Meta:
         model = AuditPage
         fields = "__all__"
-        read_only_fields = fields
+        read_only_fields = [
+            "run", "url", "final_url", "path", "status_code", "content_type",
+            "response_ms", "title", "meta_description", "canonical_url", "robots",
+            "is_indexable", "h1_count", "h2_count", "word_count", "image_count",
+            "missing_alt_count", "internal_links", "external_links",
+            "incoming_internal_links", "issue_count", "created_at", "updated_at",
+        ]
 
 
 class AuditIssueSerializer(serializers.ModelSerializer):
