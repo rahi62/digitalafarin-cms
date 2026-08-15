@@ -1,6 +1,6 @@
 """DigitalAfarin Headless CMS + SEO for Django/DRF."""
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 DJANGO_APPS = (
     "digitalafarin_cms.apps.common",

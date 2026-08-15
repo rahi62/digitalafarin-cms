@@ -1,10 +1,10 @@
 {
   "name": "@digitalafarin/cms-cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Installer/wiring CLI for DigitalAfarin CMS in Django + Next.js projects",
   "type": "module",
   "bin": {
-    "digitalafarin-cms": "./bin/cli.js"
+    "digitalafarin-cms": "bin/cli.js"
   },
   "files": [
     "bin",
@@ -20,12 +20,12 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/rahi62/digitalafarin-cms.git",
+    "url": "git+https://github.com/rahi62/digitalafarin-cms.git",
     "directory": "packages/cms-cli"
   },
   "homepage": "https://github.com/rahi62/digitalafarin-cms",
   "bugs": {
-    "url": "https://github.com/rahi62/digitalafarin-cms/issues"
+    "url": "git+https://github.com/rahi62/digitalafarin-cms.git"
   },
   "author": "DigitalAfarin",
   "keywords": [
