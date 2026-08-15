@@ -1,5 +1,6 @@
 import re
 
+from django.utils import timezone
 from rest_framework import serializers
 from .models import ContentTypeDefinition, ContentEntry, ContentRevision, Category, Tag, ReusableBlock, Menu, MenuItem
 
@@ -34,11 +35,9 @@ class ContentTypeSerializer(serializers.ModelSerializer):
             return {}
         if not isinstance(value, dict):
             raise serializers.ValidationError("schema must be an object")
-
         fields = value.get("fields", [])
         if not isinstance(fields, list):
             raise serializers.ValidationError("schema.fields must be a list")
-
         seen = set()
         for index, field in enumerate(fields):
             if not isinstance(field, dict):
@@ -56,10 +55,8 @@ class ContentTypeSerializer(serializers.ModelSerializer):
             seen.add(key)
             if field_type not in self.ALLOWED_FIELD_TYPES:
                 raise serializers.ValidationError(f"Unsupported field type: {field_type}")
-            if field_type == "select":
-                options = field.get("options", [])
-                if not isinstance(options, list):
-                    raise serializers.ValidationError(f"Select field '{key}' options must be a list")
+            if field_type == "select" and not isinstance(field.get("options", []), list):
+                raise serializers.ValidationError(f"Select field '{key}' options must be a list")
         return value
 
 
@@ -83,18 +80,24 @@ class ContentEntrySerializer(serializers.ModelSerializer):
     content_type_slug=serializers.CharField(source="content_type.slug",read_only=True)
     author=serializers.PrimaryKeyRelatedField(read_only=True)
     author_name=serializers.CharField(source="author.username",read_only=True)
-    class Meta: model=ContentEntry; fields="__all__"
+    class Meta:
+        model=ContentEntry
+        fields="__all__"
+        read_only_fields=["published_at"]
+
     def validate_path(self,value):
         if not value.startswith("/"): value="/"+value
         if "?" in value or "#" in value: raise serializers.ValidationError("Path must not contain query strings or fragments.")
         if value != "/" and not value.endswith("/"): value += "/"
         return value
+
     def validate_blocks(self,value):
         if not isinstance(value,list): raise serializers.ValidationError("blocks must be a list")
         for i,block in enumerate(value):
             if not isinstance(block,dict) or not block.get("type") or not isinstance(block.get("data",{}),dict):
                 raise serializers.ValidationError(f"Invalid block at index {i}; each block requires type and data object")
         return value
+
     def validate(self,attrs):
         site=attrs.get("site") or getattr(self.instance,"site",None)
         ctype=attrs.get("content_type") or getattr(self.instance,"content_type",None)
@@ -102,6 +105,8 @@ class ContentEntrySerializer(serializers.ModelSerializer):
         categories=attrs.get("categories")
         tags=attrs.get("tags")
         custom=attrs.get("custom_fields", getattr(self.instance,"custom_fields",{})) or {}
+        status=attrs.get("status", getattr(self.instance,"status",ContentEntry.Status.DRAFT))
+        scheduled_at=attrs.get("scheduled_at", getattr(self.instance,"scheduled_at",None))
 
         if site and ctype and ctype.site_id != site.id:
             raise serializers.ValidationError({"content_type":"Content type must belong to the same site."})
@@ -118,6 +123,12 @@ class ContentEntrySerializer(serializers.ModelSerializer):
             required=[x.get("key") for x in ctype.schema.get("fields",[]) if x.get("required")]
             missing=[key for key in required if key and custom.get(key) in (None,"")]
             if missing: raise serializers.ValidationError({"custom_fields":f"Missing required fields: {', '.join(missing)}"})
+
+        if status == ContentEntry.Status.SCHEDULED:
+            if not scheduled_at:
+                raise serializers.ValidationError({"scheduled_at": "Scheduled content requires scheduled_at."})
+            if scheduled_at <= timezone.now():
+                raise serializers.ValidationError({"scheduled_at": "scheduled_at must be in the future."})
         return attrs
 
 
@@ -134,7 +145,6 @@ class MenuItemSerializer(serializers.ModelSerializer):
     children=serializers.SerializerMethodField()
     class Meta: model=MenuItem; fields="__all__"
     def get_children(self,obj): return MenuItemSerializer(obj.children.all(),many=True).data
-
     def validate(self, attrs):
         menu = attrs.get("menu") or getattr(self.instance, "menu", None)
         parent = attrs.get("parent", getattr(self.instance, "parent", None))
