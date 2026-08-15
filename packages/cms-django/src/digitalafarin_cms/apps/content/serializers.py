@@ -55,6 +55,8 @@ class CategorySerializer(serializers.ModelSerializer):
         parent = attrs.get("parent", getattr(self.instance, "parent", None))
         if site and parent and parent.site_id != site.id:
             raise serializers.ValidationError({"parent": "Parent category must belong to the same site."})
+        if self.instance and parent and parent.pk == self.instance.pk:
+            raise serializers.ValidationError({"parent": "A category cannot be its own parent."})
         return attrs
 
 
@@ -115,6 +117,15 @@ class MenuItemSerializer(serializers.ModelSerializer):
     children=serializers.SerializerMethodField()
     class Meta: model=MenuItem; fields="__all__"
     def get_children(self,obj): return MenuItemSerializer(obj.children.all(),many=True).data
+
+    def validate(self, attrs):
+        menu = attrs.get("menu") or getattr(self.instance, "menu", None)
+        parent = attrs.get("parent", getattr(self.instance, "parent", None))
+        if menu and parent and parent.menu_id != menu.id:
+            raise serializers.ValidationError({"parent": "Parent menu item must belong to the same menu."})
+        if self.instance and parent and parent.pk == self.instance.pk:
+            raise serializers.ValidationError({"parent": "A menu item cannot be its own parent."})
+        return attrs
 
 
 class MenuSerializer(serializers.ModelSerializer):
