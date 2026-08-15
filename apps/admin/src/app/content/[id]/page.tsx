@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import BlockEditor, { ContentBlock } from "@/components/BlockEditor";
 import InternalLinksPanel from "@/components/InternalLinksPanel";
 import PageHeader from "@/components/PageHeader";
+import RevisionPanel from "@/components/RevisionPanel";
 import SchemaBuilder from "@/components/SchemaBuilder";
 import SeoPanel from "@/components/SeoPanel";
 import { apiFetch } from "@/lib/api";
@@ -86,6 +87,11 @@ export default function EditContent() {
       <SeoPanel entryId={id} pageTitle={f.title} pagePath={f.path} />
       <SchemaBuilder entryId={id} pageTitle={f.title} pagePath={f.path} blocks={f.blocks || []} />
       <InternalLinksPanel entryId={id} />
+      <RevisionPanel
+        entryId={id}
+        current={f}
+        onRestored={(entry) => setF({ ...entry, blocks: (entry.blocks || []) as ContentBlock[] })}
+      />
     </>
   );
 }
