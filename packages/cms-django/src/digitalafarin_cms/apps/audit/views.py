@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from digitalafarin_cms.apps.common.tenancy import TenantScopedViewSetMixin
+from .comparison import compare_audit_runs
 from .models import AuditIssue, AuditPage, AuditRun
 from .serializers import AuditIssueSerializer, AuditPageSerializer, AuditRunSerializer
 from .tasks import run_audit
@@ -11,7 +12,7 @@ from .tasks import run_audit
 
 class AuditRunViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = AuditRun.objects.select_related("site").annotate().all().order_by("-created_at")
+    queryset = AuditRun.objects.select_related("site").all().order_by("-created_at")
     serializer_class = AuditRunSerializer
     filterset_fields = ["site", "status"]
     ordering_fields = ["created_at", "started_at", "finished_at", "health_score", "pages_crawled"]
@@ -41,6 +42,23 @@ class AuditRunViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def rerun(self, request, pk=None):
         return self._queue(self.get_object())
+
+    @action(detail=True, methods=["get"])
+    def compare(self, request, pk=None):
+        current = self.get_object()
+        if current.status != AuditRun.Status.DONE:
+            return Response({"detail": "Only completed audit runs can be compared."}, status=drf_status.HTTP_409_CONFLICT)
+
+        visible_runs = self.get_queryset().filter(site=current.site, status=AuditRun.Status.DONE)
+        baseline_id = request.query_params.get("baseline")
+        if baseline_id:
+            baseline = visible_runs.filter(pk=baseline_id).exclude(pk=current.pk).first()
+            if baseline is None:
+                return Response({"detail": "Baseline audit run was not found for this site."}, status=drf_status.HTTP_404_NOT_FOUND)
+        else:
+            baseline = visible_runs.filter(created_at__lt=current.created_at).exclude(pk=current.pk).order_by("-created_at").first()
+
+        return Response(compare_audit_runs(current, baseline))
 
 
 class AuditPageViewSet(TenantScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
