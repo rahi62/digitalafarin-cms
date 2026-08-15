@@ -4,8 +4,10 @@ import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import BlockEditor, { ContentBlock } from "@/components/BlockEditor";
 import CustomFieldsEditor, { ContentTypeSchema } from "@/components/CustomFieldsEditor";
+import EditorialWorkflowPanel from "@/components/EditorialWorkflowPanel";
 import InternalLinksPanel from "@/components/InternalLinksPanel";
 import PageHeader from "@/components/PageHeader";
+import ParentEntryField from "@/components/ParentEntryField";
 import RevisionPanel from "@/components/RevisionPanel";
 import SchemaBuilder from "@/components/SchemaBuilder";
 import SeoPanel from "@/components/SeoPanel";
@@ -21,17 +23,21 @@ export default function EditContent() {
   const [msg, setMsg] = useState("");
   const [previewing, setPreviewing] = useState(false);
 
+  function normalizeEntry(entry: any) {
+    return {
+      ...entry,
+      categories: entry.categories || [],
+      tags: entry.tags || [],
+      custom_fields: entry.custom_fields || {},
+      blocks: (entry.blocks || []) as ContentBlock[],
+    };
+  }
+
   useEffect(() => {
     let cancelled = false;
     apiFetch<any>(`/content/entries/${id}/`).then(async (d) => {
       if (cancelled) return;
-      setF({
-        ...d,
-        categories: d.categories || [],
-        tags: d.tags || [],
-        custom_fields: d.custom_fields || {},
-        blocks: (d.blocks || []) as ContentBlock[],
-      });
+      setF(normalizeEntry(d));
       try {
         const type = await apiFetch<ContentType>(`/content/types/${d.content_type}/`);
         if (!cancelled) setContentType(type);
@@ -43,16 +49,6 @@ export default function EditContent() {
     });
     return () => { cancelled = true; };
   }, [id]);
-
-  function normalizeEntry(entry: any) {
-    return {
-      ...entry,
-      categories: entry.categories || [],
-      tags: entry.tags || [],
-      custom_fields: entry.custom_fields || {},
-      blocks: (entry.blocks || []) as ContentBlock[],
-    };
-  }
 
   function payload() {
     const body = { ...f };
@@ -81,17 +77,6 @@ export default function EditContent() {
     }
   }
 
-  async function publish() {
-    try {
-      await saveEntry(false);
-      const published = await apiFetch<any>(`/content/entries/${id}/publish/`, { method: "POST", body: "{}" });
-      setF(normalizeEntry(published));
-      setMsg("منتشر شد");
-    } catch (err: any) {
-      setMsg(err.message);
-    }
-  }
-
   async function preview() {
     setPreviewing(true);
     setMsg("");
@@ -114,74 +99,32 @@ export default function EditContent() {
       <PageHeader
         title={`ویرایش: ${f.title}`}
         description={`${f.path}${contentType ? ` · ${contentType.name}` : ""}`}
-        action={
-          <div className="editorHeaderActions">
-            <button type="button" className="btn secondary" onClick={preview} disabled={previewing}>{previewing ? "در حال ساخت..." : "پیش‌نمایش"}</button>
-            <button type="button" className="btn secondary" onClick={publish}>انتشار</button>
-          </div>
-        }
+        action={<button type="button" className="btn secondary" onClick={preview} disabled={previewing}>{previewing ? "در حال ساخت..." : "پیش‌نمایش"}</button>}
       />
       <form className="form" onSubmit={submit}>
         {msg && <div className={msg.includes("شد") || msg.includes("ساخته") ? "notice" : "error"}>{msg}</div>}
         <div className="formGrid">
-          <div className="field">
-            <label>عنوان</label>
-            <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
-          </div>
-          <div className="field">
-            <label>Slug</label>
-            <input value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value })} />
-          </div>
-          <div className="field full">
-            <label>Path</label>
-            <input dir="ltr" value={f.path} onChange={(e) => setF({ ...f, path: e.target.value })} />
-          </div>
-          <div className="field full">
-            <label>خلاصه</label>
-            <textarea style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right" }} value={f.excerpt} onChange={(e) => setF({ ...f, excerpt: e.target.value })} />
-          </div>
-          <div className="field">
-            <label>وضعیت</label>
-            <select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
-              <option value="draft">Draft</option>
-              <option value="review">Review</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="published">Published</option>
-              <option value="archived">Archived</option>
-            </select>
-          </div>
+          <div className="field"><label>عنوان</label><input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
+          <div className="field"><label>Slug</label><input value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value })} /></div>
+          <div className="field full"><label>Path</label><input dir="ltr" value={f.path} onChange={(e) => setF({ ...f, path: e.target.value })} /></div>
+          <div className="field full"><label>خلاصه</label><textarea style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right" }} value={f.excerpt} onChange={(e) => setF({ ...f, excerpt: e.target.value })} /></div>
+          <div className="field"><label>وضعیت Workflow</label><input value={f.status} readOnly className="readonlyField" /></div>
+          <ParentEntryField siteId={f.site} entryId={id} value={f.parent || null} onChange={(parent) => setF({ ...f, parent })} />
+          <label className="featuredField"><input type="checkbox" checked={Boolean(f.is_featured)} onChange={(e) => setF({ ...f, is_featured: e.target.checked })} /><span><strong>محتوای ویژه</strong><small>برای Featured sections و اولویت نمایش.</small></span></label>
 
-          <TaxonomyFields
-            siteId={f.site}
-            categories={f.categories || []}
-            tags={f.tags || []}
-            onCategoriesChange={(categories) => setF({ ...f, categories })}
-            onTagsChange={(tags) => setF({ ...f, tags })}
-          />
+          <TaxonomyFields siteId={f.site} categories={f.categories || []} tags={f.tags || []} onCategoriesChange={(categories) => setF({ ...f, categories })} onTagsChange={(tags) => setF({ ...f, tags })} />
+          <CustomFieldsEditor schema={contentType?.schema} value={f.custom_fields || {}} siteId={f.site} onChange={(custom_fields) => setF({ ...f, custom_fields })} />
 
-          <CustomFieldsEditor
-            schema={contentType?.schema}
-            value={f.custom_fields || {}}
-            siteId={f.site}
-            onChange={(custom_fields) => setF({ ...f, custom_fields })}
-          />
-
-          <div className="field full">
-            <label>محتوا</label>
-            <BlockEditor siteId={f.site} value={f.blocks || []} onChange={(blocks) => setF({ ...f, blocks })} />
-          </div>
+          <div className="field full"><label>محتوا</label><BlockEditor siteId={f.site} value={f.blocks || []} onChange={(blocks) => setF({ ...f, blocks })} /></div>
         </div>
         <div className="actions"><button className="btn">ذخیره تغییرات</button></div>
       </form>
 
+      <EditorialWorkflowPanel entryId={id} onUpdated={(entry) => setF(normalizeEntry(entry))} />
       <SeoPanel entryId={id} pageTitle={f.title} pagePath={f.path} />
       <SchemaBuilder entryId={id} pageTitle={f.title} pagePath={f.path} blocks={f.blocks || []} />
       <InternalLinksPanel entryId={id} />
-      <RevisionPanel
-        entryId={id}
-        current={f}
-        onRestored={(entry) => setF(normalizeEntry(entry))}
-      />
+      <RevisionPanel entryId={id} current={f} onRestored={(entry) => setF(normalizeEntry(entry))} />
     </>
   );
 }
