@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import BlockEditor, { ContentBlock } from "@/components/BlockEditor";
+import CustomFieldsEditor, { ContentTypeSchema } from "@/components/CustomFieldsEditor";
 import InternalLinksPanel from "@/components/InternalLinksPanel";
 import PageHeader from "@/components/PageHeader";
 import RevisionPanel from "@/components/RevisionPanel";
@@ -10,14 +11,30 @@ import SchemaBuilder from "@/components/SchemaBuilder";
 import SeoPanel from "@/components/SeoPanel";
 import { apiFetch } from "@/lib/api";
 
+type ContentType = { id: string; name: string; slug: string; schema: ContentTypeSchema };
+
 export default function EditContent() {
   const { id } = useParams<{ id: string }>();
   const [f, setF] = useState<any>(null);
+  const [contentType, setContentType] = useState<ContentType | null>(null);
   const [msg, setMsg] = useState("");
   const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
-    apiFetch<any>(`/content/entries/${id}/`).then((d) => setF({ ...d, blocks: (d.blocks || []) as ContentBlock[] }));
+    let cancelled = false;
+    apiFetch<any>(`/content/entries/${id}/`).then(async (d) => {
+      if (cancelled) return;
+      setF({ ...d, custom_fields: d.custom_fields || {}, blocks: (d.blocks || []) as ContentBlock[] });
+      try {
+        const type = await apiFetch<ContentType>(`/content/types/${d.content_type}/`);
+        if (!cancelled) setContentType(type);
+      } catch (error) {
+        if (!cancelled) setMsg(error instanceof Error ? error.message : "خطا در بارگذاری Content Type");
+      }
+    }).catch((error) => {
+      if (!cancelled) setMsg(error instanceof Error ? error.message : "خطا در بارگذاری محتوا");
+    });
+    return () => { cancelled = true; };
   }, [id]);
 
   function payload() {
@@ -33,7 +50,7 @@ export default function EditContent() {
 
   async function saveEntry(showMessage = true) {
     const saved = await apiFetch<any>(`/content/entries/${id}/`, { method: "PUT", body: JSON.stringify(payload()) });
-    setF({ ...saved, blocks: (saved.blocks || []) as ContentBlock[] });
+    setF({ ...saved, custom_fields: saved.custom_fields || {}, blocks: (saved.blocks || []) as ContentBlock[] });
     if (showMessage) setMsg("ذخیره شد");
     return saved;
   }
@@ -51,7 +68,7 @@ export default function EditContent() {
     try {
       await saveEntry(false);
       const published = await apiFetch<any>(`/content/entries/${id}/publish/`, { method: "POST", body: "{}" });
-      setF({ ...published, blocks: (published.blocks || []) as ContentBlock[] });
+      setF({ ...published, custom_fields: published.custom_fields || {}, blocks: (published.blocks || []) as ContentBlock[] });
       setMsg("منتشر شد");
     } catch (err: any) {
       setMsg(err.message);
@@ -73,13 +90,13 @@ export default function EditContent() {
     }
   }
 
-  if (!f) return <div>در حال بارگذاری...</div>;
+  if (!f) return <div>{msg || "در حال بارگذاری..."}</div>;
 
   return (
     <>
       <PageHeader
         title={`ویرایش: ${f.title}`}
-        description={f.path}
+        description={`${f.path}${contentType ? ` · ${contentType.name}` : ""}`}
         action={
           <div className="editorHeaderActions">
             <button type="button" className="btn secondary" onClick={preview} disabled={previewing}>{previewing ? "در حال ساخت..." : "پیش‌نمایش"}</button>
@@ -116,9 +133,17 @@ export default function EditContent() {
               <option value="archived">Archived</option>
             </select>
           </div>
+
+          <CustomFieldsEditor
+            schema={contentType?.schema}
+            value={f.custom_fields || {}}
+            siteId={f.site}
+            onChange={(custom_fields) => setF({ ...f, custom_fields })}
+          />
+
           <div className="field full">
             <label>محتوا</label>
-            <BlockEditor value={f.blocks || []} onChange={(blocks) => setF({ ...f, blocks })} />
+            <BlockEditor siteId={f.site} value={f.blocks || []} onChange={(blocks) => setF({ ...f, blocks })} />
           </div>
         </div>
         <div className="actions"><button className="btn">ذخیره تغییرات</button></div>
@@ -130,7 +155,7 @@ export default function EditContent() {
       <RevisionPanel
         entryId={id}
         current={f}
-        onRestored={(entry) => setF({ ...entry, blocks: (entry.blocks || []) as ContentBlock[] })}
+        onRestored={(entry) => setF({ ...entry, custom_fields: entry.custom_fields || {}, blocks: (entry.blocks || []) as ContentBlock[] })}
       />
     </>
   );

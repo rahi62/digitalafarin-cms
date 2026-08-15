@@ -1,13 +1,17 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import BlockEditor, { ContentBlock } from "@/components/BlockEditor";
+import CustomFieldsEditor, { ContentTypeSchema, customFieldDefaults } from "@/components/CustomFieldsEditor";
 import PageHeader from "@/components/PageHeader";
 import { apiFetch, Paginated } from "@/lib/api";
 
+type Site = { id: string; name: string };
+type ContentType = { id: string; site: string; name: string; slug: string; schema: ContentTypeSchema };
+
 export default function NewContent() {
-  const [sites, setSites] = useState<any[]>([]);
-  const [types, setTypes] = useState<any[]>([]);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [types, setTypes] = useState<ContentType[]>([]);
   const [msg, setMsg] = useState("");
   const [f, setF] = useState<any>({
     site: "",
@@ -17,19 +21,37 @@ export default function NewContent() {
     path: "/",
     excerpt: "",
     status: "draft",
+    custom_fields: {},
     blocks: [{ id: "p-1", type: "paragraph", data: { text: "" } }] as ContentBlock[],
   });
 
   useEffect(() => {
-    apiFetch<Paginated<any>>("/sites/").then((d) => {
+    apiFetch<Paginated<Site>>("/sites/").then((d) => {
       setSites(d.results);
       if (d.results[0]) setF((x: any) => ({ ...x, site: d.results[0].id }));
     });
-    apiFetch<Paginated<any>>("/content/types/").then((d) => {
-      setTypes(d.results);
-      if (d.results[0]) setF((x: any) => ({ ...x, content_type: d.results[0].id }));
-    });
+    apiFetch<Paginated<ContentType>>("/content/types/").then((d) => setTypes(d.results));
   }, []);
+
+  const siteTypes = useMemo(() => types.filter((type) => type.site === f.site), [types, f.site]);
+  const selectedType = useMemo(() => types.find((type) => type.id === f.content_type) || null, [types, f.content_type]);
+
+  useEffect(() => {
+    if (!f.site || siteTypes.length === 0) return;
+    if (!siteTypes.some((type) => type.id === f.content_type)) {
+      const type = siteTypes[0];
+      setF((current: any) => ({
+        ...current,
+        content_type: type.id,
+        custom_fields: customFieldDefaults(type.schema),
+      }));
+    }
+  }, [f.site, siteTypes, f.content_type]);
+
+  function selectType(typeId: string) {
+    const type = types.find((item) => item.id === typeId);
+    setF({ ...f, content_type: typeId, custom_fields: customFieldDefaults(type?.schema) });
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -47,21 +69,22 @@ export default function NewContent() {
 
   return (
     <>
-      <PageHeader title="محتوای جدید" description="ساخت Entry با Visual Block Editor" />
+      <PageHeader title="محتوای جدید" description="ساخت Entry با Visual Block Editor و Custom Fields" />
       <form className="form" onSubmit={submit}>
         {msg && <div className="error">{msg}</div>}
         <div className="formGrid">
           <div className="field">
             <label>سایت</label>
-            <select value={f.site} onChange={(e) => setF({ ...f, site: e.target.value })}>
+            <select value={f.site} onChange={(e) => setF({ ...f, site: e.target.value, content_type: "", custom_fields: {} })}>
               {sites.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
             </select>
           </div>
           <div className="field">
             <label>نوع محتوا</label>
-            <select value={f.content_type} onChange={(e) => setF({ ...f, content_type: e.target.value })}>
-              {types.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            <select value={f.content_type} onChange={(e) => selectType(e.target.value)}>
+              {siteTypes.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
             </select>
+            {siteTypes.length === 0 && <small>برای این سایت ابتدا یک Content Type بسازید.</small>}
           </div>
           <div className="field">
             <label>عنوان</label>
@@ -87,12 +110,20 @@ export default function NewContent() {
               <option value="published">Published</option>
             </select>
           </div>
+
+          <CustomFieldsEditor
+            schema={selectedType?.schema}
+            value={f.custom_fields || {}}
+            siteId={f.site}
+            onChange={(custom_fields) => setF({ ...f, custom_fields })}
+          />
+
           <div className="field full">
             <label>محتوا</label>
-            <BlockEditor value={f.blocks} onChange={(blocks) => setF({ ...f, blocks })} />
+            <BlockEditor siteId={f.site} value={f.blocks} onChange={(blocks) => setF({ ...f, blocks })} />
           </div>
         </div>
-        <div className="actions"><button className="btn">ذخیره</button></div>
+        <div className="actions"><button className="btn" disabled={!f.content_type}>ذخیره</button></div>
       </form>
     </>
   );

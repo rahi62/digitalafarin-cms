@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import MediaPicker, { MediaAsset } from "@/components/MediaPicker";
 
 export type BlockType =
   | "paragraph"
@@ -22,6 +23,7 @@ export type ContentBlock = {
 type Props = {
   value: ContentBlock[];
   onChange: (blocks: ContentBlock[]) => void;
+  siteId?: string;
 };
 
 type BlockDefinition = {
@@ -34,7 +36,7 @@ type BlockDefinition = {
 const definitions: BlockDefinition[] = [
   { type: "paragraph", label: "پاراگراف", icon: "¶", initialData: { text: "" } },
   { type: "heading", label: "تیتر", icon: "H", initialData: { text: "", level: 2 } },
-  { type: "image", label: "تصویر", icon: "▧", initialData: { src: "", alt: "", caption: "" } },
+  { type: "image", label: "تصویر", icon: "▧", initialData: { src: "", alt: "", caption: "", media_id: "" } },
   { type: "quote", label: "نقل‌قول", icon: "❝", initialData: { text: "", cite: "" } },
   { type: "list", label: "فهرست", icon: "☷", initialData: { items: [""], ordered: false } },
   { type: "code", label: "کد", icon: "</>", initialData: { code: "", language: "text" } },
@@ -63,7 +65,7 @@ function bool(value: unknown) {
   return value === true;
 }
 
-export default function BlockEditor({ value, onChange }: Props) {
+export default function BlockEditor({ value, onChange, siteId }: Props) {
   const [showLibrary, setShowLibrary] = useState(value.length === 0);
   const [showJson, setShowJson] = useState(false);
   const [jsonDraft, setJsonDraft] = useState("");
@@ -179,7 +181,7 @@ export default function BlockEditor({ value, onChange }: Props) {
                 <button type="button" className="danger" title="حذف" onClick={() => removeBlock(index)}>×</button>
               </div>
             </div>
-            <BlockFields block={block} onChange={(data) => patchBlock(index, data)} />
+            <BlockFields block={block} siteId={siteId} onChange={(data) => patchBlock(index, data)} />
           </div>
         ))}
       </div>
@@ -211,7 +213,7 @@ export default function BlockEditor({ value, onChange }: Props) {
   );
 }
 
-function BlockFields({ block, onChange }: { block: ContentBlock; onChange: (data: Record<string, unknown>) => void }) {
+function BlockFields({ block, siteId, onChange }: { block: ContentBlock; siteId?: string; onChange: (data: Record<string, unknown>) => void }) {
   const data = block.data || {};
 
   if (block.type === "paragraph") {
@@ -230,14 +232,7 @@ function BlockFields({ block, onChange }: { block: ContentBlock; onChange: (data
   }
 
   if (block.type === "image") {
-    return (
-      <div className="blockFieldGrid">
-        <input dir="ltr" className="full" placeholder="https://... یا مسیر تصویر" value={text(data.src)} onChange={(e) => onChange({ src: e.target.value })} />
-        <input placeholder="Alt تصویر" value={text(data.alt)} onChange={(e) => onChange({ alt: e.target.value })} />
-        <input placeholder="Caption" value={text(data.caption)} onChange={(e) => onChange({ caption: e.target.value })} />
-        {text(data.src) && <div className="imageBlockPreview full"><img src={text(data.src)} alt={text(data.alt)} /></div>}
-      </div>
-    );
+    return <ImageBlockFields data={data} siteId={siteId} onChange={onChange} />;
   }
 
   if (block.type === "quote") {
@@ -329,6 +324,49 @@ function BlockFields({ block, onChange }: { block: ContentBlock; onChange: (data
   return (
     <div className="unknownBlock">
       بلوک سفارشی <code>{block.type}</code> از طریق حالت JSON قابل ویرایش است.
+    </div>
+  );
+}
+
+function ImageBlockFields({ data, siteId, onChange }: { data: Record<string, unknown>; siteId?: string; onChange: (data: Record<string, unknown>) => void }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  function selectAsset(asset: MediaAsset) {
+    onChange({
+      src: asset.url || "",
+      media_id: asset.id,
+      alt: asset.alt_text || text(data.alt),
+      caption: asset.caption || text(data.caption),
+      width: asset.width,
+      height: asset.height,
+    });
+  }
+
+  return (
+    <div className="blockFieldGrid imageBlockFields">
+      <div className="imageSourceRow full">
+        <input dir="ltr" placeholder="https://... یا مسیر تصویر" value={text(data.src)} onChange={(e) => onChange({ src: e.target.value, media_id: "" })} />
+        <button type="button" className="btn secondary small" onClick={() => setPickerOpen(true)}>انتخاب از رسانه</button>
+      </div>
+      <input placeholder="Alt تصویر" value={text(data.alt)} onChange={(e) => onChange({ alt: e.target.value })} />
+      <input placeholder="Caption" value={text(data.caption)} onChange={(e) => onChange({ caption: e.target.value })} />
+      {text(data.src) && (
+        <div className="imageBlockPreview full">
+          <img src={text(data.src)} alt={text(data.alt)} />
+          <div className="imageBlockMeta">
+            {data.media_id ? <span>متصل به Media Library</span> : <span>URL دستی</span>}
+            {data.width && data.height ? <small>{String(data.width)} × {String(data.height)}</small> : null}
+          </div>
+        </div>
+      )}
+      <MediaPicker
+        siteId={siteId}
+        open={pickerOpen}
+        imageOnly
+        selectedUrl={text(data.src)}
+        onClose={() => setPickerOpen(false)}
+        onSelect={selectAsset}
+      />
     </div>
   );
 }
