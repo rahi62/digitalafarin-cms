@@ -1,138 +1,175 @@
-# انتشار عمومی DigitalAfarin CMS
+# راهنمای انتشار DigitalAfarin CMS
 
-این فایل برای انتشار مخزن `rahi62/digitalafarin-cms` آماده شده است. اگر نام GitHub owner یا repository را تغییر دادی، قبل از انتشار فیلدهای `repository.url` در هر دو `package.json` را نیز دقیقاً با همان Repository هماهنگ کن.
-
-## 1. ساخت GitHub Repository
-
-Repository عمومی زیر را بساز:
+این سند وضعیت فعلی مخزن زیر را مبنا می‌گیرد:
 
 ```text
-rahi62/digitalafarin-cms
-```
-
-سپس سورس را push کن:
-
-```bash
-git init
-git add .
-git commit -m "chore: prepare public community release"
-git branch -M main
-git remote add origin https://github.com/rahi62/digitalafarin-cms.git
-git push -u origin main
-```
-
-## 2. npm
-
-در npm حساب/Organization با scope زیر داشته باش:
-
-```text
-@digitalafarin
-```
-
-2FA را فعال کن.
-
-قبل از اولین انتشار dependencyهای workspace را نصب و SDK را build کن، سپس محتویات packageها را بررسی کن:
-
-```bash
-npm install
-npm --workspace packages/cms-next run build
-
-npm --workspace packages/cms-next pack --dry-run
-npm --workspace packages/cms-cli pack --dry-run
-```
-
-برای Bootstrap اولیه، اگر Package Settings هنوز به دلیل منتشرنشدن package در npm وجود ندارد، اولین نسخه را با حساب دارای 2FA به‌صورت مستقیم منتشر کن:
-
-```bash
-npm --workspace packages/cms-next publish --access public
-npm --workspace packages/cms-cli publish --access public
-```
-
-پس از ایجاد packageها، در npm برای **هر دو package** به Settings > Trusted Publisher برو و GitHub Actions را تنظیم کن:
-
-```text
-Organization/User: digitalafarin
+GitHub owner: rahi62
 Repository: digitalafarin-cms
-Workflow filename: release.yml
-Environment: npm
-Allowed action: npm publish
 ```
 
-سپس در Publishing access، بعد از اینکه OIDC را با یک release تست کردی، token-based publishing را محدود/غیرفعال کن.
+نسخه‌های Python و npm باید همیشه با هم منتشر شوند.
 
-## 3. PyPI
-
-در PyPI حساب و 2FA را فعال کن.
-
-PyPI می‌تواند اولین project را با Pending Trusted Publisher نیز ایجاد کند. در Account > Publishing یک Pending Publisher برای این مشخصات بساز:
+## 1. پکیج‌های عمومی
 
 ```text
-PyPI project: digitalafarin-cms
-GitHub owner: digitalafarin
-Repository: digitalafarin-cms
-Workflow: release.yml
-Environment: pypi
+PyPI: digitalafarin-cms
+npm:  @digitalafarin/cms-next
+npm:  @digitalafarin/cms-cli
 ```
 
-بنابراین برای PyPI لازم نیست الزاماً اولین نسخه را دستی با API token آپلود کنی.
+نسخه عمومی قبلی `0.2.1` است و نسخه بعدی برنامه‌ریزی‌شده `0.3.0` است.
 
-> نکته: Pending Trusted Publisher نام پروژه PyPI را رزرو نمی‌کند؛ تا زمان اولین publish شخص دیگری می‌تواند آن نام را ثبت کند.
+## 2. npm Trusted Publishing
 
-## 4. GitHub Environments
+Trusted Publishing برای هر دو npm package باید به GitHub Actions متصل باشد.
 
-در Repository > Settings > Environments دو environment بساز:
+برای بررسی وضعیت فعلی:
+
+```bash
+npm trust list "@digitalafarin/cms-next"
+npm trust list "@digitalafarin/cms-cli"
+```
+
+خروجی مورد انتظار:
 
 ```text
-pypi
+type: github
+file: release.yml
+repository: rahi62/digitalafarin-cms
+environment: npm
+permissions: publish
+```
+
+در GitHub Repository نیز Environment زیر باید وجود داشته باشد:
+
+```text
 npm
 ```
 
-برای امنیت بیشتر می‌توانی approval protection روی این environmentها قرار بدهی.
+انتشار CI از `.github/workflows/release.yml` انجام می‌شود و برای publish عادی نباید token دائمی npm لازم باشد.
 
-## 5. اولین Release هماهنگ
+## 3. PyPI Trusted Publisher
 
-نسخه‌ها باید در این فایل‌ها یکسان باشند:
+Project:
+
+```text
+digitalafarin-cms
+```
+
+Trusted Publisher باید به مشخصات زیر متصل باشد:
+
+```text
+GitHub owner: rahi62
+Repository: digitalafarin-cms
+Workflow filename: release.yml
+Environment: pypi
+```
+
+در GitHub نیز Environment زیر باید وجود داشته باشد:
+
+```text
+pypi
+```
+
+Release workflow با OIDC wheel/sdist را به PyPI منتشر می‌کند.
+
+## 4. همگام‌سازی نسخه
+
+نسخه در این منابع باید یکسان باشد:
 
 - `package.json`
+- `package-lock.json`
 - `packages/cms-next/package.json`
 - `packages/cms-cli/package.json`
 - `packages/cms-django/pyproject.toml`
 - `packages/cms-django/src/digitalafarin_cms/__init__.py`
 
-ابزار repository این کار را خودکار می‌کند:
+برای تغییر نسخه:
 
 ```bash
-npm run version:set -- 0.2.0
+npm run version:set -- 0.3.0
 npm run check:versions
 ```
 
-بعد:
+`version:set` از v0.3 به بعد metadata نسخه داخل `package-lock.json` را هم sync می‌کند.
 
-```bash
-git add .
-git commit -m "release: v0.2.0"
-git tag v0.2.0
-git push origin main --tags
+## 5. تست قبل از Tag
+
+قبل از انتشار، Checklist اصلی را اجرا کن:
+
+```text
+docs/RELEASE_CHECKLIST.md
 ```
 
-Tag باعث اجرای `.github/workflows/release.yml` می‌شود.
+CI علاوه بر تست‌های source این موارد را نیز بررسی می‌کند:
 
-## 6. پس از انتشار بررسی کن
+- Python 3.11 / 3.12 / 3.13
+- Django migration drift
+- build و `twine check`
+- نصب wheel در venv تمیز
+- اجرای migrations از wheel نصب‌شده
+- `npm pack` واقعی SDK و CLI
+- نصب tarballها در پروژه consumer تمیز
+- import exportهای SDK
+- اجرای binary نصب‌شده CLI
+
+## 6. ایجاد Release
+
+بعد از merge شدن Release Prep در `main` و سبز بودن CI:
 
 ```bash
-python -m venv /tmp/dacms-test
+git checkout main
+git pull --ff-only
+npm run check:versions
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+Tag `v*` workflow زیر را اجرا می‌کند:
+
+```text
+.github/workflows/release.yml
+```
+
+Workflow:
+
+1. نسخه Tag را با package version تطبیق می‌دهد.
+2. Python distribution را build و smoke-test می‌کند.
+3. اگر نسخه روی PyPI موجود نباشد، با OIDC منتشر می‌کند.
+4. npm SDK/CLI را pack و smoke-test می‌کند.
+5. اگر نسخه روی npm موجود نباشد، با Trusted Publishing منتشر می‌کند.
+6. در پایان GitHub Release می‌سازد.
+
+## 7. بررسی پس از انتشار
+
+Python:
+
+```bash
+python -m venv .venv-release-test
 # activate environment
-pip install "digitalafarin-cms[all]"
+pip install "digitalafarin-cms[all]==0.3.0"
 python -c "import digitalafarin_cms; print(digitalafarin_cms.__version__)"
 ```
 
-و در یک Next.js پروژه آزمایشی:
+npm:
 
 ```bash
-npm install @digitalafarin/cms-next
-npx @digitalafarin/cms-cli doctor
+npm view "@digitalafarin/cms-next@0.3.0" version
+npm view "@digitalafarin/cms-cli@0.3.0" version
+npx "@digitalafarin/cms-cli@0.3.0" doctor
 ```
 
-## 7. مدل درآمدی
+همچنین `latest` را بررسی کن:
 
-Repository عمومی فقط Community Edition است. کدهای Cloud، Billing، AI SEO، crawler پیشرفته، Agency/White-label و Enterprise را در repository/packageهای خصوصی جدا نگه دار.
+```bash
+npm dist-tag ls "@digitalafarin/cms-next"
+npm dist-tag ls "@digitalafarin/cms-cli"
+```
+
+## 8. نکته مهم درباره Search Console
+
+v0.3 مدل داده و Import/Content Decay برای داده‌های Search Console را دارد، اما Google OAuth credential و sync خودکار GSC هنوز جزو Community Edition v0.3 نیست. در مستندات انتشار نباید این قابلیت به‌عنوان اتصال خودکار Google معرفی شود.
+
+## 9. مدل انتشار Community / Commercial
+
+Community Edition تحت Apache-2.0 قابل استفاده است. قابلیت‌هایی مانند Managed Cloud، Billing، AI SEO پیشرفته، Agency/White-label، Google OAuth مدیریت‌شده و Enterprise Support می‌توانند در سرویس‌ها یا packageهای تجاری جدا توسعه پیدا کنند.

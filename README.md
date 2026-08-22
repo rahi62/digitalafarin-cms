@@ -2,17 +2,17 @@
 
 **SEO-first headless CMS for Django + Next.js.**
 
-DigitalAfarin CMS provides a reusable Django/DRF content and SEO backend, a Next.js SDK, and a CLI that wires both sides into an existing application.
+DigitalAfarin CMS combines a reusable Django/DRF content backend, a Next.js SDK, an admin application and an installer CLI. It is designed for teams that want WordPress-like content management and SEO workflows without coupling rendering to WordPress.
 
-> Status: **0.2.0 alpha / Community Edition**. The public API may still change before 1.0.
+> Status: **0.3.0 pre-release / Community Edition**. The public API can still change before 1.0.
 
 ## Packages
 
 | Package | Registry | Purpose |
 |---|---|---|
-| `digitalafarin-cms` | PyPI | Django/DRF CMS + SEO backend |
-| `@digitalafarin/cms-next` | npm | Next.js client, metadata and schema helpers |
-| `@digitalafarin/cms-cli` | npm | Installer/wiring CLI for existing projects |
+| `digitalafarin-cms` | PyPI | Django/DRF CMS, SEO, audit and integrations backend |
+| `@digitalafarin/cms-next` | npm | Next.js resolver, metadata and JSON-LD helpers |
+| `@digitalafarin/cms-cli` | npm | Installer/wiring CLI for existing Django + Next.js projects |
 
 ## Installation
 
@@ -82,32 +82,71 @@ Resolve a page:
 const page = await cms.resolve("/services/seo/");
 ```
 
-The resolver returns content, blocks, SEO metadata, schemas, breadcrumbs and related entries in a single payload.
+The resolver returns the page payload together with SEO metadata and sanitized site-level SEO context. The SDK also exposes helpers for Next.js metadata and JSON-LD rendering.
 
-## Community Edition features
+## v0.3 capabilities
 
-- Organizations and multi-site data model
-- Dynamic content types
-- Structured JSON block content
+### Content management
+
+- Organizations and multi-site tenancy
+- Dynamic content types and custom fields
+- Structured block editor data
 - Pages, posts and custom entries
-- Categories, tags, menus and reusable blocks
-- Revision history
-- Media library model
-- SEO title, description, canonical, robots and Open Graph metadata
-- JSON-LD schema storage
-- Keywords and keyword clusters
-- Redirect manager
-- Sitemap and `robots.txt` endpoints
+- Parent/child content hierarchy
+- Categories, tags and taxonomy assignment
+- Menu builder with nested menu items
+- Reusable blocks
+- Media library
+- Revision snapshots and restore support
+- Role-aware editorial workflow
+- Review, publish, schedule and archive states
 - Scheduled publishing foundation with Celery
-- SEO audit run/issue foundation
-- Webhooks/revalidation foundation
+
+### SEO management
+
+- SEO title, meta description, canonical and robots controls
+- Open Graph and Twitter metadata
+- Site-level SEO defaults and title templates
+- Global Organization/LocalBusiness-style JSON-LD defaults
+- Per-entry Schema markup
+- Keyword clusters and keyword mapping
+- Redirect manager
+- Internal-link suggestions
+- Sitemap and `robots.txt` endpoints
+- Secure preview support
+
+### SEO Audit & intelligence
+
+- Same-origin, SSRF-aware SEO crawler
+- Page-level crawl metrics
+- Technical/content issue engine
+- Site health score
+- Audit history and crawl comparison
+- New / fixed / persistent issue tracking
+- Search Performance daily data foundation
+- Manual / connector-friendly Search Console data import
+- Content Decay analysis across equal comparison windows
+- Ranking-loss, CTR-loss, demand-decline and refresh signals
+- Unified SEO Opportunity Engine
+- Prioritized SEO Action Queue combining Audit, Search Performance, SeoMeta and internal-link signals
+
+> v0.3 stores and analyzes Search Console-compatible performance data, but Google OAuth credential storage and automatic Google Search Console synchronization are intentionally not part of this release.
+
+### Developer experience
+
 - JWT API authentication
-- Next.js SDK
+- Next.js SDK with metadata and schema helpers
 - Django + Next.js installer CLI
+- Tenant isolation and role-aware write protection
+- npm Trusted Publishing and PyPI OIDC release workflow
+- Python 3.11 / 3.12 / 3.13 CI
+- Migration-drift checks
+- Installed-wheel smoke tests
+- Real npm tarball consumer tests for SDK and CLI
 
-## Commercial direction
+## Community Edition and commercial direction
 
-The Apache-2.0 Community Edition remains usable on its own. Commercial products can be built separately around managed hosting, advanced crawler/audit capabilities, Search Console intelligence, AI SEO, agency controls, white-label features and enterprise support. See [`docs/COMMERCIAL.md`](docs/COMMERCIAL.md).
+The Apache-2.0 Community Edition is usable on its own. Managed Cloud, billing, advanced AI-assisted SEO, agency/white-label controls, managed Google integrations and enterprise services can be developed separately. See [`docs/COMMERCIAL.md`](docs/COMMERCIAL.md).
 
 ## Repository layout
 
@@ -119,7 +158,7 @@ packages/cms-next/       Publishable npm SDK
 packages/cms-cli/        Publishable npm CLI
 examples/next-site/      Example Next.js consumer
 .github/workflows/       CI and trusted-publishing release workflows
-docs/                    Release and product documentation
+docs/                    Architecture, upgrade and release documentation
 ```
 
 ## Development
@@ -142,20 +181,16 @@ npm run typecheck
 
 ## Release model
 
-Versions are synchronized across Python and npm packages.
+Versions are synchronized across Python, npm packages and lockfile metadata.
 
 ```bash
-npm run version:set -- 0.2.1
+npm run version:set -- 0.3.0
 npm run check:versions
-git add .
-git commit -m "release: v0.2.1"
-git tag v0.2.1
-git push origin main --tags
 ```
 
-A `v*` tag triggers `.github/workflows/release.yml`. PyPI and npm publishing are designed for OIDC Trusted Publishing and do not require long-lived write tokens after registry setup.
+Before a release, follow [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md). A `v*` tag triggers `.github/workflows/release.yml`, which validates and publishes through npm Trusted Publishing and PyPI OIDC.
 
-See [`docs/PUBLISHING.fa.md`](docs/PUBLISHING.fa.md) for the exact first-publication checklist.
+Upgrade notes are maintained in [`docs/UPGRADING.md`](docs/UPGRADING.md) and release history in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Security
 

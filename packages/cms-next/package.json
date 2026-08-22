@@ -1,6 +1,6 @@
 {
   "name": "@digitalafarin/cms-next",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Next.js SDK for DigitalAfarin Headless CMS + SEO",
   "type": "module",
   "main": "./dist/index.js",
@@ -35,7 +35,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/rahi62/digitalafarin-cms.git",
+    "url": "git+https://github.com/rahi62/digitalafarin-cms.git",
     "directory": "packages/cms-next"
   },
   "homepage": "https://github.com/rahi62/digitalafarin-cms",
