@@ -13,12 +13,15 @@ class WebhookEndpointSerializer(serializers.ModelSerializer):
 
 class SearchPerformanceDailySerializer(serializers.ModelSerializer):
     site_name = serializers.CharField(source="site.name", read_only=True)
-    entry_title = serializers.CharField(source="entry.title", read_only=True)
+    entry_title = serializers.SerializerMethodField()
 
     class Meta:
         model = SearchPerformanceDaily
         fields = "__all__"
         read_only_fields = ["entry"]
+
+    def get_entry_title(self, obj):
+        return obj.entry.title if obj.entry_id and obj.entry else None
 
 
 class SearchImportRunSerializer(serializers.ModelSerializer):
