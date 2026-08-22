@@ -7,6 +7,8 @@ import "../styles/taxonomy-menu.css";
 import "../styles/editorial-workflow.css";
 import "../styles/audit-v2.css";
 import "../styles/audit-trends.css";
+import "../styles/site-settings.css";
+import "../styles/search-performance.css";
 import Shell from "@/components/Shell";
 
 export const metadata: Metadata = {
