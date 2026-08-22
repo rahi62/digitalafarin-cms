@@ -18,10 +18,19 @@ const initMatch = init.match(/^__version__\s*=\s*"([^"]+)"/m);
 if (!initMatch) throw new Error("Could not find digitalafarin_cms.__version__");
 versions.set("digitalafarin_cms.__version__", initMatch[1]);
 
+if (fs.existsSync("package-lock.json")) {
+  const lock = readJson("package-lock.json");
+  versions.set("package-lock.json", lock.version);
+  versions.set("package-lock.json#packages[root]", lock.packages?.[""]?.version);
+  for (const workspace of ["packages/cms-next", "packages/cms-cli"]) {
+    versions.set(`package-lock.json#${workspace}`, lock.packages?.[workspace]?.version);
+  }
+}
+
 const bad = [...versions].filter(([, v]) => v !== rootVersion);
 if (bad.length) {
   console.error(`Version mismatch. Expected ${rootVersion}:`);
-  for (const [file, version] of bad) console.error(`- ${file}: ${version}`);
+  for (const [file, version] of bad) console.error(`- ${file}: ${version ?? "missing"}`);
   process.exit(1);
 }
-console.log(`All publishable packages are synchronized at ${rootVersion}.`);
+console.log(`All publishable packages and lockfile metadata are synchronized at ${rootVersion}.`);
