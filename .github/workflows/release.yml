@@ -21,6 +21,9 @@ jobs:
           package-manager-cache: false
       - run: npm install --ignore-scripts
       - run: npm run check:versions
+      - run: npm --workspace packages/cms-next run build
+      - name: Smoke test npm release tarballs
+        run: node scripts/smoke-npm-packages.mjs
       - id: version
         name: Verify tag matches package version
         shell: bash
@@ -48,6 +51,12 @@ jobs:
           python -m pip install build twine
           python -m build packages/cms-django --outdir dist/python
           python -m twine check dist/python/*
+      - name: Smoke test installed Python wheel
+        run: |
+          python -m venv .smoke-python
+          .smoke-python/bin/python -m pip install --upgrade pip
+          .smoke-python/bin/python -m pip install dist/python/*.whl
+          .smoke-python/bin/python scripts/smoke-python-package.py
       - id: exists
         name: Check whether version already exists on PyPI
         env:
