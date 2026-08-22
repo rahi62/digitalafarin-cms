@@ -29,12 +29,27 @@ jobs:
           DJANGO_SETTINGS_MODULE: tests.settings
           PYTHONPATH: packages/cms-django
         run: python -m pytest packages/cms-django/tests -q
+      - name: Check Django configuration and migration drift
+        if: matrix.python-version == '3.13'
+        env:
+          DJANGO_SETTINGS_MODULE: tests.settings
+          PYTHONPATH: packages/cms-django
+        run: |
+          python -m django check
+          python -m django makemigrations --check --dry-run
       - name: Build Python distributions
         if: matrix.python-version == '3.13'
         run: python -m build packages/cms-django --outdir dist/python
       - name: Validate Python distributions
         if: matrix.python-version == '3.13'
         run: python -m twine check dist/python/*
+      - name: Smoke test installed Python wheel
+        if: matrix.python-version == '3.13'
+        run: |
+          python -m venv .smoke-python
+          .smoke-python/bin/python -m pip install --upgrade pip
+          .smoke-python/bin/python -m pip install dist/python/*.whl
+          .smoke-python/bin/python scripts/smoke-python-package.py
 
   node:
     runs-on: ubuntu-latest
@@ -49,6 +64,8 @@ jobs:
       - run: npm --workspace packages/cms-next run build
       - run: npm --workspace packages/cms-next run typecheck
       - run: npm --workspace apps/admin run typecheck
+      - name: Smoke test installed npm tarballs
+        run: node scripts/smoke-npm-packages.mjs
       - name: Inspect npm package contents
         run: |
           npm --workspace packages/cms-next run pack:check
