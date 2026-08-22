@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -128,8 +128,8 @@ class SearchPerformanceDecayTests(TestCase):
         )
         ContentEntry.objects.filter(pk=self.entry.pk).update(updated_at=timezone.now() - timedelta(days=240))
 
-        baseline_date = timezone.datetime(2026, 6, 1).date()
-        current_date = timezone.datetime(2026, 7, 1).date()
+        baseline_date = date(2026, 6, 1)
+        current_date = date(2026, 7, 1)
         rows = [
             (self.entry, baseline_date, 100, 1000, 4.0),
             (self.entry, current_date, 50, 950, 7.0),
