@@ -10,6 +10,7 @@ const links=[
   ["/menus","منوها","☰"],
   ["/media","رسانه","▧"],
   ["/seo","سئو صفحات","◎"],
+  ["/opportunities","SEO Opportunities","★"],
   ["/keywords","کلمات کلیدی","⌕"],
   ["/redirects","ریدایرکت‌ها","↪"],
   ["/audit","SEO Audit","✓"],
