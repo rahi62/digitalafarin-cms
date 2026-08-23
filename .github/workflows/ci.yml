@@ -68,5 +68,6 @@ jobs:
         run: node scripts/smoke-npm-packages.mjs
       - name: Inspect npm package contents
         run: |
+          npm --workspace apps/admin run pack:check
           npm --workspace packages/cms-next run pack:check
           npm --workspace packages/cms-cli run pack:check
