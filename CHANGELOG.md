@@ -2,9 +2,41 @@
 
 All notable changes to DigitalAfarin CMS are documented here.
 
-The project uses synchronized versions for the Django package, Next.js SDK and CLI.
+The project uses synchronized versions for the Django package, Next.js SDK, Admin and CLI.
 
-## [0.3.0] - Unreleased
+## [0.4.0] - Unreleased
+
+### Added
+
+- New publishable `@digitalafarin/cms-admin` package.
+- Scaffoldable Next.js CMS Admin application designed for path deployment under `/cms`.
+- `digitalafarin-cms-admin scaffold` command with configurable admin directory, base path, Django API upstream and port.
+- `@digitalafarin/cms-cli admin` command for scaffolding only the visual Admin application.
+- `@digitalafarin/cms-cli init --with-admin` for wiring Django, the public Next.js SDK and the visual Admin in one workflow.
+- Generated Nginx `/cms` reverse-proxy configuration.
+- Same-origin `/cms/api-proxy/*` route in the Admin application; the browser no longer needs direct CORS access to a separate Django API subdomain.
+- Admin package tarball and CLI-to-Admin integration smoke tests in CI/release verification.
+
+### Changed
+
+- The Next.js Admin now supports a configurable `NEXT_PUBLIC_DIGITALAFARIN_CMS_ADMIN_BASE_PATH`, defaulting to `/cms`.
+- Admin authentication, login, logout and unauthorized redirects are base-path aware.
+- Hard-coded demonstration credentials were removed from the login form.
+- Version synchronization, lockfile validation, `pack:all` and npm release publishing now include `@digitalafarin/cms-admin`.
+- The intended editorial workflow is the visual Next.js Admin; Django Admin remains a technical/maintenance interface.
+
+### Deployment
+
+A typical production layout is now:
+
+```text
+https://example.com/       -> public Next.js website
+https://example.com/cms/   -> DigitalAfarin CMS Admin Next.js process
+/cms/api-proxy/*           -> same-origin Admin proxy
+Django CMS API             -> API subdomain or internal upstream
+```
+
+## [0.3.0] - 2026-08-23
 
 ### Added
 
@@ -36,7 +68,7 @@ The project uses synchronized versions for the Django package, Next.js SDK and C
 - Schema helpers can emit both page schemas and global Organization schema.
 - Content publishing is enforced through explicit workflow actions instead of unrestricted status mutation.
 - Private content types are excluded from public resolver/sitemap behavior.
-- Version tooling now synchronizes `package-lock.json` metadata with all publishable packages.
+- Version tooling synchronizes `package-lock.json` metadata with publishable packages.
 - Release workflow smoke-tests built artifacts before registry publication.
 
 ### Security

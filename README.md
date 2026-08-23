@@ -2,9 +2,9 @@
 
 **SEO-first headless CMS for Django + Next.js.**
 
-DigitalAfarin CMS combines a reusable Django/DRF content backend, a Next.js SDK, an admin application and an installer CLI. It is designed for teams that want WordPress-like content management and SEO workflows without coupling rendering to WordPress.
+DigitalAfarin CMS combines a reusable Django/DRF content backend, a Next.js SDK, a visual Next.js Admin application and an installer CLI. It is designed for teams that want WordPress-like content management and SEO workflows without coupling rendering to WordPress.
 
-> Status: **0.3.0 pre-release / Community Edition**. The public API can still change before 1.0.
+> Status: **0.4.0 pre-release / Community Edition**. The public API can still change before 1.0.
 
 ## Packages
 
@@ -12,7 +12,8 @@ DigitalAfarin CMS combines a reusable Django/DRF content backend, a Next.js SDK,
 |---|---|---|
 | `digitalafarin-cms` | PyPI | Django/DRF CMS, SEO, audit and integrations backend |
 | `@digitalafarin/cms-next` | npm | Next.js resolver, metadata and JSON-LD helpers |
-| `@digitalafarin/cms-cli` | npm | Installer/wiring CLI for existing Django + Next.js projects |
+| `@digitalafarin/cms-admin` | npm | Scaffoldable visual Next.js CMS Admin for `/cms` path deployments |
+| `@digitalafarin/cms-cli` | npm | Installer/wiring CLI for Django + Next.js + CMS Admin |
 
 ## Installation
 
@@ -22,17 +23,55 @@ Django:
 pip install "digitalafarin-cms[all]"
 ```
 
-Next.js:
+Public Next.js site:
 
 ```bash
 npm install @digitalafarin/cms-next
 ```
 
-Or wire an existing repository automatically:
+Wire an existing repository automatically:
 
 ```bash
 npx @digitalafarin/cms-cli init --backend backend --frontend frontend
 ```
+
+Wire the backend/frontend **and** scaffold the visual Admin under `/cms`:
+
+```bash
+npx @digitalafarin/cms-cli init \
+  --backend backend \
+  --frontend frontend \
+  --with-admin \
+  --admin-dir cms-admin \
+  --admin-base-path /cms \
+  --admin-api-url https://api.example.com/api/cms/v1 \
+  --admin-port 3001
+```
+
+Or scaffold only the Admin application:
+
+```bash
+npx @digitalafarin/cms-admin scaffold \
+  --dir cms-admin \
+  --base-path /cms \
+  --api-url https://api.example.com/api/cms/v1 \
+  --port 3001
+```
+
+The generated Admin uses a same-origin `/cms/api-proxy` route. Browser requests stay on the main website origin while the Admin server forwards requests to the Django API upstream. This avoids requiring direct browser CORS access when Django is hosted on an API subdomain.
+
+## Recommended production layout
+
+```text
+https://example.com/        Public Next.js website
+https://example.com/cms/    DigitalAfarin CMS Admin
+/cms/api-proxy/*            Same-origin Admin API proxy
+Django CMS API              api.example.com or an internal upstream
+```
+
+The Admin scaffold generates `deploy/nginx.cms.conf` for routing `/cms/` to its Node process.
+
+Django Admin is still useful for technical maintenance, but normal editorial/content management should happen in the visual Next.js CMS Admin.
 
 ## Django integration
 
@@ -59,7 +98,7 @@ Then run:
 python manage.py migrate
 ```
 
-## Next.js integration
+## Public Next.js integration
 
 Set:
 
@@ -84,19 +123,19 @@ const page = await cms.resolve("/services/seo/");
 
 The resolver returns the page payload together with SEO metadata and sanitized site-level SEO context. The SDK also exposes helpers for Next.js metadata and JSON-LD rendering.
 
-## v0.3 capabilities
+## CMS capabilities
 
 ### Content management
 
 - Organizations and multi-site tenancy
 - Dynamic content types and custom fields
-- Structured block editor data
+- Visual structured Block Editor
 - Pages, posts and custom entries
 - Parent/child content hierarchy
 - Categories, tags and taxonomy assignment
-- Menu builder with nested menu items
+- Menu Builder with nested menu items
 - Reusable blocks
-- Media library
+- Media Library
 - Revision snapshots and restore support
 - Role-aware editorial workflow
 - Review, publish, schedule and archive states
@@ -108,7 +147,7 @@ The resolver returns the page payload together with SEO metadata and sanitized s
 - Open Graph and Twitter metadata
 - Site-level SEO defaults and title templates
 - Global Organization/LocalBusiness-style JSON-LD defaults
-- Per-entry Schema markup
+- Per-entry Schema Builder
 - Keyword clusters and keyword mapping
 - Redirect manager
 - Internal-link suggestions
@@ -130,19 +169,22 @@ The resolver returns the page payload together with SEO metadata and sanitized s
 - Unified SEO Opportunity Engine
 - Prioritized SEO Action Queue combining Audit, Search Performance, SeoMeta and internal-link signals
 
-> v0.3 stores and analyzes Search Console-compatible performance data, but Google OAuth credential storage and automatic Google Search Console synchronization are intentionally not part of this release.
+> The Community Edition stores and analyzes Search Console-compatible performance data, but Google OAuth credential storage and automatic Google Search Console synchronization are not yet part of the core package.
 
 ### Developer experience
 
 - JWT API authentication
 - Next.js SDK with metadata and schema helpers
-- Django + Next.js installer CLI
+- Scaffoldable visual CMS Admin
+- Django + Next.js + Admin installer CLI
+- `/cms` path deployment with generated Nginx config
+- Same-origin Admin API proxy
 - Tenant isolation and role-aware write protection
 - npm Trusted Publishing and PyPI OIDC release workflow
 - Python 3.11 / 3.12 / 3.13 CI
 - Migration-drift checks
 - Installed-wheel smoke tests
-- Real npm tarball consumer tests for SDK and CLI
+- Real npm tarball consumer/scaffold tests for SDK, CLI and Admin
 
 ## Community Edition and commercial direction
 
@@ -151,11 +193,11 @@ The Apache-2.0 Community Edition is usable on its own. Managed Cloud, billing, a
 ## Repository layout
 
 ```text
-apps/admin/              Next.js admin UI
+apps/admin/              Publishable/scaffoldable Next.js CMS Admin
 apps/backend/            Example/self-hosted Django host project
 packages/cms-django/     Publishable PyPI package
 packages/cms-next/       Publishable npm SDK
-packages/cms-cli/        Publishable npm CLI
+packages/cms-cli/        Publishable npm installer CLI
 examples/next-site/      Example Next.js consumer
 .github/workflows/       CI and trusted-publishing release workflows
 docs/                    Architecture, upgrade and release documentation
@@ -181,10 +223,10 @@ npm run typecheck
 
 ## Release model
 
-Versions are synchronized across Python, npm packages and lockfile metadata.
+Versions are synchronized across Python, npm packages (including CMS Admin) and lockfile metadata.
 
 ```bash
-npm run version:set -- 0.3.0
+npm run version:set -- 0.4.0
 npm run check:versions
 ```
 
