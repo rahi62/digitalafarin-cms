@@ -1,8 +1,60 @@
 {
-  "name": "@digitalafarin/seo-cms-admin",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {"dev":"next dev","build":"next build","start":"next start","typecheck":"tsc --noEmit"},
-  "dependencies": {"next":"^16.3.0","react":"^19.2.0","react-dom":"^19.2.0"},
-  "devDependencies": {"typescript":"^5.9.0","@types/node":"^22.0.0","@types/react":"^19.0.0","@types/react-dom":"^19.0.0"}
+  "name": "@digitalafarin/cms-admin",
+  "version": "0.3.0",
+  "description": "Scaffoldable Next.js admin application for DigitalAfarin Headless SEO CMS",
+  "type": "module",
+  "bin": {
+    "digitalafarin-cms-admin": "bin/scaffold.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "next.config.ts",
+    "tsconfig.json",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "pack:check": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "next": "^16.3.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rahi62/digitalafarin-cms.git",
+    "directory": "apps/admin"
+  },
+  "homepage": "https://github.com/rahi62/digitalafarin-cms",
+  "bugs": {
+    "url": "https://github.com/rahi62/digitalafarin-cms/issues"
+  },
+  "author": "DigitalAfarin",
+  "keywords": [
+    "digitalafarin",
+    "cms",
+    "headless",
+    "seo",
+    "nextjs",
+    "admin"
+  ]
 }
