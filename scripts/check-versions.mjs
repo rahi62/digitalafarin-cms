@@ -2,11 +2,16 @@ import fs from "node:fs";
 
 const readJson = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
 const rootVersion = readJson("package.json").version;
-const versions = new Map([
-  ["package.json", rootVersion],
-  ["packages/cms-next/package.json", readJson("packages/cms-next/package.json").version],
-  ["packages/cms-cli/package.json", readJson("packages/cms-cli/package.json").version],
-]);
+const npmWorkspaces = [
+  "apps/admin",
+  "packages/cms-next",
+  "packages/cms-cli",
+];
+
+const versions = new Map([["package.json", rootVersion]]);
+for (const workspace of npmWorkspaces) {
+  versions.set(`${workspace}/package.json`, readJson(`${workspace}/package.json`).version);
+}
 
 const pyproject = fs.readFileSync("packages/cms-django/pyproject.toml", "utf8");
 const pyMatch = pyproject.match(/^version\s*=\s*"([^"]+)"/m);
@@ -22,7 +27,7 @@ if (fs.existsSync("package-lock.json")) {
   const lock = readJson("package-lock.json");
   versions.set("package-lock.json", lock.version);
   versions.set("package-lock.json#packages[root]", lock.packages?.[""]?.version);
-  for (const workspace of ["packages/cms-next", "packages/cms-cli"]) {
+  for (const workspace of npmWorkspaces) {
     versions.set(`package-lock.json#${workspace}`, lock.packages?.[workspace]?.version);
   }
 }

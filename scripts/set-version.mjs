@@ -2,11 +2,17 @@ import fs from "node:fs";
 
 const version = process.argv[2];
 if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
-  console.error("Usage: npm run version:set -- 0.3.0");
+  console.error("Usage: npm run version:set -- 0.4.0");
   process.exit(2);
 }
 
-for (const file of ["package.json", "packages/cms-next/package.json", "packages/cms-cli/package.json"]) {
+const npmWorkspaces = [
+  "apps/admin",
+  "packages/cms-next",
+  "packages/cms-cli",
+];
+
+for (const file of ["package.json", ...npmWorkspaces.map((workspace) => `${workspace}/package.json`)]) {
   const data = JSON.parse(fs.readFileSync(file, "utf8"));
   data.version = version;
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
@@ -17,7 +23,7 @@ if (fs.existsSync(lockPath)) {
   const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
   lock.version = version;
   if (lock.packages?.[""]) lock.packages[""].version = version;
-  for (const workspace of ["packages/cms-next", "packages/cms-cli"]) {
+  for (const workspace of npmWorkspaces) {
     if (lock.packages?.[workspace]) lock.packages[workspace].version = version;
   }
   fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + "\n");

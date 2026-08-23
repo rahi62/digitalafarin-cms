@@ -12,6 +12,7 @@
     "dev:admin": "npm --workspace apps/admin run dev",
     "build:admin": "npm --workspace apps/admin run build",
     "typecheck": "npm --workspace apps/admin run typecheck",
+    "pack:admin": "npm pack --workspace apps/admin",
     "pack:next": "npm pack --workspace packages/cms-next",
     "pack:cli": "npm pack --workspace packages/cms-cli",
     "check:versions": "node scripts/check-versions.mjs",

@@ -1,4 +1,6 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/cms/v1";
+import { adminPath } from "@/lib/admin-path";
+
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || adminPath("/api-proxy");
 
 export function getAccessToken() {
   if (typeof window === "undefined") return null;
@@ -17,7 +19,7 @@ export async function apiFetch<T=any>(path:string, options:RequestInit={}):Promi
   const token=getAccessToken();
   const headers=new Headers(options.headers || {}); if(!(options.body instanceof FormData)) headers.set("Content-Type","application/json"); if(token) headers.set("Authorization",`Bearer ${token}`);
   const res=await fetch(`${API_URL}${path}`,{...options,headers,cache:"no-store"});
-  if(res.status===401 && typeof window!=="undefined") { clearTokens(); window.location.href="/login"; throw new Error("Unauthorized"); }
+  if(res.status===401 && typeof window!=="undefined") { clearTokens(); window.location.href=adminPath("/login"); throw new Error("Unauthorized"); }
   if(!res.ok){ let message=`API error ${res.status}`; try{const e=await res.json(); message=e.detail || JSON.stringify(e);}catch{} throw new Error(message); }
   if(res.status===204) return undefined as T;
   const body=await res.text();

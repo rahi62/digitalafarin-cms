@@ -10,4 +10,5 @@ const run = (cmd, args, cwd = process.cwd()) => {
 run("npm", ["run", "build"], "packages/cms-next");
 run("npm", ["pack", "--pack-destination", "../../dist"], "packages/cms-next");
 run("npm", ["pack", "--pack-destination", "../../dist"], "packages/cms-cli");
+run("npm", ["pack", "--pack-destination", "../../dist"], "apps/admin");
 console.log("npm packages written to dist/. Build the Python package with: python -m build packages/cms-django --outdir dist");
