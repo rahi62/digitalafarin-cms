@@ -22,6 +22,7 @@ jobs:
       - run: npm install --ignore-scripts
       - run: npm run check:versions
       - run: npm --workspace packages/cms-next run build
+      - run: npm --workspace apps/admin run typecheck
       - name: Smoke test npm release tarballs
         run: node scripts/smoke-npm-packages.mjs
       - id: version
@@ -122,6 +123,17 @@ jobs:
         run: |
           if npm view "@digitalafarin/cms-cli@$VERSION" version >/dev/null 2>&1; then
             echo "@digitalafarin/cms-cli@$VERSION already exists; skipping."
+          else
+            npm publish --access public
+          fi
+      - name: Publish CMS Admin if missing
+        working-directory: apps/admin
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        shell: bash
+        run: |
+          if npm view "@digitalafarin/cms-admin@$VERSION" version >/dev/null 2>&1; then
+            echo "@digitalafarin/cms-admin@$VERSION already exists; skipping."
           else
             npm publish --access public
           fi
