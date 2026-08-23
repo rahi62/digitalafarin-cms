@@ -5,8 +5,8 @@ import { spawnSync } from "node:child_process";
 
 const args = process.argv.slice(2);
 const command = args[0] || "init";
-if (!["init", "doctor"].includes(command)) {
-  console.error("Usage: digitalafarin-cms [init|doctor] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate]");
+if (!["init", "doctor", "admin"].includes(command)) {
+  console.error("Usage: digitalafarin-cms [init|doctor|admin] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-admin] [--admin-dir DIR] [--admin-base-path /cms] [--admin-api-url URL] [--admin-port 3001]");
   process.exit(2);
 }
 
@@ -85,6 +85,28 @@ function ensureNextAdapter(frontend) {
     fs.writeFileSync(file, `import { createCmsClientFromEnv } from "@digitalafarin/cms-next";\n\nexport const cms = createCmsClientFromEnv({ revalidate: 60 });\n`);
   }
 }
+function scaffoldAdmin() {
+  const adminPackage = arg("--admin-package", "@digitalafarin/cms-admin");
+  const adminDir = arg("--admin-dir", "cms-admin");
+  const adminBasePath = arg("--admin-base-path", "/cms");
+  const adminApiUrl = arg("--admin-api-url", "http://localhost:8000/api/cms/v1");
+  const adminPort = arg("--admin-port", "3001");
+  const commandArgs = [
+    "exec",
+    "--yes",
+    `--package=${adminPackage}`,
+    "--",
+    "digitalafarin-cms-admin",
+    "scaffold",
+    "--dir", adminDir,
+    "--base-path", adminBasePath,
+    "--api-url", adminApiUrl,
+    "--port", adminPort,
+  ];
+  if (has("--skip-install")) commandArgs.push("--skip-install");
+  if (has("--force-admin")) commandArgs.push("--force");
+  run("npm", commandArgs, { cwd });
+}
 
 const backend = detectBackend();
 const frontend = detectFrontend();
@@ -94,8 +116,14 @@ console.log(`Next.js: ${frontend || "not detected"}`);
 if (command === "doctor") {
   process.exit(backend || frontend ? 0 : 1);
 }
-if (!backend && !frontend) {
-  throw new Error("No Django or Next.js project detected. Use --backend and/or --frontend.");
+
+if (command === "admin") {
+  scaffoldAdmin();
+  process.exit(0);
+}
+
+if (!backend && !frontend && !has("--with-admin")) {
+  throw new Error("No Django or Next.js project detected. Use --backend and/or --frontend, or pass --with-admin to scaffold only the CMS Admin app.");
 }
 
 const skipInstall = has("--skip-install");
@@ -127,6 +155,9 @@ if (frontend) {
   ensureNextAdapter(frontend);
 }
 
+if (has("--with-admin")) scaffoldAdmin();
+
 console.log("\nDigitalAfarin CMS wiring complete.");
 console.log("Backend API default: /api/cms/v1/");
 console.log("Next adapter: lib/digitalafarin-cms.ts (or src/lib/...)");
+if (has("--with-admin")) console.log(`CMS Admin: ${arg("--admin-base-path", "/cms")} on port ${arg("--admin-port", "3001")}`);
