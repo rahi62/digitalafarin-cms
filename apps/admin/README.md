@@ -20,9 +20,12 @@ The command creates a standalone Next.js application containing the DigitalAfari
 
 ```env
 NEXT_PUBLIC_DIGITALAFARIN_CMS_ADMIN_BASE_PATH=/cms
-NEXT_PUBLIC_API_URL=https://api.example.com/api/cms/v1
+NEXT_PUBLIC_API_URL=/cms/api-proxy
+DIGITALAFARIN_CMS_API_URL=https://api.example.com/api/cms/v1
 PORT=3001
 ```
+
+The browser talks only to the same-origin `/cms/api-proxy` route. The Next.js Admin server forwards those requests to `DIGITALAFARIN_CMS_API_URL`. This avoids exposing cross-origin CMS API calls in the browser and means the Admin does not need Django CORS access when the backend lives on an API subdomain.
 
 ## Production path deployment
 
