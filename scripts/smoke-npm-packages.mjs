@@ -102,13 +102,15 @@ try {
     ".env.local",
     "src/app/page.tsx",
     "src/app/login/page.tsx",
+    "src/app/api-proxy/[...path]/route.ts",
     "deploy/nginx.cms.conf",
   ]) {
     if (!fs.existsSync(path.join(directAdmin, expected))) throw new Error(`Admin scaffold missing ${expected}`);
   }
   const env = fs.readFileSync(path.join(directAdmin, ".env.local"), "utf8");
   if (!env.includes("NEXT_PUBLIC_DIGITALAFARIN_CMS_ADMIN_BASE_PATH=/cms")) throw new Error("Admin base path was not scaffolded");
-  if (!env.includes("NEXT_PUBLIC_API_URL=https://api.example.com/api/cms/v1")) throw new Error("Admin API URL was not scaffolded");
+  if (!env.includes("NEXT_PUBLIC_API_URL=/cms/api-proxy")) throw new Error("Same-origin browser API proxy URL was not scaffolded");
+  if (!env.includes("DIGITALAFARIN_CMS_API_URL=https://api.example.com/api/cms/v1")) throw new Error("Django upstream API URL was not scaffolded");
   const nginx = fs.readFileSync(path.join(directAdmin, "deploy", "nginx.cms.conf"), "utf8");
   if (!nginx.includes("location /cms/")) throw new Error("Nginx /cms route missing");
   console.log("@digitalafarin/cms-admin installed tarball scaffold OK");
@@ -124,6 +126,8 @@ try {
     "--skip-install",
   ], app);
   if (!fs.existsSync(path.join(cliAdmin, "src", "app", "page.tsx"))) throw new Error("cms-cli admin command did not scaffold admin app");
+  const cliEnv = fs.readFileSync(path.join(cliAdmin, ".env.local"), "utf8");
+  if (!cliEnv.includes("NEXT_PUBLIC_API_URL=/cms/api-proxy")) throw new Error("cms-cli admin command did not configure same-origin API proxy");
   console.log("@digitalafarin/cms-cli admin integration OK");
 } finally {
   for (const tarball of tarballs) {
