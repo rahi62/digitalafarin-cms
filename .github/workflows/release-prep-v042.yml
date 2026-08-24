@@ -1,0 +1,36 @@
+name: Prepare v0.4.2 versions
+
+on:
+  push:
+    branches:
+      - release/v0.4.2-prep
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: release/v0.4.2-prep
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Synchronize package versions
+        run: npm run version:set -- 0.4.2
+      - name: Verify synchronized versions
+        run: npm run check:versions
+      - name: Commit release version metadata
+        run: |
+          if git diff --quiet; then
+            echo "Versions already synchronized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json apps/admin/package.json packages/cms-next/package.json packages/cms-cli/package.json packages/cms-django/pyproject.toml packages/cms-django/src/digitalafarin_cms/__init__.py
+          git commit -m "release: set version 0.4.2"
+          git push origin HEAD:release/v0.4.2-prep
