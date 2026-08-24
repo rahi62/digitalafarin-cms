@@ -12,6 +12,7 @@ const basePath = normalizeBasePath(process.env.NEXT_PUBLIC_DIGITALAFARIN_CMS_ADM
 const nextConfig: NextConfig = {
   output: "standalone",
   basePath,
+  skipTrailingSlashRedirect: true,
 };
 
 export default nextConfig;
