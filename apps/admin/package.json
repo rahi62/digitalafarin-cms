@@ -1,6 +1,6 @@
 {
   "name": "@digitalafarin/cms-admin",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Scaffoldable Next.js admin application for DigitalAfarin Headless SEO CMS",
   "type": "module",
   "bin": {
