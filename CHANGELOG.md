@@ -4,7 +4,15 @@ All notable changes to DigitalAfarin CMS are documented here.
 
 The project uses synchronized versions for the Django package, Next.js SDK, Admin and CLI.
 
-## [0.4.0] - Unreleased
+## [0.4.1] - 2026-08-24
+
+### Fixed
+
+- The Next.js Admin same-origin API proxy now preserves trailing slashes from incoming `/cms/api-proxy/.../` requests when forwarding to Django endpoints. This prevents Django `APPEND_SLASH` redirects on endpoints such as `/auth/token/` and keeps authentication/API traffic inside the same-origin proxy.
+- Added package smoke coverage for trailing-slash preservation in scaffolded Admin applications.
+- Added an explicit `rootDir` for the Next.js SDK TypeScript build so CI remains deterministic with newer TypeScript releases.
+
+## [0.4.0] - 2026-08-23
 
 ### Added
 
