@@ -22,6 +22,14 @@ function wordCount(value: string) {
   return value.trim() ? value.trim().split(/\s+/u).length : 0;
 }
 
+function cleanPastedHtml(html: string) {
+  return html
+    .replace(/<\/?o:p[^>]*>/gi, "")
+    .replace(/<(meta|link|style)[^>]*>[\s\S]*?<\/\1>/gi, "")
+    .replace(/<(meta|link)[^>]*\/?\s*>/gi, "")
+    .replace(/\s(?:class|style|id|lang|data-[\w-]+)=(?:"[^"]*"|'[^']*')/gi, "");
+}
+
 function ToolbarButton({ active = false, disabled = false, title, onClick, children }: {
   active?: boolean;
   disabled?: boolean;
@@ -90,6 +98,7 @@ export default function RichTextEditor({ value, onChange, siteId }: Props) {
         dir: "rtl",
         spellcheck: "true",
       },
+      transformPastedHTML: cleanPastedHtml,
     },
     onCreate({ editor }) {
       const text = editor.getText();
@@ -124,8 +133,15 @@ export default function RichTextEditor({ value, onChange, siteId }: Props) {
   useEffect(() => {
     if (!fullscreen) return;
     const previous = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullscreen(false);
+    };
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previous; };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [fullscreen]);
 
   if (!editor) return <div className="richEditorLoading">در حال آماده‌سازی ویرایشگر…</div>;
@@ -187,12 +203,12 @@ export default function RichTextEditor({ value, onChange, siteId }: Props) {
         </div>
         <div className="toolbarGroup">
           <ToolbarButton title="متن معمولی" active={editor.isActive("paragraph")} onClick={() => editor.chain().focus().setParagraph().run()}>متن</ToolbarButton>
-          {[2, 3, 4].map((level) => (
+          {[2, 3, 4, 5, 6].map((level) => (
             <ToolbarButton
               key={level}
               title={`تیتر H${level}`}
               active={editor.isActive("heading", { level })}
-              onClick={() => editor.chain().focus().toggleHeading({ level: level as 2 | 3 | 4 }).run()}
+              onClick={() => editor.chain().focus().toggleHeading({ level: level as 2 | 3 | 4 | 5 | 6 }).run()}
             >
               H{level}
             </ToolbarButton>
@@ -241,6 +257,7 @@ export default function RichTextEditor({ value, onChange, siteId }: Props) {
       <div className="richEditorStatus">
         <span>{metrics.words.toLocaleString("fa-IR")} کلمه</span>
         <span>حدود {metrics.minutes.toLocaleString("fa-IR")} دقیقه مطالعه</span>
+        <span>Paste پاک‌سازی‌شده · H1 از عنوان صفحه</span>
         <span>Tiptap JSON · ذخیره ساختاریافته</span>
       </div>
 
