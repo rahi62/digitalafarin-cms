@@ -66,6 +66,9 @@ jobs:
       - run: npm --workspace apps/admin run typecheck
       - run: npm --workspace apps/admin run build
       - run: npm --workspace examples/next-site run build
+      - name: Install Chromium for editor browser tests
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:editor
       - name: Smoke test installed npm tarballs
         run: node scripts/smoke-npm-packages.mjs
       - name: Inspect npm package contents
