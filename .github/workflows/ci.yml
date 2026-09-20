@@ -63,6 +63,7 @@ jobs:
       - run: npm run check:versions
       - run: npm --workspace packages/cms-next run build
       - run: npm --workspace packages/cms-next run typecheck
+      - run: npm --workspace packages/cms-next run test:rich-text
       - run: npm --workspace apps/admin run typecheck
       - run: npm --workspace apps/admin run build
       - run: npm --workspace examples/next-site run build
