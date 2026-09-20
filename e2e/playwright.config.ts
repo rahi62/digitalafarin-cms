@@ -1,8 +1,4 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
-
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 export default defineConfig({
   testDir: ".",
@@ -20,7 +16,7 @@ export default defineConfig({
     ...devices["Desktop Chrome"],
   },
   webServer: {
-    cwd: repoRoot,
+    cwd: process.cwd(),
     command: "npm --workspace apps/admin run dev -- --hostname 127.0.0.1 --port 3101",
     url: "http://127.0.0.1:3101/cms/login",
     reuseExistingServer: !process.env.CI,
