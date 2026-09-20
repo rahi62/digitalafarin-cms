@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import BlockEditor, { ContentBlock } from "@/components/BlockEditor";
+import type { ContentBlock } from "@/components/BlockEditor";
+import ProfessionalEditor from "@/components/ProfessionalEditor";
 import CustomFieldsEditor, { ContentTypeSchema, customFieldDefaults } from "@/components/CustomFieldsEditor";
 import PageHeader from "@/components/PageHeader";
 import ParentEntryField from "@/components/ParentEntryField";
@@ -18,7 +19,7 @@ export default function NewContent() {
   const [f, setF] = useState<any>({
     site: "", content_type: "", title: "", slug: "", path: "/", excerpt: "",
     status: "draft", parent: null, is_featured: false, categories: [], tags: [], custom_fields: {},
-    blocks: [{ id: "p-1", type: "paragraph", data: { text: "" } }] as ContentBlock[],
+    blocks: [] as ContentBlock[],
   });
 
   useEffect(() => {
@@ -74,7 +75,7 @@ export default function NewContent() {
 
           <TaxonomyFields siteId={f.site} categories={f.categories || []} tags={f.tags || []} onCategoriesChange={(categories) => setF({ ...f, categories })} onTagsChange={(tags) => setF({ ...f, tags })} />
           <CustomFieldsEditor schema={selectedType?.schema} value={f.custom_fields || {}} siteId={f.site} onChange={(custom_fields) => setF({ ...f, custom_fields })} />
-          <div className="field full"><label>محتوا</label><BlockEditor siteId={f.site} value={f.blocks} onChange={(blocks) => setF({ ...f, blocks })} /></div>
+          <div className="field full contentEditorField"><label>محتوا</label><ProfessionalEditor siteId={f.site} value={f.blocks} onChange={(blocks) => setF({ ...f, blocks })} /></div>
         </div>
         <div className="actions"><button className="btn" disabled={!f.content_type}>ایجاد محتوا</button></div>
       </form>
