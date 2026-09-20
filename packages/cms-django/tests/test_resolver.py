@@ -13,14 +13,14 @@ class ResolveApiTests(TestCase):
             name="Acme",
             domain="example.test",
         )
-        content_type = ContentTypeDefinition.objects.create(
+        self.content_type = ContentTypeDefinition.objects.create(
             site=self.site,
             name="Page",
             slug="page",
         )
         ContentEntry.objects.create(
             site=self.site,
-            content_type=content_type,
+            content_type=self.content_type,
             title="Home",
             slug="home",
             path="/",
@@ -34,6 +34,64 @@ class ResolveApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["content"]["title"], "Home")
+
+
+    def test_rich_text_block_is_accepted_and_resolved(self):
+        User = get_user_model()
+        author = User.objects.create_user(username="rich-editor", password="x")
+        Membership.objects.create(
+            organization=self.site.organization,
+            user=author,
+            role=Membership.Role.OWNER,
+        )
+        rich_text = {
+            "id": "rich_text-test",
+            "type": "rich_text",
+            "data": {
+                "format": "tiptap-json",
+                "version": 1,
+                "doc": {
+                    "type": "doc",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Hello from Tiptap"}],
+                        }
+                    ],
+                },
+                "html": "<p>Hello from Tiptap</p>",
+                "text": "Hello from Tiptap",
+            },
+        }
+
+        client = APIClient()
+        client.force_authenticate(author)
+        create_response = client.post(
+            "/api/cms/v1/content/entries/",
+            {
+                "site": str(self.site.id),
+                "content_type": str(self.content_type.id),
+                "title": "Rich page",
+                "slug": "rich-page",
+                "path": "/rich-page/",
+                "status": ContentEntry.Status.DRAFT,
+                "blocks": [rich_text],
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(create_response.data["blocks"], [rich_text])
+
+        entry = ContentEntry.objects.get(pk=create_response.data["id"])
+        entry.publish()
+
+        resolve_response = APIClient().get(
+            "/api/cms/v1/content/resolve/",
+            {"site": "example.test", "path": "/rich-page/"},
+        )
+        self.assertEqual(resolve_response.status_code, 200)
+        self.assertEqual(resolve_response.data["blocks"], [rich_text])
+        self.assertEqual(resolve_response.data["blocks"][0]["data"]["doc"]["type"], "doc")
 
     def test_missing_site_is_400(self):
         response = APIClient().get("/api/cms/v1/content/resolve/", {"path": "/"})
