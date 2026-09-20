@@ -4,7 +4,7 @@
 
 DigitalAfarin CMS combines a reusable Django/DRF content backend, a Next.js SDK, a visual Next.js Admin application and an installer CLI. It is designed for teams that want WordPress-like content management and SEO workflows without coupling rendering to WordPress.
 
-> Status: **0.4.0 pre-release / Community Edition**. The public API can still change before 1.0.
+> Status: **0.5.0 pre-release / Community Edition**. The public API can still change before 1.0.
 
 ## Packages
 
@@ -34,6 +34,17 @@ Wire an existing repository automatically:
 ```bash
 npx @digitalafarin/cms-cli init --backend backend --frontend frontend
 ```
+
+For a Next.js App Router site that should publish CMS-created URLs directly:
+
+```bash
+npx @digitalafarin/cms-cli init \\
+  --backend backend \\
+  --frontend frontend \\
+  --with-public-route
+```
+
+The optional public route scaffold creates a safe CMS catch-all only when it will not conflict with an existing root catch-all.
 
 Wire the backend/frontend **and** scaffold the visual Admin under `/cms`:
 
@@ -226,7 +237,7 @@ npm run typecheck
 Versions are synchronized across Python, npm packages (including CMS Admin) and lockfile metadata.
 
 ```bash
-npm run version:set -- 0.4.0
+npm run version:set -- 0.5.0
 npm run check:versions
 ```
 
