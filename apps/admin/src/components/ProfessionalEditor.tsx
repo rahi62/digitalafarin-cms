@@ -21,7 +21,10 @@ export default function ProfessionalEditor({ value, onChange, siteId }: Props) {
 
   function updateRichText(next: RichTextValue) {
     if (!analysis.standardAvailable) return;
-    onChange([richTextValueToBlock(next, analysis.existingId)]);
+    onChange([
+      richTextValueToBlock(next, analysis.existingId),
+      ...analysis.preservedBlocks,
+    ]);
   }
 
   return (
@@ -63,7 +66,14 @@ export default function ProfessionalEditor({ value, onChange, siteId }: Props) {
 
       {mode === "standard" && analysis.migratesLegacy && (
         <div className="editorMigrationNotice">
-          این نوشته از بلوک‌های متنی قدیمی خوانده شده است. با اولین تغییر، فقط بخش‌های سازگار به فرمت جدید Tiptap تبدیل می‌شوند.
+          این نوشته از بلوک‌های متنی قدیمی خوانده شده است. با اولین تغییر، بخش متنی به فرمت جدید Tiptap تبدیل می‌شود.
+        </div>
+      )}
+
+      {mode === "standard" && analysis.preservedBlocks.length > 0 && (
+        <div className="editorAdvancedPreservedNotice">
+          <strong>{analysis.preservedBlocks.length.toLocaleString("fa-IR")} بلوک پیشرفته حفظ شده است</strong>
+          <span>CTA، FAQ یا بلوک‌های سفارشی بدون تغییر پس از متن باقی می‌مانند؛ برای ویرایش آن‌ها از «بلوک‌های پیشرفته» استفاده کنید.</span>
         </div>
       )}
 
