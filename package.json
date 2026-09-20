@@ -29,5 +29,6 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"
-  }
+  },
+  "packageManager": "npm@10.9.4"
 }
