@@ -1,5 +1,77 @@
 # Upgrading DigitalAfarin CMS
 
+## 0.4.2 -> 0.5.0
+
+v0.5 introduces the Professional Content Editor, typed `rich_text` blocks, a safe SDK renderer, browser-level editor tests and an optional public App Router catch-all scaffold.
+
+### 1. Back up before upgrading
+
+Back up the database, media storage, current generated CMS Admin directory and reverse-proxy configuration before replacing the Admin application.
+
+### 2. Upgrade synchronized packages
+
+```bash
+pip install --upgrade "digitalafarin-cms[all]==0.5.0"
+npm install @digitalafarin/cms-next@0.5.0
+```
+
+If you use the CLI directly:
+
+```bash
+npm install --save-dev @digitalafarin/cms-cli@0.5.0
+```
+
+Then:
+
+```bash
+python manage.py migrate
+python manage.py check
+```
+
+No new Django model migration is required specifically for the Professional Editor, but normal migration checks should still be run.
+
+### 3. Refresh the generated Admin
+
+`@digitalafarin/cms-admin` is a scaffoldable application. Existing generated Admin directories do not update automatically when the package version changes.
+
+Recommended safe workflow:
+
+```bash
+npx @digitalafarin/cms-admin@0.5.0 scaffold \\
+  --dir cms-admin-v050 \\
+  --base-path /cms \\
+  --api-url https://api.example.com/api/cms/v1 \\
+  --port 3001
+```
+
+Verify the fresh scaffold, copy any intentional local customizations, then switch your process manager to the new directory. Avoid using `--force` against a customized Admin unless you have reviewed the diff.
+
+### 4. Public frontend integration
+
+Existing frontend routes continue to work. If the site does not yet have a generic CMS route and should expose CMS-created URLs directly, the CLI can scaffold one for App Router projects:
+
+```bash
+npx @digitalafarin/cms-cli@0.5.0 init \\
+  --frontend frontend \\
+  --skip-install \\
+  --with-public-route
+```
+
+The generated route uses `cms.resolve()` and the safe `renderCmsRichTextHtml()` helper. If a root catch-all already exists, the CLI stops instead of creating a conflicting route; integrate CMS resolution into the existing route manually.
+
+### 5. Rich-text compatibility
+
+- Existing paragraph/heading/list/quote/code/divider blocks remain valid.
+- Compatible legacy prose can be opened in the Standard Editor.
+- CTA, FAQ and custom trailing blocks are preserved.
+- Interleaved layouts that cannot round-trip safely remain Advanced-only.
+- `ContentEntry.blocks` remains canonical; `rich_text.data.doc` is the canonical body for Professional Editor prose.
+
+### 6. Verify before production
+
+Verify `/cms/login`, create/edit, Standard -> Advanced -> Standard, Media Library insertion, save, preview, publish/revision restore, one public `rich_text` page, and one redirect resolution path.
+
+---
 ## 0.3.0 -> 0.4.0
 
 v0.4 makes the visual Next.js CMS Admin a first-class installable package and supports serving it under `/cms` on the same website domain. Django Admin remains available for technical maintenance, but normal editorial work should move to the visual Admin.
