@@ -27,7 +27,7 @@ export function BlockRenderer({ blocks }: { blocks: CmsBlock[] }) {
 
           case "heading": {
             const level = Math.min(6, Math.max(2, Number(data.level) || 2));
-            const Tag = `h${level}` as keyof JSX.IntrinsicElements;
+            const Tag = `h${level}` as "h2" | "h3" | "h4" | "h5" | "h6";
             return <Tag key={key}>{data.text}</Tag>;
           }
 
