@@ -19,10 +19,17 @@ jobs:
         with:
           node-version: "24"
           package-manager-cache: false
-      - run: npm install --ignore-scripts
+      - run: npm ci --ignore-scripts
       - run: npm run check:versions
       - run: npm --workspace packages/cms-next run build
+      - run: npm --workspace packages/cms-next run typecheck
+      - run: npm --workspace packages/cms-next run test:rich-text
       - run: npm --workspace apps/admin run typecheck
+      - run: npm --workspace apps/admin run build
+      - run: npm --workspace examples/next-site run build
+      - name: Install Chromium for editor browser tests
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:editor
       - name: Smoke test npm release tarballs
         run: node scripts/smoke-npm-packages.mjs
       - id: version
@@ -101,7 +108,7 @@ jobs:
           package-manager-cache: false
       - name: Ensure npm CLI supports Trusted Publishing
         run: npm install --global npm@11
-      - run: npm install --ignore-scripts
+      - run: npm ci --ignore-scripts
       - run: npm run check:versions
       - run: npm --workspace packages/cms-next run build
       - name: Publish Next.js SDK if missing
