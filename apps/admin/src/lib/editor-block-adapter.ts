@@ -21,6 +21,7 @@ export type BlockAnalysis = {
   value: RichTextValue;
   existingId?: string;
   migratesLegacy: boolean;
+  preservedBlocks: ContentBlock[];
   reason?: string;
 };
 
@@ -126,10 +127,11 @@ export function analyzeBlocks(blocks: ContentBlock[]): BlockAnalysis {
       standardAvailable: true,
       value: { doc: emptyDoc(), html: "", text: "" },
       migratesLegacy: false,
+      preservedBlocks: [],
     };
   }
 
-  if (blocks.length === 1 && blocks[0].type === "rich_text") {
+  if (blocks[0].type === "rich_text" && !blocks.slice(1).some((block) => block.type === "rich_text")) {
     const data = blocks[0].data || {};
     const doc = data.doc && typeof data.doc === "object" ? data.doc as RichTextDoc : emptyDoc();
 
@@ -142,14 +144,23 @@ export function analyzeBlocks(blocks: ContentBlock[]): BlockAnalysis {
         text: typeof data.text === "string" ? data.text : "",
       },
       migratesLegacy: false,
+      preservedBlocks: blocks.slice(1),
     };
   }
 
-  if (blocks.every(isSafeLegacyBlock)) {
+  const firstUnsafeIndex = blocks.findIndex((block) => !isSafeLegacyBlock(block));
+  const legacyPrefix = firstUnsafeIndex === -1 ? blocks : blocks.slice(0, firstUnsafeIndex);
+  const preservedSuffix = firstUnsafeIndex === -1 ? [] : blocks.slice(firstUnsafeIndex);
+  const safeSuffix = preservedSuffix.every(
+    (block) => block.type !== "rich_text" && !isSafeLegacyBlock(block),
+  );
+
+  if (legacyPrefix.length > 0 && safeSuffix) {
     return {
       standardAvailable: true,
-      value: { doc: legacyBlocksToDoc(blocks), html: "", text: "" },
+      value: { doc: legacyBlocksToDoc(legacyPrefix), html: "", text: "" },
       migratesLegacy: true,
+      preservedBlocks: preservedSuffix,
     };
   }
 
@@ -157,7 +168,8 @@ export function analyzeBlocks(blocks: ContentBlock[]): BlockAnalysis {
     standardAvailable: false,
     value: { doc: emptyDoc(), html: "", text: "" },
     migratesLegacy: false,
-    reason: "این محتوا شامل CTA، FAQ، تصویر دارای متادیتا یا بلوک سفارشی است. برای جلوگیری از جابه‌جایی یا حذف داده، فعلاً در حالت بلوک‌های پیشرفته ویرایش می‌شود.",
+    preservedBlocks: [],
+    reason: "چیدمان این محتوا ترکیبی یا دارای بلوک‌های سفارشی میان متن است. برای جلوگیری از جابه‌جایی یا حذف داده، فعلاً در حالت بلوک‌های پیشرفته ویرایش می‌شود.",
   };
 }
 
