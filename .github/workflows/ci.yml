@@ -60,6 +60,13 @@ jobs:
           node-version: "24"
           package-manager-cache: false
       - run: npm install --ignore-scripts
+      - name: Export generated lockfile for this PR
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-package-lock
+          path: package-lock.json
+          retention-days: 1
       - run: npm run check:versions
       - run: npm --workspace packages/cms-next run build
       - run: npm --workspace packages/cms-next run typecheck
