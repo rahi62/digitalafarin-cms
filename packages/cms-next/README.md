@@ -8,10 +8,10 @@ Next.js SDK for DigitalAfarin Headless CMS + SEO.
 npm install @digitalafarin/cms-next
 ```
 
-For the v0.3 release archive:
+For the v0.5 release archive:
 
 ```bash
-npm install ./digitalafarin-cms-next-0.3.0.tgz
+npm install ./digitalafarin-cms-next-0.5.0.tgz
 ```
 
 ## Environment
