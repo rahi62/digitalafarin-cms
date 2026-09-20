@@ -67,6 +67,12 @@ function inferDjangoFiles(backend) {
   if (!exists(urlsFile)) throw new Error(`URLs file not found: ${urlsFile}`);
   return { settingsFile, urlsFile };
 }
+function sourceRoot(frontend) {
+  if (exists(path.join(frontend, "src", "app"))) return path.join(frontend, "src");
+  if (exists(path.join(frontend, "app"))) return frontend;
+  return exists(path.join(frontend, "src")) ? path.join(frontend, "src") : frontend;
+}
+
 function ensureEnv(frontend) {
   const envFile = path.join(frontend, ".env.local");
   let text = exists(envFile) ? fs.readFileSync(envFile, "utf8") : "";
@@ -80,8 +86,7 @@ function ensureEnv(frontend) {
   }
 }
 function ensureNextAdapter(frontend) {
-  const useSrc = exists(path.join(frontend, "src"));
-  const lib = path.join(frontend, useSrc ? "src" : "", "lib");
+  const lib = path.join(sourceRoot(frontend), "lib");
   fs.mkdirSync(lib, { recursive: true });
   const file = path.join(lib, "digitalafarin-cms.ts");
   if (!exists(file)) {
@@ -90,9 +95,8 @@ function ensureNextAdapter(frontend) {
 }
 
 function ensurePublicRoute(frontend) {
-  const useSrc = exists(path.join(frontend, "src"));
-  const sourceRoot = path.join(frontend, useSrc ? "src" : "");
-  const appDir = path.join(sourceRoot, "app");
+  const root = sourceRoot(frontend);
+  const appDir = path.join(root, "app");
   if (!exists(appDir)) {
     throw new Error("--with-public-route requires a Next.js App Router project with app/ or src/app/.");
   }
@@ -114,7 +118,7 @@ function ensurePublicRoute(frontend) {
 
   const routeDir = path.join(appDir, routeName);
   const routeFile = path.join(routeDir, "page.tsx");
-  const componentDir = path.join(sourceRoot, "components", "digitalafarin-cms");
+  const componentDir = path.join(root, "components", "digitalafarin-cms");
   const rendererFile = path.join(componentDir, "BlockRenderer.tsx");
   const templateDir = path.join(packageRoot, "templates", "next");
 
