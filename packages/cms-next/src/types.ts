@@ -1,4 +1,19 @@
+export type CmsRichTextNode={
+  type:string;
+  attrs?:Record<string,unknown>;
+  content?:CmsRichTextNode[];
+  marks?:{type:string;attrs?:Record<string,unknown>}[];
+  text?:string;
+};
+export type CmsRichTextData={
+  format:"tiptap-json";
+  version:number;
+  doc:CmsRichTextNode;
+  html:string;
+  text:string;
+};
 export type CmsBlock={id?:string;type:string;data:Record<string,unknown>};
+export type CmsRichTextBlock=Omit<CmsBlock,"type"|"data"> & {type:"rich_text";data:CmsRichTextData};
 export type CmsSeo={title:string;description:string;canonical_url:string;robots_index:boolean;robots_follow:boolean;og_title:string;og_description:string;og_image:string;twitter_card:string;focus_keyword?:string;secondary_keywords?:string[];seo_score?:number};
 export type CmsSchema={id:string;schema_type:string;data:Record<string,unknown>;is_active:boolean};
 export type CmsEntry={id:string;title:string;slug:string;path:string;excerpt:string;status:string;blocks:CmsBlock[];custom_fields:Record<string,unknown>;content_type_slug:string;published_at:string|null;updated_at:string};
