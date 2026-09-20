@@ -8,6 +8,7 @@ import PageHeader from "@/components/PageHeader";
 import ParentEntryField from "@/components/ParentEntryField";
 import TaxonomyFields from "@/components/TaxonomyFields";
 import { apiFetch, Paginated } from "@/lib/api";
+import { adminPath } from "@/lib/admin-path";
 
 type Site = { id: string; name: string };
 type ContentType = { id: string; site: string; name: string; slug: string; schema: ContentTypeSchema };
@@ -51,7 +52,7 @@ export default function NewContent() {
     setMsg("");
     try {
       const d: any = await apiFetch("/content/entries/", { method: "POST", body: JSON.stringify(f) });
-      location.href = `/content/${d.id}`;
+      location.href = adminPath(`/content/${d.id}`);
     } catch (err: any) {
       setMsg(err.message);
     }
