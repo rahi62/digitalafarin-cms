@@ -8,10 +8,10 @@ Reusable Django/DRF backend for the DigitalAfarin Headless CMS + SEO platform.
 pip install "digitalafarin-cms[all]"
 ```
 
-For the v0.3 release wheel:
+For the v0.5 release wheel:
 
 ```bash
-pip install ./digitalafarin_cms-0.3.0-py3-none-any.whl
+pip install ./digitalafarin_cms-0.5.0-py3-none-any.whl
 ```
 
 ## Django settings
