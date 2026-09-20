@@ -2,7 +2,8 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import BlockEditor, { ContentBlock } from "@/components/BlockEditor";
+import type { ContentBlock } from "@/components/BlockEditor";
+import ProfessionalEditor from "@/components/ProfessionalEditor";
 import CustomFieldsEditor, { ContentTypeSchema } from "@/components/CustomFieldsEditor";
 import EditorialWorkflowPanel from "@/components/EditorialWorkflowPanel";
 import InternalLinksPanel from "@/components/InternalLinksPanel";
@@ -115,7 +116,7 @@ export default function EditContent() {
           <TaxonomyFields siteId={f.site} categories={f.categories || []} tags={f.tags || []} onCategoriesChange={(categories) => setF({ ...f, categories })} onTagsChange={(tags) => setF({ ...f, tags })} />
           <CustomFieldsEditor schema={contentType?.schema} value={f.custom_fields || {}} siteId={f.site} onChange={(custom_fields) => setF({ ...f, custom_fields })} />
 
-          <div className="field full"><label>محتوا</label><BlockEditor siteId={f.site} value={f.blocks || []} onChange={(blocks) => setF({ ...f, blocks })} /></div>
+          <div className="field full contentEditorField"><label>محتوا</label><ProfessionalEditor siteId={f.site} value={f.blocks || []} onChange={(blocks) => setF({ ...f, blocks })} /></div>
         </div>
         <div className="actions"><button className="btn">ذخیره تغییرات</button></div>
       </form>
