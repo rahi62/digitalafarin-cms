@@ -4,6 +4,39 @@ All notable changes to DigitalAfarin CMS are documented here.
 
 The project uses synchronized versions for the Django package, Next.js SDK, Admin and CLI.
 
+## [0.5.0] - 2026-09-20
+
+### Added
+
+- Tiptap-based Professional Content Editor as the default writer-first editing experience.
+- Standard and Advanced Blocks modes with protected round-tripping for legacy and custom blocks.
+- RTL/LTR controls, H2-H6, inline formatting, links, lists, quotes, code, tables, Media Library image insertion, focus mode, word count and reading-time estimation.
+- Typed `rich_text` block contract in `@digitalafarin/cms-next`.
+- Safe Tiptap JSON renderer that escapes text, allow-lists supported markup and rejects unsafe URL protocols.
+- Browser-level Playwright coverage for Standard/Advanced switching, Media Library insertion and `/cms` base-path redirects.
+- Optional `@digitalafarin/cms-cli --with-public-route` App Router catch-all scaffold for CMS-created public URLs.
+- Generated reusable public block renderer using the SDK safe rich-text renderer.
+- Resolver round-trip coverage for `rich_text` blocks.
+
+### Changed
+
+- Admin content creation now keeps redirects inside the configured Admin base path.
+- CI and release validation build both the Admin and example consumer and use lockfile-driven npm installs.
+- Example `robots.txt` and sitemap proxy routes are runtime-dynamic so frontend builds do not require a live CMS API.
+- Root package lock now includes the Professional Editor and browser-test dependencies.
+
+### Compatibility
+
+- No Django model migration is required for the editor.
+- Existing structured blocks remain valid.
+- `ContentEntry.blocks` remains the canonical content body.
+- Unsupported/interleaved layouts remain editable through Advanced Blocks rather than being rewritten.
+
+## [0.4.2] - 2026-09-20
+
+### Fixed
+
+- Disabled Next.js automatic trailing-slash canonicalization in the Admin so same-origin `/cms/api-proxy/*` requests reach Django without an unwanted pre-handler redirect.
 ## [0.4.1] - 2026-08-24
 
 ### Fixed
