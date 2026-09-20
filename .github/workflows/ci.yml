@@ -65,6 +65,7 @@ jobs:
       - run: npm --workspace packages/cms-next run typecheck
       - run: npm --workspace apps/admin run typecheck
       - run: npm --workspace apps/admin run build
+      - run: npm --workspace examples/next-site run build
       - name: Smoke test installed npm tarballs
         run: node scripts/smoke-npm-packages.mjs
       - name: Inspect npm package contents
