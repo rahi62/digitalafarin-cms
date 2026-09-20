@@ -1,4 +1,4 @@
-import type { CmsBlock } from "@digitalafarin/cms-next";
+import { isCmsRichTextBlock, renderCmsRichTextHtml, type CmsBlock } from "@digitalafarin/cms-next";
 
 export function BlockRenderer({ blocks }: { blocks: CmsBlock[] }) {
   return (
@@ -9,13 +9,13 @@ export function BlockRenderer({ blocks }: { blocks: CmsBlock[] }) {
 
         switch (block.type) {
           case "rich_text":
-            return (
+            return isCmsRichTextBlock(block) ? (
               <div
                 key={key}
                 className="cms-rich-text"
-                dangerouslySetInnerHTML={{ __html: typeof data.html === "string" ? data.html : "" }}
+                dangerouslySetInnerHTML={{ __html: renderCmsRichTextHtml(block) }}
               />
-            );
+            ) : null;
 
           case "hero":
             return (
