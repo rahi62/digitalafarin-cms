@@ -41,3 +41,12 @@ Then route the main website path to the admin process. The generated `deploy/ngi
 For a `/cms` deployment, keep `proxy_pass` without a trailing slash so the Next.js process receives the `/cms` prefix it was built with.
 
 The Django Admin remains available for technical maintenance, but editorial users should use the Next.js CMS Admin UI.
+
+
+## Professional editor (v0.5)
+
+New and compatible entries open in a Tiptap-based Standard Editor with RTL/LTR, headings, formatting, links, tables, Media Library images, lists, quotes, code blocks, word count and focus mode.
+
+The original structured Block Editor remains available as **Advanced Blocks**. CMS content is still stored as structured `blocks`; rich prose uses a typed `rich_text` block whose canonical body is Tiptap JSON.
+
+Existing advanced/custom blocks are preserved. Layouts that cannot round-trip safely are kept in Advanced mode rather than silently rewritten.
