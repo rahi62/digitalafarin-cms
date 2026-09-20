@@ -9,7 +9,6 @@ import TextAlign from "@tiptap/extension-text-align";
 import Image from "@tiptap/extension-image";
 import { TableKit } from "@tiptap/extension-table";
 import { Placeholder } from "@tiptap/extensions";
-import { Extension } from "@tiptap/core";
 import MediaPicker, { MediaAsset } from "@/components/MediaPicker";
 import type { RichTextDoc, RichTextValue } from "@/lib/editor-block-adapter";
 
@@ -18,22 +17,6 @@ type Props = {
   onChange: (value: RichTextValue) => void;
   siteId?: string;
 };
-
-const TextDirection = Extension.create({
-  name: "textDirection",
-  addGlobalAttributes() {
-    return [{
-      types: ["paragraph", "heading"],
-      attributes: {
-        dir: {
-          default: null,
-          parseHTML: (element) => element.getAttribute("dir"),
-          renderHTML: (attributes) => attributes.dir ? { dir: attributes.dir } : {},
-        },
-      },
-    }];
-  },
-});
 
 function wordCount(value: string) {
   return value.trim() ? value.trim().split(/\s+/u).length : 0;
@@ -94,11 +77,11 @@ export default function RichTextEditor({ value, onChange, siteId }: Props) {
       allowBase64: false,
       resize: { enabled: true },
     }),
-    TextDirection,
   ], []);
 
   const editor = useEditor({
     immediatelyRender: false,
+    textDirection: "rtl",
     extensions,
     content: value.doc,
     editorProps: {
@@ -148,8 +131,7 @@ export default function RichTextEditor({ value, onChange, siteId }: Props) {
   if (!editor) return <div className="richEditorLoading">در حال آماده‌سازی ویرایشگر…</div>;
 
   function setDirection(dir: "rtl" | "ltr") {
-    const node = editor.isActive("heading") ? "heading" : "paragraph";
-    editor.chain().focus().updateAttributes(node, { dir }).run();
+    editor.chain().focus().setTextDirection(dir).run();
   }
 
   function openLinkEditor() {
