@@ -84,3 +84,35 @@ jobs:
           npm --workspace packages/cms-next run pack:check
           npm --workspace packages/cms-cli run pack:check
 
+
+  regenerate-npm10-lockfile:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/professional-editor-v0.5' && github.actor == 'rahi62'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Regenerate lockfile with production npm
+        run: |
+          node --version
+          npm --version
+          rm -f package-lock.json
+          npm install --package-lock-only --ignore-scripts
+      - name: Commit npm 10 lockfile
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo "No lockfile change"
+            exit 0
+          fi
+          git commit -m "build: regenerate lockfile with npm 10"
+          git push origin HEAD:${{ github.head_ref }}
