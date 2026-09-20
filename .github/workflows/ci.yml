@@ -79,3 +79,30 @@ jobs:
           npm --workspace apps/admin run pack:check
           npm --workspace packages/cms-next run pack:check
           npm --workspace packages/cms-cli run pack:check
+
+  sync-editor-lockfile:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/professional-editor-v0.5' && github.actor == 'rahi62'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - run: npm install --ignore-scripts
+      - name: Commit generated package-lock.json when needed
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json is already synchronized"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "build: sync package lock for professional editor"
+          git push origin HEAD:${{ github.head_ref }}
