@@ -4,7 +4,7 @@ All notable changes to DigitalAfarin CMS are documented here.
 
 The project uses synchronized versions for the Django package, Next.js SDK, Admin and CLI.
 
-## [0.5.0] - 2026-09-20
+## [0.5.0] - 2026-09-21
 
 ### Added
 
