@@ -243,7 +243,7 @@ npm run check:versions
 
 Before a release, follow [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md). A `v*` tag triggers `.github/workflows/release.yml`, which validates and publishes through npm Trusted Publishing and PyPI OIDC.
 
-Upgrade notes are maintained in [`docs/UPGRADING.md`](docs/UPGRADING.md) and release history in [`CHANGELOG.md`](CHANGELOG.md).
+For a fresh multi-site installation, follow [`docs/INSTALL_NEW_SITE.md`](docs/INSTALL_NEW_SITE.md). Upgrade notes are maintained in [`docs/UPGRADING.md`](docs/UPGRADING.md) and release history in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Security
 
