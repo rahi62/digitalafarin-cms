@@ -129,13 +129,14 @@ export default function RichTextEditor({ value, onChange, siteId }: Props) {
   }, [fullscreen]);
 
   if (!editor) return <div className="richEditorLoading">در حال آماده‌سازی ویرایشگر…</div>;
+  const activeEditor = editor;
 
   function setDirection(dir: "rtl" | "ltr") {
-    editor.chain().focus().setTextDirection(dir).run();
+    activeEditor.chain().focus().setTextDirection(dir).run();
   }
 
   function openLinkEditor() {
-    const attrs = editor.getAttributes("link") || {};
+    const attrs = activeEditor.getAttributes("link") || {};
     const rel = typeof attrs.rel === "string" ? attrs.rel.split(/\s+/) : [];
     setLinkDraft({
       href: typeof attrs.href === "string" ? attrs.href : "",
@@ -149,7 +150,7 @@ export default function RichTextEditor({ value, onChange, siteId }: Props) {
   function applyLink() {
     const href = linkDraft.href.trim();
     if (!href) {
-      editor.chain().focus().unsetLink().run();
+      activeEditor.chain().focus().unsetLink().run();
       setLinkOpen(false);
       return;
     }
@@ -159,7 +160,7 @@ export default function RichTextEditor({ value, onChange, siteId }: Props) {
       linkDraft.newTab ? "noopener noreferrer" : "",
     ].filter(Boolean).join(" ");
 
-    editor.chain().focus().extendMarkRange("link").setLink({
+    activeEditor.chain().focus().extendMarkRange("link").setLink({
       href,
       target: linkDraft.newTab ? "_blank" : null,
       rel: rel || null,
@@ -169,7 +170,7 @@ export default function RichTextEditor({ value, onChange, siteId }: Props) {
 
   function selectImage(asset: MediaAsset) {
     if (!asset.url) return;
-    editor.chain().focus().setImage({
+    activeEditor.chain().focus().setImage({
       src: asset.url,
       alt: asset.alt_text || "",
       title: asset.caption || undefined,
