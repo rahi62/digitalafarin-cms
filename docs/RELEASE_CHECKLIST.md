@@ -14,10 +14,10 @@ Use this checklist before creating any `v*` tag.
 npm run check:versions
 ```
 
-Expected for v0.4:
+Expected for v0.5:
 
 ```text
-All publishable packages and lockfile metadata are synchronized at 0.4.0.
+All publishable packages and lockfile metadata are synchronized at 0.5.0.
 ```
 
 The synchronized npm workspaces now include:
@@ -31,10 +31,15 @@ packages/cms-cli                -> @digitalafarin/cms-cli
 ## 2. Node validation
 
 ```bash
-npm install --ignore-scripts
+npm ci --ignore-scripts
 npm --workspace packages/cms-next run build
 npm --workspace packages/cms-next run typecheck
+npm --workspace packages/cms-next run test:rich-text
 npm --workspace apps/admin run typecheck
+npm --workspace apps/admin run build
+npm --workspace examples/next-site run build
+npx playwright install --with-deps chromium
+npm run test:e2e:editor
 npm --workspace apps/admin run pack:check
 npm --workspace packages/cms-next run pack:check
 npm --workspace packages/cms-cli run pack:check
@@ -42,13 +47,17 @@ node scripts/smoke-npm-packages.mjs
 ```
 
 - [ ] Next SDK builds.
-- [ ] CMS Admin typecheck passes.
+- [ ] CMS Admin typecheck and production build pass.
+- [ ] Safe rich-text renderer tests pass.
+- [ ] Example public Next.js consumer build passes.
+- [ ] Playwright Professional Editor tests pass.
 - [ ] Packed SDK imports successfully from a clean consumer project.
 - [ ] Installed CLI binary runs from the packed package.
 - [ ] Packed `@digitalafarin/cms-admin` installs in a clean consumer project.
 - [ ] `digitalafarin-cms-admin scaffold` generates a `/cms` Admin app.
 - [ ] Generated Admin contains `/cms/api-proxy`, `.env.local`, and `deploy/nginx.cms.conf`.
 - [ ] `digitalafarin-cms admin` can scaffold the Admin through the main CLI.
+- [ ] `digitalafarin-cms init --with-public-route` creates the App Router catch-all and safe renderer in a clean frontend.
 
 ## 3. Python validation
 
@@ -102,7 +111,7 @@ permissions: publish
 
 ### First publication of `@digitalafarin/cms-admin`
 
-`@digitalafarin/cms-admin` is new in v0.4. npm Trusted Publishing can only be attached after the npm package exists. Therefore **before creating the v0.4.0 tag**, bootstrap only this new package once with the npm account that owns the `@digitalafarin` scope:
+`@digitalafarin/cms-admin` is new in v0.4. npm Trusted Publishing can only be attached after the npm package exists. Therefore **before creating the v0.5.0 tag**, bootstrap only this new package once with the npm account that owns the `@digitalafarin` scope:
 
 ```bash
 npm --workspace apps/admin publish --access public
@@ -129,13 +138,13 @@ npm trust list "@digitalafarin/cms-admin"
 
 Expected target is the same `rahi62/digitalafarin-cms` / `release.yml` / `npm` environment configuration shown above.
 
-- [ ] `@digitalafarin/cms-admin@0.4.0` exists on npm before the release tag.
+- [ ] `@digitalafarin/cms-admin@0.5.0` exists on npm before the release tag.
 - [ ] npm Trusted Publishing is configured for all three npm packages.
 - [ ] GitHub environment `npm` exists.
 - [ ] GitHub environment `pypi` exists.
 - [ ] PyPI Trusted Publisher points to owner `rahi62`, repository `digitalafarin-cms`, workflow `release.yml`, environment `pypi`.
 
-The v0.4.0 release workflow will detect that the bootstrapped Admin version already exists and skip republishing it. Future versions can publish all three npm packages through OIDC.
+The v0.5.0 release workflow will detect that the bootstrapped Admin version already exists and skip republishing it. Future versions can publish all three npm packages through OIDC.
 
 ## 6. Pre-tag product checks
 
@@ -146,6 +155,10 @@ The v0.4.0 release workflow will detect that the bootstrapped Admin version alre
 - [ ] Server-side Admin proxy reaches the configured Django CMS API upstream.
 - [ ] Generated Nginx configuration routes `/cms/` to the Admin process without stripping the base path.
 - [ ] Create/edit/publish a content entry.
+- [ ] Standard -> Advanced -> Standard preserves rich text and advanced blocks.
+- [ ] Media Library insertion works inside the Professional Editor.
+- [ ] `/cms` content-create redirect remains under the configured base path.
+- [ ] Public `rich_text` output is rendered through the SDK safe renderer.
 - [ ] Revision restore works.
 - [ ] Categories/tags assignment works.
 - [ ] Menu resolver returns nested menu data.
@@ -165,8 +178,8 @@ Only after all checks above are green **and the new Admin package has been boots
 git checkout main
 git pull --ff-only
 npm run check:versions
-git tag v0.4.0
-git push origin v0.4.0
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
 The tag triggers `.github/workflows/release.yml`.
@@ -178,23 +191,23 @@ Do not manually republish a version that already exists in npm or PyPI.
 Python:
 
 ```bash
-pip install "digitalafarin-cms[all]==0.4.0"
+pip install "digitalafarin-cms[all]==0.5.0"
 python -c "import digitalafarin_cms; print(digitalafarin_cms.__version__)"
 ```
 
 npm:
 
 ```bash
-npm view "@digitalafarin/cms-next@0.4.0" version
-npm view "@digitalafarin/cms-cli@0.4.0" version
-npm view "@digitalafarin/cms-admin@0.4.0" version
-npx "@digitalafarin/cms-cli@0.4.0" doctor
+npm view "@digitalafarin/cms-next@0.5.0" version
+npm view "@digitalafarin/cms-cli@0.5.0" version
+npm view "@digitalafarin/cms-admin@0.5.0" version
+npx "@digitalafarin/cms-cli@0.5.0" doctor
 ```
 
 Admin scaffold smoke check:
 
 ```bash
-npx "@digitalafarin/cms-admin@0.4.0" scaffold \
+npx "@digitalafarin/cms-admin@0.5.0" scaffold \
   --dir cms-admin-release-test \
   --base-path /cms \
   --api-url https://api.example.com/api/cms/v1 \
@@ -202,7 +215,7 @@ npx "@digitalafarin/cms-admin@0.4.0" scaffold \
   --skip-install
 ```
 
-- [ ] PyPI shows `0.4.0`.
-- [ ] npm `latest` points to `0.4.0` for SDK, CLI and Admin.
-- [ ] GitHub Release `v0.4.0` exists.
+- [ ] PyPI shows `0.5.0`.
+- [ ] npm `latest` points to `0.5.0` for SDK, CLI and Admin.
+- [ ] GitHub Release `v0.5.0` exists.
 - [ ] Install instructions in README match the published packages.
