@@ -172,9 +172,9 @@ test("standard editor survives mode switching, inserts media and keeps /cms afte
   await page.goto("/cms/content/new");
   await expect(page.getByText("ویرایشگر حرفه‌ای")).toBeVisible();
 
-  await page.getByLabel("عنوان").fill("Browser test");
-  await page.getByLabel("Slug").fill("browser-test");
-  await page.getByLabel("Path").fill("/browser-test/");
+  await page.locator(".field").filter({ hasText: "عنوان" }).locator("input").fill("Browser test");
+  await page.locator(".field").filter({ hasText: "Slug" }).locator("input").fill("browser-test");
+  await page.locator(".field").filter({ hasText: "Path" }).locator("input").fill("/browser-test/");
 
   const canvas = page.locator(".cmsRichTextCanvas");
   await canvas.fill("متن تست برای ویرایشگر حرفه‌ای");
