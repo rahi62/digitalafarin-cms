@@ -97,11 +97,11 @@ Package override flags are useful when testing local release artifacts.
 ## Local archives
 
 ```bash
-npx ./digitalafarin-cms-cli-0.4.0.tgz init \
-  --django-package ../digitalafarin_cms-0.4.0-py3-none-any.whl \
-  --next-package ../digitalafarin-cms-next-0.4.0.tgz \
+npx ./digitalafarin-cms-cli-0.5.0.tgz init \
+  --django-package ../digitalafarin_cms-0.5.0-py3-none-any.whl \
+  --next-package ../digitalafarin-cms-next-0.5.0.tgz \
   --with-admin \
-  --admin-package ../digitalafarin-cms-admin-0.4.0.tgz
+  --admin-package ../digitalafarin-cms-admin-0.5.0.tgz
 ```
 
 The release CI installs packed SDK, CLI and Admin packages into a clean temporary consumer, executes the installed binaries and verifies that `/cms` scaffolding is complete.
