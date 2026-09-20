@@ -90,13 +90,16 @@ python scripts/smoke-python-package.py
 - [ ] Release workflow still contains npm tarball/scaffold smoke tests before publishing.
 - [ ] Release workflow contains a publish step for `@digitalafarin/cms-admin`.
 
-## 5. Trusted Publishing and first Admin-package bootstrap
+## 5. Trusted Publishing
 
-Existing packages should already have npm Trusted Publishing:
+All publishable packages already exist from the v0.4.x line. v0.5 must publish through the configured GitHub environments/OIDC workflow; do not bootstrap or manually publish a package version.
+
+Verify npm Trusted Publishing for all three packages:
 
 ```bash
 npm trust list "@digitalafarin/cms-next"
 npm trust list "@digitalafarin/cms-cli"
+npm trust list "@digitalafarin/cms-admin"
 ```
 
 Expected trust target:
@@ -109,42 +112,11 @@ environment: npm
 permissions: publish
 ```
 
-### First publication of `@digitalafarin/cms-admin`
-
-`@digitalafarin/cms-admin` is new in v0.4. npm Trusted Publishing can only be attached after the npm package exists. Therefore **before creating the v0.5.0 tag**, bootstrap only this new package once with the npm account that owns the `@digitalafarin` scope:
-
-```bash
-npm --workspace apps/admin publish --access public
-```
-
-If npm requests a 2FA OTP, provide it using the normal npm authentication flow.
-
-Then configure Trusted Publishing for the new package:
-
-```bash
-npm trust github "@digitalafarin/cms-admin" \
-  --repo "rahi62/digitalafarin-cms" \
-  --file "release.yml" \
-  --env "npm" \
-  --allow-publish \
-  --yes
-```
-
-Verify:
-
-```bash
-npm trust list "@digitalafarin/cms-admin"
-```
-
-Expected target is the same `rahi62/digitalafarin-cms` / `release.yml` / `npm` environment configuration shown above.
-
-- [ ] `@digitalafarin/cms-admin@0.5.0` exists on npm before the release tag.
-- [ ] npm Trusted Publishing is configured for all three npm packages.
+- [ ] npm Trusted Publishing is configured for SDK, CLI and Admin.
 - [ ] GitHub environment `npm` exists.
 - [ ] GitHub environment `pypi` exists.
 - [ ] PyPI Trusted Publisher points to owner `rahi62`, repository `digitalafarin-cms`, workflow `release.yml`, environment `pypi`.
-
-The v0.5.0 release workflow will detect that the bootstrapped Admin version already exists and skip republishing it. Future versions can publish all three npm packages through OIDC.
+- [ ] `0.5.0` does not already exist in npm/PyPI before tagging.
 
 ## 6. Pre-tag product checks
 
@@ -172,7 +144,7 @@ The v0.5.0 release workflow will detect that the bootstrapped Admin version alre
 
 ## 7. Tag and publish
 
-Only after all checks above are green **and the new Admin package has been bootstrapped/trusted**:
+Only after all checks above are green and Trusted Publishing has been verified:
 
 ```bash
 git checkout main
