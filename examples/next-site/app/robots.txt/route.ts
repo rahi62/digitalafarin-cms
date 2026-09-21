@@ -1,5 +1,7 @@
 import { cms } from "../../lib/cms";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const response = await fetch(cms.getRobotsUrl(), { next: { revalidate: 300 } });
   if (!response.ok) return new Response("User-agent: *\nDisallow: /\n", { status: 502 });

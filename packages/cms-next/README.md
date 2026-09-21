@@ -8,10 +8,10 @@ Next.js SDK for DigitalAfarin Headless CMS + SEO.
 npm install @digitalafarin/cms-next
 ```
 
-For the v0.3 release archive:
+For the v0.5 release archive:
 
 ```bash
-npm install ./digitalafarin-cms-next-0.3.0.tgz
+npm install ./digitalafarin-cms-next-0.5.0.tgz
 ```
 
 ## Environment
@@ -57,3 +57,26 @@ The helper returns active page schemas together with the configured global Organ
 ## Other public helpers
 
 The SDK also exposes typed clients/helpers for CMS resolution, site context, menus, redirects, metadata and schema rendering. See the root repository README and `examples/next-site` for an end-to-end consumer example.
+
+
+## Safe rich-text rendering
+
+v0.5 exposes a typed `rich_text` contract and a server-safe renderer that renders the canonical Tiptap JSON rather than trusting stored HTML.
+
+```tsx
+import {
+  isCmsRichTextBlock,
+  renderCmsRichTextHtml,
+} from "@digitalafarin/cms-next";
+
+if (isCmsRichTextBlock(block)) {
+  return (
+    <div
+      className="cms-rich-text"
+      dangerouslySetInnerHTML={{ __html: renderCmsRichTextHtml(block) }}
+    />
+  );
+}
+```
+
+The renderer escapes text, allow-lists supported nodes/marks and rejects unsafe URL protocols. `data.html` remains a derived cache/fallback; `data.doc` is authoritative.

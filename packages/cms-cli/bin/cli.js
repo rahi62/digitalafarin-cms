@@ -2,11 +2,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
+const __filename = fileURLToPath(import.meta.url);
+const packageRoot = path.resolve(path.dirname(__filename), "..");
 const args = process.argv.slice(2);
 const command = args[0] || "init";
 if (!["init", "doctor", "admin"].includes(command)) {
-  console.error("Usage: digitalafarin-cms [init|doctor|admin] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-admin] [--admin-dir DIR] [--admin-base-path /cms] [--admin-api-url URL] [--admin-port 3001]");
+  console.error("Usage: digitalafarin-cms [init|doctor|admin] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--with-admin] [--admin-dir DIR] [--admin-base-path /cms] [--admin-api-url URL] [--admin-port 3001]");
   process.exit(2);
 }
 
@@ -64,6 +67,12 @@ function inferDjangoFiles(backend) {
   if (!exists(urlsFile)) throw new Error(`URLs file not found: ${urlsFile}`);
   return { settingsFile, urlsFile };
 }
+function sourceRoot(frontend) {
+  if (exists(path.join(frontend, "src", "app"))) return path.join(frontend, "src");
+  if (exists(path.join(frontend, "app"))) return frontend;
+  return exists(path.join(frontend, "src")) ? path.join(frontend, "src") : frontend;
+}
+
 function ensureEnv(frontend) {
   const envFile = path.join(frontend, ".env.local");
   let text = exists(envFile) ? fs.readFileSync(envFile, "utf8") : "";
@@ -77,13 +86,53 @@ function ensureEnv(frontend) {
   }
 }
 function ensureNextAdapter(frontend) {
-  const useSrc = exists(path.join(frontend, "src"));
-  const lib = path.join(frontend, useSrc ? "src" : "", "lib");
+  const lib = path.join(sourceRoot(frontend), "lib");
   fs.mkdirSync(lib, { recursive: true });
   const file = path.join(lib, "digitalafarin-cms.ts");
   if (!exists(file)) {
     fs.writeFileSync(file, `import { createCmsClientFromEnv } from "@digitalafarin/cms-next";\n\nexport const cms = createCmsClientFromEnv({ revalidate: 60 });\n`);
   }
+}
+
+function ensurePublicRoute(frontend) {
+  const root = sourceRoot(frontend);
+  const appDir = path.join(root, "app");
+  if (!exists(appDir)) {
+    throw new Error("--with-public-route requires a Next.js App Router project with app/ or src/app/.");
+  }
+
+  const routeName = "[[...cms_path]]";
+  const conflictingCatchAll = fs.readdirSync(appDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .find((name) =>
+      name !== routeName &&
+      (/^\[\[\.\.\..+\]\]$/.test(name) || /^\[\.\.\..+\]$/.test(name))
+    );
+
+  if (conflictingCatchAll) {
+    throw new Error(
+      `Cannot scaffold the CMS public route because app/${conflictingCatchAll} already owns the root catch-all. Integrate cms.resolve() into that route manually instead.`,
+    );
+  }
+
+  const routeDir = path.join(appDir, routeName);
+  const routeFile = path.join(routeDir, "page.tsx");
+  const componentDir = path.join(root, "components", "digitalafarin-cms");
+  const rendererFile = path.join(componentDir, "BlockRenderer.tsx");
+  const templateDir = path.join(packageRoot, "templates", "next");
+
+  fs.mkdirSync(routeDir, { recursive: true });
+  fs.mkdirSync(componentDir, { recursive: true });
+
+  if (!exists(routeFile)) {
+    fs.copyFileSync(path.join(templateDir, "public-page.tsx"), routeFile);
+  }
+  if (!exists(rendererFile)) {
+    fs.copyFileSync(path.join(templateDir, "BlockRenderer.tsx"), rendererFile);
+  }
+
+  return { routeFile, rendererFile };
 }
 function scaffoldAdmin() {
   const adminPackage = arg("--admin-package", "@digitalafarin/cms-admin");
@@ -153,6 +202,9 @@ if (frontend) {
   if (!skipInstall) run("npm", ["install", nextPackage], { cwd: frontend });
   ensureEnv(frontend);
   ensureNextAdapter(frontend);
+  if (has("--with-public-route")) ensurePublicRoute(frontend);
+} else if (has("--with-public-route")) {
+  throw new Error("--with-public-route requires a detected or explicit Next.js frontend.");
 }
 
 if (has("--with-admin")) scaffoldAdmin();
@@ -160,4 +212,5 @@ if (has("--with-admin")) scaffoldAdmin();
 console.log("\nDigitalAfarin CMS wiring complete.");
 console.log("Backend API default: /api/cms/v1/");
 console.log("Next adapter: lib/digitalafarin-cms.ts (or src/lib/...)");
+if (has("--with-public-route")) console.log("Public CMS route: app/[[...cms_path]]/page.tsx (or src/app/...)");
 if (has("--with-admin")) console.log(`CMS Admin: ${arg("--admin-base-path", "/cms")} on port ${arg("--admin-port", "3001")}`);

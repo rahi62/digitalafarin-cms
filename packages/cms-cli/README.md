@@ -23,7 +23,17 @@ The CLI:
 5. installs `@digitalafarin/cms-next`;
 6. creates `.env.local` defaults and a Next.js CMS client adapter.
 
-It does **not** overwrite an existing Next.js route or page renderer.
+By default it does **not** overwrite an existing Next.js route or page renderer.
+
+For an App Router site that should expose CMS-created paths directly, add:
+
+```bash
+npx @digitalafarin/cms-cli init \
+  --frontend frontend \
+  --with-public-route
+```
+
+This creates `app/[[...cms_path]]/page.tsx` (or `src/app/...`) plus a reusable block renderer. The generated renderer uses the SDK's safe Tiptap JSON renderer. If the application already has a root catch-all route, the CLI stops and asks you to integrate `cms.resolve()` into the existing route instead of creating a conflicting route.
 
 ## Add the visual CMS Admin under `/cms`
 
@@ -72,6 +82,7 @@ npx @digitalafarin/cms-cli doctor
 --skip-migrate
 --django-package SPEC
 --next-package SPEC
+--with-public-route
 --with-admin
 --admin-package SPEC
 --admin-dir DIR
@@ -86,11 +97,11 @@ Package override flags are useful when testing local release artifacts.
 ## Local archives
 
 ```bash
-npx ./digitalafarin-cms-cli-0.4.0.tgz init \
-  --django-package ../digitalafarin_cms-0.4.0-py3-none-any.whl \
-  --next-package ../digitalafarin-cms-next-0.4.0.tgz \
+npx ./digitalafarin-cms-cli-0.5.0.tgz init \
+  --django-package ../digitalafarin_cms-0.5.0-py3-none-any.whl \
+  --next-package ../digitalafarin-cms-next-0.5.0.tgz \
   --with-admin \
-  --admin-package ../digitalafarin-cms-admin-0.4.0.tgz
+  --admin-package ../digitalafarin-cms-admin-0.5.0.tgz
 ```
 
 The release CI installs packed SDK, CLI and Admin packages into a clean temporary consumer, executes the installed binaries and verifies that `/cms` scaffolding is complete.

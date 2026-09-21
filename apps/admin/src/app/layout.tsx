@@ -10,6 +10,7 @@ import "../styles/audit-trends.css";
 import "../styles/site-settings.css";
 import "../styles/search-performance.css";
 import "../styles/seo-opportunities.css";
+import "../styles/professional-editor.css";
 import Shell from "@/components/Shell";
 
 export const metadata: Metadata = {

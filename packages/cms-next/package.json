@@ -1,6 +1,6 @@
 {
   "name": "@digitalafarin/cms-next",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Next.js SDK for DigitalAfarin Headless CMS + SEO",
   "type": "module",
   "main": "./dist/index.js",
@@ -30,7 +30,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pack:check": "npm pack --dry-run"
+    "pack:check": "npm pack --dry-run",
+    "test:rich-text": "node --test test/rich-text.test.mjs"
   },
   "license": "Apache-2.0",
   "repository": {

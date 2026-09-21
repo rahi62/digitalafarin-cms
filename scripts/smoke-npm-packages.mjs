@@ -50,6 +50,7 @@ try {
   const app = path.join(tempRoot, "consumer");
   const frontend = path.join(app, "frontend");
   fs.mkdirSync(frontend, { recursive: true });
+  fs.mkdirSync(path.join(frontend, "app"), { recursive: true });
 
   fs.writeFileSync(
     path.join(app, "package.json"),
@@ -67,10 +68,12 @@ try {
   );
 
   const probe = `
-    import { createCmsClient, toNextMetadata, allSchemaJsonLd } from "@digitalafarin/cms-next";
+    import { createCmsClient, toNextMetadata, allSchemaJsonLd, renderCmsRichTextHtml, isCmsRichTextBlock } from "@digitalafarin/cms-next";
     if (typeof createCmsClient !== "function") throw new Error("createCmsClient export missing");
     if (typeof toNextMetadata !== "function") throw new Error("toNextMetadata export missing");
     if (typeof allSchemaJsonLd !== "function") throw new Error("allSchemaJsonLd export missing");
+    if (typeof renderCmsRichTextHtml !== "function") throw new Error("renderCmsRichTextHtml export missing");
+    if (typeof isCmsRichTextBlock !== "function") throw new Error("isCmsRichTextBlock export missing");
     const client = createCmsClient({ baseUrl: "https://cms.example/api/cms/v1", site: "example.com" });
     if (typeof client.resolve !== "function" || typeof client.getMenu !== "function") throw new Error("CMS client surface incomplete");
     console.log("@digitalafarin/cms-next installed tarball import OK");
@@ -81,6 +84,27 @@ try {
   if (!fs.existsSync(cliBin)) throw new Error("digitalafarin-cms bin shim was not installed");
   run(cliBin, ["doctor", "--frontend", frontend], app);
   console.log("@digitalafarin/cms-cli installed tarball executable OK");
+
+  run(cliBin, [
+    "init",
+    "--frontend", frontend,
+    "--skip-install",
+    "--with-public-route",
+  ], app);
+  for (const expected of [
+    "lib/digitalafarin-cms.ts",
+    "app/[[...cms_path]]/page.tsx",
+    "components/digitalafarin-cms/BlockRenderer.tsx",
+  ]) {
+    if (!fs.existsSync(path.join(frontend, expected))) {
+      throw new Error(`cms-cli --with-public-route missing ${expected}`);
+    }
+  }
+  const publicRoute = fs.readFileSync(path.join(frontend, "app", "[[...cms_path]]", "page.tsx"), "utf8");
+  if (!publicRoute.includes("cms.resolve")) throw new Error("Generated public route does not resolve CMS content");
+  const publicRenderer = fs.readFileSync(path.join(frontend, "components", "digitalafarin-cms", "BlockRenderer.tsx"), "utf8");
+  if (!publicRenderer.includes("renderCmsRichTextHtml")) throw new Error("Generated public renderer does not use safe rich text helper");
+  console.log("@digitalafarin/cms-cli public route scaffold OK");
 
   const adminBin = binPath(app, "digitalafarin-cms-admin");
   if (!fs.existsSync(adminBin)) throw new Error("digitalafarin-cms-admin bin shim was not installed");
@@ -103,6 +127,10 @@ try {
     "src/app/page.tsx",
     "src/app/login/page.tsx",
     "src/app/api-proxy/[...path]/route.ts",
+    "src/components/ProfessionalEditor.tsx",
+    "src/components/RichTextEditor.tsx",
+    "src/lib/editor-block-adapter.ts",
+    "src/styles/professional-editor.css",
     "deploy/nginx.cms.conf",
   ]) {
     if (!fs.existsSync(path.join(directAdmin, expected))) throw new Error(`Admin scaffold missing ${expected}`);

@@ -1,5 +1,7 @@
 import { cms } from "../../lib/cms";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const response = await fetch(cms.getSitemapUrl(), { next: { revalidate: 300 } });
   if (!response.ok) return new Response("Sitemap unavailable", { status: 502 });

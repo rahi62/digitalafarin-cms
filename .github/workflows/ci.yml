@@ -57,13 +57,25 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: "24"
+          node-version: "22"
           package-manager-cache: false
-      - run: npm install --ignore-scripts
+      - name: Verify locked Node toolchain
+        run: |
+          node --version
+          npm --version
+          test -f package-lock.json
+          node -e "const l=require('./package-lock.json'); if(l.lockfileVersion<1) process.exit(1); console.log('lockfileVersion='+l.lockfileVersion)"
+      - run: npm ci --ignore-scripts
       - run: npm run check:versions
       - run: npm --workspace packages/cms-next run build
       - run: npm --workspace packages/cms-next run typecheck
+      - run: npm --workspace packages/cms-next run test:rich-text
       - run: npm --workspace apps/admin run typecheck
+      - run: npm --workspace apps/admin run build
+      - run: npm --workspace examples/next-site run build
+      - name: Install Chromium for editor browser tests
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:editor
       - name: Smoke test installed npm tarballs
         run: node scripts/smoke-npm-packages.mjs
       - name: Inspect npm package contents
@@ -71,3 +83,5 @@ jobs:
           npm --workspace apps/admin run pack:check
           npm --workspace packages/cms-next run pack:check
           npm --workspace packages/cms-cli run pack:check
+
+

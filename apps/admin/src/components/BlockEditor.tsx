@@ -216,6 +216,17 @@ export default function BlockEditor({ value, onChange, siteId }: Props) {
 function BlockFields({ block, siteId, onChange }: { block: ContentBlock; siteId?: string; onChange: (data: Record<string, unknown>) => void }) {
   const data = block.data || {};
 
+  if (block.type === "rich_text") {
+    const preview = text(data.text).trim();
+    return (
+      <div className="richTextBlockSummary">
+        <strong>متن حرفه‌ای (Tiptap)</strong>
+        <p>{preview ? preview.slice(0, 320) : "این بلوک با ویرایشگر استاندارد ساخته شده است."}</p>
+        <small>برای ویرایش متن به حالت «ویرایشگر استاندارد» برگردید. JSON کامل همچنان از ابزار بالای Block Editor در دسترس است.</small>
+      </div>
+    );
+  }
+
   if (block.type === "paragraph") {
     return <textarea className="blockTextArea" placeholder="متن پاراگراف..." value={text(data.text)} onChange={(e) => onChange({ text: e.target.value })} />;
   }
