@@ -50,6 +50,7 @@ try {
   const app = path.join(tempRoot, "consumer");
   const frontend = path.join(app, "frontend");
   fs.mkdirSync(frontend, { recursive: true });
+  fs.mkdirSync(path.join(frontend, "app"), { recursive: true });
 
   fs.writeFileSync(
     path.join(app, "package.json"),
