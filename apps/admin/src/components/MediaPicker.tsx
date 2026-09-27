@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch, Paginated } from "@/lib/api";
+import { adminPath } from "@/lib/admin-path";
 
 export type MediaAsset = {
   id: string; site: string; url: string | null; filename: string; mime_type: string;
@@ -110,7 +111,7 @@ export default function MediaPicker({
               <option value="">همه پوشه‌ها</option>
               {folders.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
-            <Link href="/media" className="btn secondary small" target="_blank">مدیریت رسانه‌ها ↗</Link>
+            <Link href={adminPath("/media")} className="btn secondary small" target="_blank">مدیریت رسانه‌ها ↗</Link>
           </div>
 
           {message && <div className="error">{message}</div>}
