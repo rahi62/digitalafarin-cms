@@ -4,7 +4,7 @@
 
 DigitalAfarin CMS combines a reusable Django/DRF content backend, a Next.js SDK, a visual Next.js Admin application and an installer CLI. It is designed for teams that want WordPress-like content management and SEO workflows without coupling rendering to WordPress.
 
-> Status: **0.5.0 / Community Edition (pre-1.0)**. The public API can still change before 1.0.
+> Status: **0.5.1 / Community Edition (pre-1.0)**. Active v0.6 development is happening on `main`; the public API can still change before 1.0.
 
 ## Packages
 
@@ -12,7 +12,7 @@ DigitalAfarin CMS combines a reusable Django/DRF content backend, a Next.js SDK,
 |---|---|---|
 | `digitalafarin-cms` | PyPI | Django/DRF CMS, SEO, audit and integrations backend |
 | `@digitalafarin/cms-next` | npm | Next.js resolver, metadata and JSON-LD helpers |
-| `@digitalafarin/cms-admin` | npm | Scaffoldable visual Next.js CMS Admin for `/cms` path deployments |
+| `@digitalafarin/cms-admin` | npm | Embeddable visual CMS Admin for an existing Next.js app, with optional standalone scaffolding |
 | `@digitalafarin/cms-cli` | npm | Installer/wiring CLI for Django + Next.js + CMS Admin |
 
 ## Installation
@@ -46,41 +46,52 @@ npx @digitalafarin/cms-cli init \\
 
 The optional public route scaffold creates a safe CMS catch-all only when it will not conflict with an existing root catch-all.
 
-Wire the backend/frontend **and** scaffold the visual Admin under `/cms`:
+Wire the backend/frontend **and embed the visual Admin inside the existing Next.js application** under `/cms`:
 
 ```bash
 npx @digitalafarin/cms-cli init \
   --backend backend \
   --frontend frontend \
   --with-admin \
+  --admin-base-path /cms \
+  --admin-api-url https://api.example.com/api/cms/v1
+```
+
+This installs `@digitalafarin/cms-admin` into the **host frontend's existing `node_modules`** and generates the `/cms` routes inside that same Next.js app. It does not create a second Next.js project or a second `node_modules`.
+
+To add only the embedded Admin to an existing Next.js project:
+
+```bash
+npx @digitalafarin/cms-cli admin \
+  --frontend frontend \
+  --admin-base-path /cms \
+  --admin-api-url https://api.example.com/api/cms/v1
+```
+
+A standalone Admin application remains available as an explicit deployment option:
+
+```bash
+npx @digitalafarin/cms-cli admin-standalone \
   --admin-dir cms-admin \
   --admin-base-path /cms \
   --admin-api-url https://api.example.com/api/cms/v1 \
   --admin-port 3001
 ```
 
-Or scaffold only the Admin application:
-
-```bash
-npx @digitalafarin/cms-admin scaffold \
-  --dir cms-admin \
-  --base-path /cms \
-  --api-url https://api.example.com/api/cms/v1 \
-  --port 3001
-```
-
-The generated Admin uses a same-origin `/cms/api-proxy` route. Browser requests stay on the main website origin while the Admin server forwards requests to the Django API upstream. This avoids requiring direct browser CORS access when Django is hosted on an API subdomain.
+The embedded Admin uses a same-origin `/cms/api-proxy` route in the host Next.js app. Browser requests stay on the website origin while the route forwards requests to the Django API upstream.
 
 ## Recommended production layout
 
 ```text
-https://example.com/        Public Next.js website
-https://example.com/cms/    DigitalAfarin CMS Admin
-/cms/api-proxy/*            Same-origin Admin API proxy
-Django CMS API              api.example.com or an internal upstream
+One Next.js application
+├─ https://example.com/        Public website
+├─ https://example.com/cms/    Embedded DigitalAfarin CMS Admin
+└─ /cms/api-proxy/*            Same-origin Admin API proxy
+
+Django CMS API                api.example.com or an internal upstream
 ```
 
-The Admin scaffold generates `deploy/nginx.cms.conf` for routing `/cms/` to its Node process.
+No second Node process is required for the default embedded mode. Standalone Admin deployment is still available when process isolation is explicitly desired.
 
 Django Admin is still useful for technical maintenance, but normal editorial/content management should happen in the visual Next.js CMS Admin.
 
