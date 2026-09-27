@@ -242,6 +242,13 @@ test("standard edits preserve trailing advanced blocks through Standard ↔ Adva
   await expect(page.getByPlaceholder("عنوان CTA")).toHaveValue("Contact us");
   await expect(page.getByPlaceholder("توضیح کوتاه")).toHaveValue("Keep this block");
 
+  const richTextBlock = page.locator(".editorBlock").filter({ hasText: "rich_text" });
+  await expect(richTextBlock.getByTitle("پایین")).toBeDisabled();
+  await expect(richTextBlock.getByTitle("تکثیر")).toBeDisabled();
+
+  const ctaEditorBlock = page.locator(".editorBlock").filter({ hasText: "cta" });
+  await expect(ctaEditorBlock.getByTitle("بالا")).toBeDisabled();
+
   await page.getByRole("tab", { name: "ویرایشگر استاندارد" }).click();
   await expect(canvas).toContainText("Edited body");
 
