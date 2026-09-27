@@ -1,21 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch, Paginated } from "@/lib/api";
 
 export type MediaAsset = {
-  id: string;
-  site: string;
-  url: string | null;
-  filename: string;
-  mime_type: string;
-  alt_text: string;
-  caption: string;
-  folder: string;
-  width: number | null;
-  height: number | null;
-  size_bytes: number;
+  id: string; site: string; url: string | null; filename: string; mime_type: string;
+  alt_text: string; caption: string; folder: string; width: number | null;
+  height: number | null; size_bytes: number;
 };
 
 type Props = {
@@ -28,52 +20,73 @@ type Props = {
 };
 
 export default function MediaPicker({
-  siteId,
-  open,
-  imageOnly = true,
-  selectedUrl = "",
-  onClose,
-  onSelect,
+  siteId, open, imageOnly = true, selectedUrl = "", onClose, onSelect,
 }: Props) {
   const [rows, setRows] = useState<MediaAsset[]>([]);
+  const [folders, setFolders] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [folder, setFolder] = useState("");
   const [message, setMessage] = useState("");
+  const [page, setPage] = useState(1);
+  const [count, setCount] = useState(0);
+  const pageSize = 30;
+
+  useEffect(() => {
+    if (!open) {
+      setSearch("");
+      setFolder("");
+      setPage(1);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open || !siteId) return;
     let cancelled = false;
-    setLoading(true);
-    setMessage("");
-    apiFetch<Paginated<MediaAsset>>(`/media/assets/?site=${encodeURIComponent(siteId)}`)
-      .then((data) => {
-        if (!cancelled) setRows(data.results);
-      })
-      .catch((error) => {
-        if (!cancelled) setMessage(error instanceof Error ? error.message : "خطا در بارگذاری رسانه‌ها");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    apiFetch<{ results: string[] }>(`/media/assets/folders/?site=${encodeURIComponent(siteId)}`)
+      .then((data) => { if (!cancelled) setFolders(data.results); })
+      .catch(() => { if (!cancelled) setFolders([]); });
     return () => { cancelled = true; };
   }, [open, siteId]);
 
-  const folders = useMemo(
-    () => Array.from(new Set(rows.map((item) => item.folder).filter(Boolean))).sort(),
-    [rows],
-  );
+  useEffect(() => {
+    if (!open || !siteId) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setMessage("");
+      const params = new URLSearchParams({
+        site: siteId,
+        page: String(page),
+        page_size: String(pageSize),
+        ordering: "-created_at",
+      });
+      if (imageOnly) params.set("type", "images");
+      if (search.trim()) params.set("search", search.trim());
+      if (folder) params.set("folder", folder);
 
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return rows.filter((asset) => {
-      if (imageOnly && !asset.mime_type?.startsWith("image/")) return false;
-      if (folder && asset.folder !== folder) return false;
-      if (!query) return true;
-      return [asset.filename, asset.alt_text, asset.caption, asset.folder]
-        .some((value) => (value || "").toLowerCase().includes(query));
-    });
-  }, [rows, search, folder, imageOnly]);
+      apiFetch<Paginated<MediaAsset>>(`/media/assets/?${params.toString()}`)
+        .then((data) => {
+          if (!cancelled) {
+            setRows(data.results);
+            setCount(data.count);
+          }
+        })
+        .catch((error) => {
+          if (!cancelled) setMessage(error instanceof Error ? error.message : "خطا در بارگذاری رسانه‌ها");
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [open, siteId, imageOnly, search, folder, page]);
+
+  const totalPages = Math.max(1, Math.ceil(count / pageSize));
 
   if (!open) return null;
 
@@ -90,50 +103,44 @@ export default function MediaPicker({
           <button type="button" onClick={onClose}>×</button>
         </div>
 
-        {!siteId ? (
-          <div className="error">ابتدا سایت محتوا را انتخاب کنید.</div>
-        ) : (
-          <>
-            <div className="mediaPickerToolbar">
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="جستجو در نام، Alt یا Caption..." />
-              <select value={folder} onChange={(event) => setFolder(event.target.value)}>
-                <option value="">همه پوشه‌ها</option>
-                {folders.map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
-              <Link href="/media" className="btn secondary small" target="_blank">مدیریت رسانه‌ها ↗</Link>
-            </div>
+        {!siteId ? <div className="error">ابتدا سایت محتوا را انتخاب کنید.</div> : <>
+          <div className="mediaPickerToolbar">
+            <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="جستجو در نام، Alt یا Caption..." />
+            <select value={folder} onChange={(event) => { setFolder(event.target.value); setPage(1); }}>
+              <option value="">همه پوشه‌ها</option>
+              {folders.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+            <Link href="/media" className="btn secondary small" target="_blank">مدیریت رسانه‌ها ↗</Link>
+          </div>
 
-            {message && <div className="error">{message}</div>}
-            {loading ? (
-              <div className="mediaPickerEmpty">در حال بارگذاری...</div>
-            ) : filtered.length === 0 ? (
-              <div className="mediaPickerEmpty">رسانه مناسبی پیدا نشد.</div>
-            ) : (
-              <div className="mediaPickerGrid">
-                {filtered.map((asset) => (
-                  <button
-                    type="button"
-                    key={asset.id}
-                    className={`mediaPickerCard ${asset.url === selectedUrl ? "selected" : ""}`}
-                    onClick={() => { onSelect(asset); onClose(); }}
-                  >
-                    <div className="mediaPickerThumb">
-                      {asset.url && asset.mime_type?.startsWith("image/")
-                        ? <img src={asset.url} alt={asset.alt_text || asset.filename} />
-                        : <span>FILE</span>}
-                    </div>
-                    <strong title={asset.filename}>{asset.filename || "بدون نام"}</strong>
-                    <span>{asset.alt_text || "Alt ندارد"}</span>
-                    {asset.width && asset.height && <small>{asset.width} × {asset.height}</small>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </>
-        )}
+          {message && <div className="error">{message}</div>}
+          {loading ? <div className="mediaPickerEmpty">در حال بارگذاری...</div> :
+            rows.length === 0 ? <div className="mediaPickerEmpty">رسانه مناسبی پیدا نشد.</div> :
+            <div className="mediaPickerGrid">{rows.map((asset) => (
+              <button
+                type="button"
+                key={asset.id}
+                className={`mediaPickerCard ${asset.url === selectedUrl ? "selected" : ""}`}
+                onClick={() => { onSelect(asset); onClose(); }}
+              >
+                <div className="mediaPickerThumb">
+                  {asset.url && asset.mime_type?.startsWith("image/") ? <img src={asset.url} alt={asset.alt_text || asset.filename} /> : <span>FILE</span>}
+                </div>
+                <strong title={asset.filename}>{asset.filename || "بدون نام"}</strong>
+                <span>{asset.alt_text || "Alt ندارد"}</span>
+                {asset.width && asset.height && <small>{asset.width} × {asset.height}</small>}
+              </button>
+            ))}</div>}
+
+          {count > pageSize && <div className="mediaPickerPagination">
+            <button type="button" className="btn secondary small" disabled={page <= 1 || loading} onClick={() => setPage((value) => Math.max(1, value - 1))}>قبلی</button>
+            <span>صفحه {page} از {totalPages}</span>
+            <button type="button" className="btn secondary small" disabled={page >= totalPages || loading} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>بعدی</button>
+          </div>}
+        </>}
 
         <div className="mediaPickerFooter">
-          <span>{filtered.length} فایل قابل انتخاب</span>
+          <span>{count} فایل قابل انتخاب</span>
           <button type="button" className="btn secondary" onClick={onClose}>انصراف</button>
         </div>
       </div>
