@@ -237,6 +237,13 @@ test("standard edits preserve trailing advanced blocks through Standard ↔ Adva
   await expect(canvas).toContainText("Original body");
   await canvas.fill("Edited body");
 
+  await expect(page.getByText("تغییرات ذخیره‌نشده")).toBeVisible();
+  await expect.poll(
+    () => JSON.stringify((state.entry?.blocks || [])),
+    { timeout: 8000 },
+  ).toContain("Edited body");
+  await expect(page.getByText("ذخیره شد")).toBeVisible();
+
   await page.getByRole("tab", { name: "بلوک‌های پیشرفته" }).click();
   await expect(page.getByText("متن حرفه‌ای (Tiptap)")).toBeVisible();
   await expect(page.getByPlaceholder("عنوان CTA")).toHaveValue("Contact us");
