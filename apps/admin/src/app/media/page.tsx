@@ -39,6 +39,8 @@ export default function MediaPage() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
   const [selected, setSelected] = useState<Asset | null>(null);
+  const [mimeFilter, setMimeFilter] = useState<"all" | "images" | "documents">("all");
+  const [sort, setSort] = useState<"newest" | "oldest" | "name">("newest");
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function loadAssets(siteId = site) {
@@ -64,12 +66,23 @@ export default function MediaPage() {
   const folders = useMemo(() => Array.from(new Set(assets.map((asset) => asset.folder).filter(Boolean))).sort(), [assets]);
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return assets.filter((asset) => {
+    const rows = assets.filter((asset) => {
       if (folder && asset.folder !== folder) return false;
+      if (mimeFilter === "images" && !asset.mime_type?.startsWith("image/")) return false;
+      if (mimeFilter === "documents" && asset.mime_type?.startsWith("image/")) return false;
       if (!query) return true;
       return [asset.filename, asset.alt_text, asset.caption, asset.folder].some((value) => (value || "").toLowerCase().includes(query));
     });
-  }, [assets, search, folder]);
+
+    rows.sort((a, b) => {
+      if (sort === "name") return (a.filename || "").localeCompare(b.filename || "", "fa");
+      const left = new Date(a.created_at).getTime();
+      const right = new Date(b.created_at).getTime();
+      return sort === "oldest" ? left - right : right - left;
+    });
+
+    return rows;
+  }, [assets, search, folder, mimeFilter, sort]);
 
   async function upload(e: FormEvent) {
     e.preventDefault();
@@ -147,6 +160,16 @@ export default function MediaPage() {
               <div><h2>فایل‌ها</h2><span>{filtered.length} از {assets.length}</span></div>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="جستجو در نام، alt، caption..." />
               <select value={folder} onChange={(e) => setFolder(e.target.value)}><option value="">همه پوشه‌ها</option>{folders.map((item) => <option key={item} value={item}>{item}</option>)}</select>
+              <select value={mimeFilter} onChange={(e) => setMimeFilter(e.target.value as "all" | "images" | "documents")}>
+                <option value="all">همه نوع‌ها</option>
+                <option value="images">فقط تصاویر</option>
+                <option value="documents">فایل‌های غیرتصویری</option>
+              </select>
+              <select value={sort} onChange={(e) => setSort(e.target.value as "newest" | "oldest" | "name")}>
+                <option value="newest">جدیدترین</option>
+                <option value="oldest">قدیمی‌ترین</option>
+                <option value="name">نام فایل</option>
+              </select>
             </div>
 
             {filtered.length === 0 ? <div className="emptyState">رسانه‌ای برای نمایش وجود ندارد.</div> : (
@@ -174,7 +197,19 @@ export default function MediaPage() {
               <div className="field"><label>Caption</label><textarea value={selected.caption || ""} onChange={(e) => setSelected({ ...selected, caption: e.target.value })} /></div>
               <div className="field"><label>Folder</label><input value={selected.folder || ""} onChange={(e) => setSelected({ ...selected, folder: e.target.value })} /></div>
               <div className="field"><label>URL</label><input dir="ltr" readOnly value={selected.url || ""} onFocus={(e) => e.currentTarget.select()} /></div>
-              <div className="mediaDetailActions"><button type="button" className="btn" onClick={() => saveAsset(selected)}>ذخیره</button><button type="button" className="btn dangerBtn" onClick={() => removeAsset(selected)}>حذف</button></div>
+              <div className="mediaDetailActions">
+                <button type="button" className="btn" onClick={() => saveAsset(selected)}>ذخیره</button>
+                <button type="button" className="btn secondary" disabled={!selected.url} onClick={async () => {
+                  if (!selected.url) return;
+                  try {
+                    await navigator.clipboard.writeText(selected.url);
+                    setMessage("URL رسانه کپی شد");
+                  } catch {
+                    setMessage("خطا در کپی URL رسانه");
+                  }
+                }}>کپی URL</button>
+                <button type="button" className="btn dangerBtn" onClick={() => removeAsset(selected)}>حذف</button>
+              </div>
             </>
           )}
         </aside>
