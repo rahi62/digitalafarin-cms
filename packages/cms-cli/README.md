@@ -20,8 +20,9 @@ The CLI:
 2. adds the CMS settings helper to Django;
 3. mounts `/api/cms/v1/`;
 4. runs Django migrations unless `--skip-migrate` is used;
-5. installs `@digitalafarin/cms-next`;
-6. creates `.env.local` defaults and a Next.js CMS client adapter.
+5. installs `@digitalafarin/cms-next` into the host frontend;
+6. creates `.env.local` defaults and a Next.js CMS client adapter;
+7. with `--with-admin`, installs `@digitalafarin/cms-admin` into that same frontend and embeds `/cms` into the host App Router.
 
 By default it does **not** overwrite an existing Next.js route or page renderer.
 
@@ -37,32 +38,48 @@ This creates `app/[[...cms_path]]/page.tsx` (or `src/app/...`) plus a reusable b
 
 ## Add the visual CMS Admin under `/cms`
 
-To wire the backend/frontend and also scaffold the separate Next.js admin application:
+The default Admin mode is **embedded**. It uses the existing Next.js application and the same `node_modules`:
 
 ```bash
 npx @digitalafarin/cms-cli init \
   --backend backend \
   --frontend frontend \
   --with-admin \
-  --admin-dir cms-admin \
   --admin-base-path /cms \
-  --admin-api-url https://api.example.com/api/cms/v1 \
-  --admin-port 3001
+  --admin-api-url https://api.example.com/api/cms/v1
 ```
 
-Or scaffold only the admin application:
+To install only the embedded Admin into an existing frontend:
 
 ```bash
 npx @digitalafarin/cms-cli admin \
+  --frontend frontend \
+  --admin-base-path /cms \
+  --admin-api-url https://api.example.com/api/cms/v1
+```
+
+The host project remains one Next.js application:
+
+```text
+frontend/
+├─ app/ or src/app/
+│  └─ cms/
+├─ digitalafarin-cms-admin/ or src/digitalafarin-cms-admin/
+├─ node_modules/
+└─ package.json
+```
+
+No `cms-admin/node_modules` is created.
+
+For intentionally isolated deployments, the legacy standalone mode remains explicit:
+
+```bash
+npx @digitalafarin/cms-cli admin-standalone \
   --admin-dir cms-admin \
   --admin-base-path /cms \
   --admin-api-url https://api.example.com/api/cms/v1 \
   --admin-port 3001
 ```
-
-The generated admin app is a standalone Next.js application. It can be reverse-proxied from the main website domain so editorial users visit `https://example.com/cms/` without a separate CMS subdomain.
-
-The generated `cms-admin/deploy/nginx.cms.conf` contains the Nginx location block.
 
 ## Doctor
 
@@ -85,9 +102,13 @@ npx @digitalafarin/cms-cli doctor
 --with-public-route
 --with-admin
 --admin-package SPEC
---admin-dir DIR
 --admin-base-path /cms
 --admin-api-url URL
+--admin-package SPEC
+--force-admin
+
+Standalone-only flags:
+--admin-dir DIR
 --admin-port 3001
 --force-admin
 ```
