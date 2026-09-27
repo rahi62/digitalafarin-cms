@@ -145,6 +145,7 @@ function embedAdmin(frontend) {
     "--api-url", adminApiUrl,
   ];
   if (has("--force-admin")) commandArgs.push("--force");
+  if (has("--skip-install")) commandArgs.push("--skip-install");
   run("npm", commandArgs, { cwd: frontend });
 }
 
