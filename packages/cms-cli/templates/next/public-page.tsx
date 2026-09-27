@@ -1,5 +1,6 @@
 import {
   allSchemaJsonLd,
+  isCmsNotFoundError,
   jsonLdScriptProps,
   toNextMetadata,
 } from "@digitalafarin/cms-next";
@@ -14,12 +15,14 @@ function cmsPath(segments?: string[]) {
 async function resolveCmsPage(path: string) {
   try {
     return await cms.resolve(path);
-  } catch {
+  } catch (error) {
+    if (!isCmsNotFoundError(error)) throw error;
+
     let rule: { match: boolean; type?: number; destination?: string | null } | null = null;
     try {
       rule = await cms.resolveRedirect(path);
-    } catch {
-      rule = null;
+    } catch (redirectError) {
+      if (!isCmsNotFoundError(redirectError)) throw redirectError;
     }
 
     if (rule?.match && rule.destination) {
@@ -39,8 +42,9 @@ export async function generateMetadata({
   const path = cmsPath((await params).cms_path);
   try {
     return toNextMetadata(await cms.resolve(path));
-  } catch {
-    return {};
+  } catch (error) {
+    if (isCmsNotFoundError(error)) return {};
+    throw error;
   }
 }
 

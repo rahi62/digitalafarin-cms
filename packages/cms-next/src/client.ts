@@ -14,6 +14,22 @@ type NextRequestInit = RequestInit & {
   next?: { revalidate?: number };
 };
 
+export class CmsRequestError extends Error {
+  status: number;
+  body: string;
+
+  constructor(status: number, body: string) {
+    super(`CMS request failed: ${status} ${body}`);
+    this.name = "CmsRequestError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
+export function isCmsNotFoundError(error: unknown): error is CmsRequestError {
+  return error instanceof CmsRequestError && error.status === 404;
+}
+
 function normalizeBaseUrl(value: string) {
   if (!value) throw new Error("CMS baseUrl is required");
   return value.replace(/\/$/, "");
@@ -38,7 +54,7 @@ export function createCmsClient(options: CmsClientOptions) {
 
     const res = await fetch(`${base}${path}`, requestInit);
     if (!res.ok) {
-      throw new Error(`CMS request failed: ${res.status} ${await res.text()}`);
+      throw new CmsRequestError(res.status, await res.text());
     }
     return res.json() as Promise<T>;
   }

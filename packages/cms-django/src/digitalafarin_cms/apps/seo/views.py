@@ -17,6 +17,95 @@ from .models import InternalLinkSuggestion, Keyword, KeywordCluster, KeywordMapp
 from .serializers import InternalLinkSuggestionSerializer, KeywordClusterSerializer, KeywordMappingSerializer, KeywordSerializer, RedirectSerializer, SchemaMarkupSerializer, SeoMetaSerializer
 
 
+def _flatten(value):
+    if isinstance(value, dict):
+        return " ".join(_flatten(v) for v in value.values())
+    if isinstance(value, list):
+        return " ".join(_flatten(v) for v in value)
+    return str(value) if value is not None else ""
+
+
+def _node_text(node):
+    if not isinstance(node, dict):
+        return ""
+    parts = []
+    if isinstance(node.get("text"), str):
+        parts.append(node["text"])
+    content = node.get("content")
+    if isinstance(content, list):
+        parts.extend(_node_text(child) for child in content)
+    return " ".join(part for part in parts if part)
+
+
+def _iter_tiptap_nodes(node):
+    if not isinstance(node, dict):
+        return
+    yield node
+    content = node.get("content")
+    if isinstance(content, list):
+        for child in content:
+            yield from _iter_tiptap_nodes(child)
+
+
+def _seo_block_metrics(blocks):
+    text_parts = []
+    headings = []
+    images = []
+    internal_links = 0
+
+    for block in blocks if isinstance(blocks, list) else []:
+        if not isinstance(block, dict):
+            continue
+        block_type = block.get("type")
+        data = block.get("data") if isinstance(block.get("data"), dict) else {}
+
+        if block_type == "rich_text":
+            text_parts.append(data.get("text") if isinstance(data.get("text"), str) else "")
+            doc = data.get("doc")
+            for node in _iter_tiptap_nodes(doc):
+                node_type = node.get("type")
+                attrs = node.get("attrs") if isinstance(node.get("attrs"), dict) else {}
+                if node_type == "heading":
+                    headings.append({"level": attrs.get("level"), "text": _node_text(node)})
+                elif node_type == "image":
+                    images.append({"alt": attrs.get("alt")})
+
+                marks = node.get("marks")
+                if isinstance(marks, list):
+                    for mark in marks:
+                        if not isinstance(mark, dict) or mark.get("type") != "link":
+                            continue
+                        mark_attrs = mark.get("attrs") if isinstance(mark.get("attrs"), dict) else {}
+                        if str(mark_attrs.get("href") or "").startswith("/"):
+                            internal_links += 1
+            continue
+
+        text_parts.append(_flatten(data))
+        if block_type == "heading":
+            headings.append({"level": data.get("level"), "text": str(data.get("text") or "")})
+        elif block_type == "image":
+            images.append({"alt": data.get("alt")})
+        elif block_type == "link" and str(data.get("url") or "").startswith("/"):
+            internal_links += 1
+
+    h1_count = sum(1 for heading in headings if str(heading.get("level") or "") == "1")
+    h2_text = " ".join(
+        str(heading.get("text") or "")
+        for heading in headings
+        if str(heading.get("level") or "") == "2"
+    ).lower()
+    missing_alt = sum(1 for image in images if not image.get("alt"))
+
+    return {
+        "text": " ".join(part for part in text_parts if part),
+        "h1_count": h1_count,
+        "h2_text": h2_text,
+        "image_count": len(images),
+        "missing_alt": missing_alt,
+        "internal_links": internal_links,
+    }
+
+
 class SeoMetaViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = SeoMeta.objects.select_related("entry", "entry__site").all()
@@ -31,42 +120,24 @@ class SeoMetaViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         entry = meta.entry
         keyword = (meta.focus_keyword or "").strip().lower()
 
-        def flatten(value):
-            if isinstance(value, dict):
-                return " ".join(flatten(v) for v in value.values())
-            if isinstance(value, list):
-                return " ".join(flatten(v) for v in value)
-            return str(value) if value is not None else ""
-
-        block_text = flatten(entry.blocks)
-        text = " ".join([entry.title, entry.excerpt, block_text]).lower()
+        metrics = _seo_block_metrics(entry.blocks)
+        text = " ".join([entry.title, entry.excerpt, metrics["text"]]).lower()
         words = re.findall(r"\w+", text, flags=re.UNICODE)
-        headings = [b for b in entry.blocks if isinstance(b, dict) and b.get("type") == "heading"]
-        h1 = [b for b in headings if str(b.get("data", {}).get("level", "")) == "1"]
-        h2_text = " ".join(
-            flatten(b.get("data", {}))
-            for b in headings
-            if str(b.get("data", {}).get("level", "")) == "2"
-        ).lower()
-        images = [b for b in entry.blocks if isinstance(b, dict) and b.get("type") == "image"]
-        missing_alt = sum(1 for b in images if not b.get("data", {}).get("alt"))
-        internal_links = text.count('href="/') + sum(
-            1
-            for b in entry.blocks
-            if isinstance(b, dict)
-            and b.get("type") == "link"
-            and str(b.get("data", {}).get("url", "")).startswith("/")
-        )
+        h1_count = metrics["h1_count"]
+        h2_text = metrics["h2_text"]
+        image_count = metrics["image_count"]
+        missing_alt = metrics["missing_alt"]
+        internal_links = metrics["internal_links"]
         checks = {
             "keyword_in_title": bool(keyword and keyword in entry.title.lower()),
             "keyword_in_description": bool(keyword and keyword in meta.description.lower()),
             "keyword_in_path": bool(keyword and any(part in entry.path.lower() for part in keyword.split())),
-            "keyword_in_h2": bool(keyword and keyword in h2_text) if headings else False,
+            "keyword_in_h2": bool(keyword and keyword in h2_text),
             "has_meta_title": bool(meta.title),
             "has_meta_description": bool(meta.description),
             "title_length_ok": 30 <= len(meta.title) <= 65,
             "description_length_ok": 80 <= len(meta.description) <= 180,
-            "single_h1_or_template_h1": len(h1) <= 1,
+            "single_h1_or_template_h1": h1_count <= 1,
             "word_count_adequate": len(words) >= 300,
             "images_have_alt": missing_alt == 0,
             "has_internal_links": internal_links >= 1,
@@ -76,8 +147,8 @@ class SeoMetaViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
             "checks": checks,
             "metrics": {
                 "word_count": len(words),
-                "h1_count": len(h1),
-                "image_count": len(images),
+                "h1_count": h1_count,
+                "image_count": image_count,
                 "missing_alt": missing_alt,
                 "internal_links": internal_links,
             },

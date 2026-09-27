@@ -111,9 +111,16 @@ export default function BlockEditor({ value, onChange, siteId }: Props) {
   function moveBlock(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= value.length) return;
+    if (value[index]?.type === "rich_text" || value[target]?.type === "rich_text") return;
     const next = [...value];
     [next[index], next[target]] = [next[target], next[index]];
     onChange(next);
+  }
+
+  function canMoveBlock(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= value.length) return false;
+    return value[index]?.type !== "rich_text" && value[target]?.type !== "rich_text";
   }
 
   function openJson() {
@@ -126,6 +133,15 @@ export default function BlockEditor({ value, onChange, siteId }: Props) {
     try {
       const parsed = JSON.parse(jsonDraft);
       if (!Array.isArray(parsed)) throw new Error("Root value must be an array");
+      const richTextIndexes = parsed
+        .map((block, index) => block && typeof block === "object" && block.type === "rich_text" ? index : -1)
+        .filter((index) => index >= 0);
+      if (richTextIndexes.length > 1) {
+        throw new Error("Only one rich_text block is allowed");
+      }
+      if (richTextIndexes.length === 1 && richTextIndexes[0] !== 0) {
+        throw new Error("rich_text must remain the first block");
+      }
       onChange(parsed as ContentBlock[]);
       setShowJson(false);
       setJsonError("");
@@ -175,9 +191,9 @@ export default function BlockEditor({ value, onChange, siteId }: Props) {
                 <code>{block.type}</code>
               </div>
               <div className="editorBlockActions">
-                <button type="button" title="بالا" disabled={index === 0} onClick={() => moveBlock(index, -1)}>↑</button>
-                <button type="button" title="پایین" disabled={index === value.length - 1} onClick={() => moveBlock(index, 1)}>↓</button>
-                <button type="button" title="تکثیر" onClick={() => duplicateBlock(index)}>⧉</button>
+                <button type="button" title="بالا" disabled={!canMoveBlock(index, -1)} onClick={() => moveBlock(index, -1)}>↑</button>
+                <button type="button" title="پایین" disabled={!canMoveBlock(index, 1)} onClick={() => moveBlock(index, 1)}>↓</button>
+                <button type="button" title="تکثیر" disabled={block.type === "rich_text"} onClick={() => duplicateBlock(index)}>⧉</button>
                 <button type="button" className="danger" title="حذف" onClick={() => removeBlock(index)}>×</button>
               </div>
             </div>
