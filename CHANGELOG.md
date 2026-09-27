@@ -4,6 +4,36 @@ All notable changes to DigitalAfarin CMS are documented here.
 
 The project uses synchronized versions for the Django package, Next.js SDK, Admin and CLI.
 
+## [0.6.0] - 2026-09-27
+
+### Added
+
+- Embedded CMS Admin installation inside an existing Next.js App Router project under `/cms`.
+- Host-project installation for `@digitalafarin/cms-admin` using the existing `package.json`, Next.js runtime and `node_modules`.
+- Explicit `admin-standalone` compatibility mode for deployments that intentionally require a separate Admin process.
+- Autosave state, queued idle saves and local crash-recovery drafts in the content editor.
+- Recovery banner with restore/discard actions and unsaved-change protection.
+- Readable revision comparisons for structured blocks and rich-text content.
+- Server-side Media Library pagination, search, folder filtering, MIME-type filtering and ordering.
+- Tenant-scoped Media Library folder discovery endpoint.
+- Paginated/debounced server-side Media Picker search.
+
+### Changed
+
+- `@digitalafarin/cms-admin` now treats Next.js, React and React DOM as peer dependencies so embedded installations reuse the host application runtime.
+- `@digitalafarin/cms-cli init --with-admin` now embeds the Admin into the detected frontend instead of creating a second Next.js project.
+- `@digitalafarin/cms-cli admin` now installs only the embedded Admin into an existing Next.js frontend.
+- Admin internal navigation is base-path-aware for embedded `/cms` installations.
+- Embedded generated imports no longer require a host `@/*` TypeScript alias.
+- Embedded setup ensures required TypeScript tooling is present when installation is enabled.
+- Media Library filtering and sorting now run against the API instead of only the first client-side page.
+
+### Validation
+
+- Added production-build smoke coverage for installing packed npm artifacts into a fresh host Next.js project with a single host `node_modules`.
+- Added Django regression coverage for Media Library pagination, search, ordering, MIME filters and tenant-scoped folders.
+- Existing Admin typecheck/build, example Next.js build, Playwright editor tests, npm tarball smoke tests and Python 3.11/3.12/3.13 suites remain green.
+
 ## [0.5.1] - 2026-09-27
 
 ### Fixed
