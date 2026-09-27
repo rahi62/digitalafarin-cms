@@ -1,7 +1,7 @@
 {
   "name": "@digitalafarin/cms-admin",
   "version": "0.5.1",
-  "description": "Scaffoldable Next.js admin application for DigitalAfarin Headless SEO CMS",
+  "description": "Embeddable and standalone Next.js admin package for DigitalAfarin Headless SEO CMS",
   "type": "module",
   "bin": {
     "digitalafarin-cms-admin": "bin/scaffold.js"
@@ -30,16 +30,16 @@
     "@tiptap/pm": "3.31.3",
     "@tiptap/react": "3.31.3",
     "@tiptap/starter-kit": "3.31.3",
-    "next": "^16.3.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.2.0",
     "@tiptap/core": "3.31.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
     "@types/node": "^26.2.0",
     "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "next": "^16.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.2.0"
   },
   "engines": {
     "node": ">=20"
@@ -66,5 +66,10 @@
     "seo",
     "nextjs",
     "admin"
-  ]
+  ],
+  "peerDependencies": {
+    "next": ">=15 <17",
+    "react": ">=18.3 <20",
+    "react-dom": ">=18.3 <20"
+  }
 }
