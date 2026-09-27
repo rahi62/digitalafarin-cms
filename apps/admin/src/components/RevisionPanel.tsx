@@ -47,8 +47,40 @@ function currentSnapshot(entry: CurrentEntry) {
   return Object.fromEntries(fields.map((field) => [field, currentValue(entry, field)]));
 }
 function same(a: unknown, b: unknown) { return JSON.stringify(a ?? null) === JSON.stringify(b ?? null); }
-function formatted(value: unknown) {
+function richTextBlockText(block: unknown) {
+  if (!block || typeof block !== "object") return "";
+  const value = block as Record<string, unknown>;
+  if (value.type !== "rich_text") return "";
+  const data = value.data && typeof value.data === "object" ? value.data as Record<string, unknown> : {};
+  return typeof data.text === "string" ? data.text : "";
+}
+
+function blocksSummary(value: unknown) {
+  if (!Array.isArray(value)) return formatted(value);
+  const lines: string[] = [];
+  value.forEach((block, index) => {
+    if (!block || typeof block !== "object") {
+      lines.push(`#${index + 1} unknown`);
+      return;
+    }
+    const item = block as Record<string, unknown>;
+    const type = String(item.type || "unknown");
+    const richText = richTextBlockText(item).trim();
+    if (richText) {
+      lines.push(`#${index + 1} rich_text\n${richText}`);
+      return;
+    }
+    const data = item.data && typeof item.data === "object" ? item.data as Record<string, unknown> : {};
+    const shortText = [data.text, data.title, data.label, data.alt, data.caption]
+      .find((part) => typeof part === "string" && part.trim());
+    lines.push(`#${index + 1} ${type}${shortText ? ` — ${String(shortText)}` : ""}`);
+  });
+  return lines.join("\n\n") || "—";
+}
+
+function formatted(value: unknown, field?: string) {
   if (value === null || value === undefined || value === "") return "—";
+  if (field === "blocks") return blocksSummary(value);
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "string") return value;
   return JSON.stringify(value, null, 2);
@@ -105,7 +137,7 @@ export default function RevisionPanel({ entryId, current, onRestored }: Props) {
             <div className="compareArrow">←→</div>
             <div className="field"><label>نسخه B</label><select value={right} onChange={(e) => setRight(e.target.value)}><option value="current">نسخه فعلی</option>{rows.map((row) => <option value={row.id} key={row.id}>#{row.number} — {row.note || dateLabel(row.created_at)}</option>)}</select></div>
           </div>
-          {changedFields.length === 0 ? <div className="revisionNoChanges">تفاوتی بین دو نسخه انتخاب‌شده وجود ندارد.</div> : <div className="revisionDiffs">{changedFields.map((field) => <details className="revisionDiff" key={field} open={["title", "excerpt", "status", "category_ids", "tag_ids"].includes(field)}><summary>{labels[field]}</summary><div className="revisionDiffGrid"><div><span>نسخه A</span><pre dir={field === "path" || field === "slug" ? "ltr" : "auto"}>{formatted(leftSnapshot[field])}</pre></div><div><span>نسخه B</span><pre dir={field === "path" || field === "slug" ? "ltr" : "auto"}>{formatted(rightSnapshot[field])}</pre></div></div></details>)}</div>}
+          {changedFields.length === 0 ? <div className="revisionNoChanges">تفاوتی بین دو نسخه انتخاب‌شده وجود ندارد.</div> : <div className="revisionDiffs">{changedFields.map((field) => <details className="revisionDiff" key={field} open={["title", "excerpt", "status", "blocks", "category_ids", "tag_ids"].includes(field)}><summary>{labels[field]}</summary><div className="revisionDiffGrid"><div><span>نسخه A</span><pre className={field === "blocks" ? "revisionReadableBlocks" : ""} dir={field === "path" || field === "slug" ? "ltr" : "auto"}>{formatted(leftSnapshot[field], field)}</pre></div><div><span>نسخه B</span><pre className={field === "blocks" ? "revisionReadableBlocks" : ""} dir={field === "path" || field === "slug" ? "ltr" : "auto"}>{formatted(rightSnapshot[field], field)}</pre></div></div></details>)}</div>}
         </div>
       </>}
     </section>
