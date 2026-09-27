@@ -42,7 +42,7 @@ function copyTree(source, destination, transform) {
     const to = path.join(destination, entry.name);
     if (entry.isDirectory()) copyTree(from, to, transform);
     else if (transform && /\.(ts|tsx|js|jsx|css)$/.test(entry.name)) {
-      fs.writeFileSync(to, transform(fs.readFileSync(from, "utf8"), from));
+      fs.writeFileSync(to, transform(fs.readFileSync(from, "utf8"), from, to));
     } else {
       fs.copyFileSync(from, to);
     }
@@ -68,11 +68,21 @@ function ensureEnvValue(file, key, value) {
   }
   fs.writeFileSync(file, text);
 }
-function embeddedTransform(text) {
-  return text
-    .replaceAll('from "@/components/', 'from "@/digitalafarin-cms-admin/components/')
-    .replaceAll('from "@/lib/', 'from "@/digitalafarin-cms-admin/lib/')
-    .replaceAll('from "@/styles/', 'from "@/digitalafarin-cms-admin/styles/');
+function importPath(fromFile, targetDirectory) {
+  let relative = path.relative(path.dirname(fromFile), targetDirectory).replaceAll(path.sep, "/");
+  if (!relative.startsWith(".")) relative = `./${relative}`;
+  return relative;
+}
+function embeddedTransformFor(embeddedRoot) {
+  return (text, _from, to) => {
+    const components = importPath(to, path.join(embeddedRoot, "components"));
+    const lib = importPath(to, path.join(embeddedRoot, "lib"));
+    const styles = importPath(to, path.join(embeddedRoot, "styles"));
+    return text
+      .replaceAll('from "@/components/', `from "${components}/`)
+      .replaceAll('from "@/lib/', `from "${lib}/`)
+      .replaceAll('from "@/styles/', `from "${styles}/`);
+  };
 }
 function scopeGlobalCss(text) {
   return text
@@ -105,9 +115,10 @@ function embed() {
   fs.mkdirSync(routeDir, { recursive: true });
   fs.mkdirSync(embeddedRoot, { recursive: true });
 
-  copyTree(path.join(packageRoot, "src", "components"), path.join(embeddedRoot, "components"), embeddedTransform);
-  copyTree(path.join(packageRoot, "src", "lib"), path.join(embeddedRoot, "lib"), embeddedTransform);
-  copyTree(path.join(packageRoot, "src", "styles"), path.join(embeddedRoot, "styles"), embeddedTransform);
+  const transform = embeddedTransformFor(embeddedRoot);
+  copyTree(path.join(packageRoot, "src", "components"), path.join(embeddedRoot, "components"), transform);
+  copyTree(path.join(packageRoot, "src", "lib"), path.join(embeddedRoot, "lib"), transform);
+  copyTree(path.join(packageRoot, "src", "styles"), path.join(embeddedRoot, "styles"), transform);
 
   const globals = scopeGlobalCss(
     fs.readFileSync(path.join(packageRoot, "src", "app", "globals.css"), "utf8"),
@@ -119,12 +130,15 @@ function embed() {
     if (entry.name === "layout.tsx" || entry.name === "globals.css") continue;
     const from = path.join(adminApp, entry.name);
     const to = path.join(routeDir, entry.name);
-    if (entry.isDirectory()) copyTree(from, to, embeddedTransform);
+    if (entry.isDirectory()) copyTree(from, to, transform);
     else if (/\.(ts|tsx|js|jsx)$/.test(entry.name)) {
-      fs.writeFileSync(to, embeddedTransform(fs.readFileSync(from, "utf8")));
+      fs.writeFileSync(to, transform(fs.readFileSync(from, "utf8"), from, to));
     }
   }
 
+  const layoutFile = path.join(routeDir, "layout.tsx");
+  const styleRoot = importPath(layoutFile, path.join(embeddedRoot, "styles"));
+  const componentRoot = importPath(layoutFile, path.join(embeddedRoot, "components"));
   const styleImports = [
     "globals.css",
     "editor-v03.css",
@@ -138,12 +152,12 @@ function embed() {
     "search-performance.css",
     "seo-opportunities.css",
     "professional-editor.css",
-  ].map((name) => `import "@/digitalafarin-cms-admin/styles/${name}";`).join("\n");
+  ].map((name) => `import "${styleRoot}/${name}";`).join("\n");
 
   fs.writeFileSync(
-    path.join(routeDir, "layout.tsx"),
+    layoutFile,
     `${styleImports}
-import Shell from "@/digitalafarin-cms-admin/components/Shell";
+import Shell from "${componentRoot}/Shell";
 
 export const metadata = {
   title: "DigitalAfarin SEO CMS",
