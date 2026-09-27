@@ -145,20 +145,77 @@ try {
   if (!nginx.includes("location /cms/")) throw new Error("Nginx /cms route missing");
   console.log("@digitalafarin/cms-admin installed tarball scaffold OK");
 
-  const cliAdmin = path.join(app, "cli-admin");
+  const embeddedFrontend = path.join(app, "embedded-frontend");
+  fs.mkdirSync(path.join(embeddedFrontend, "app"), { recursive: true });
+  fs.writeFileSync(
+    path.join(embeddedFrontend, "package.json"),
+    JSON.stringify({
+      name: "embedded-next-app",
+      private: true,
+      scripts: { build: "next build" },
+      dependencies: {
+        next: "^16.3.0",
+        react: "^19.3.0",
+        "react-dom": "^19.2.0",
+      },
+    }, null, 2),
+  );
+  fs.writeFileSync(
+    path.join(embeddedFrontend, "app", "layout.tsx"),
+    'export default function Layout({children}:{children:React.ReactNode}){return <html><body>{children}</body></html>}\n',
+  );
+  fs.writeFileSync(
+    path.join(embeddedFrontend, "app", "page.tsx"),
+    'export default function Page(){return <main>Host website</main>}\n',
+  );
+
   run(cliBin, [
-    "admin",
+    "init",
+    "--frontend", embeddedFrontend,
+    "--next-package", sdkTarball,
     "--admin-package", adminTarball,
-    "--admin-dir", cliAdmin,
+    "--with-admin",
     "--admin-base-path", "/cms",
     "--admin-api-url", "https://api.example.com/api/cms/v1",
-    "--admin-port", "3002",
-    "--skip-install",
   ], app);
-  if (!fs.existsSync(path.join(cliAdmin, "src", "app", "page.tsx"))) throw new Error("cms-cli admin command did not scaffold admin app");
-  const cliEnv = fs.readFileSync(path.join(cliAdmin, ".env.local"), "utf8");
-  if (!cliEnv.includes("NEXT_PUBLIC_API_URL=/cms/api-proxy")) throw new Error("cms-cli admin command did not configure same-origin API proxy");
-  console.log("@digitalafarin/cms-cli admin integration OK");
+
+  for (const expected of [
+    "app/cms/page.tsx",
+    "app/cms/login/page.tsx",
+    "app/cms/api-proxy/[...path]/route.ts",
+    "app/cms/layout.tsx",
+    "digitalafarin-cms-admin/components/ProfessionalEditor.tsx",
+    "digitalafarin-cms-admin/components/RichTextEditor.tsx",
+    "digitalafarin-cms-admin/lib/api.ts",
+    "digitalafarin-cms-admin/styles/globals.css",
+  ]) {
+    if (!fs.existsSync(path.join(embeddedFrontend, expected))) {
+      throw new Error(`Embedded admin missing ${expected}`);
+    }
+  }
+  if (fs.existsSync(path.join(app, "cms-admin"))) {
+    throw new Error("Embedded admin unexpectedly created a standalone cms-admin directory");
+  }
+
+  const embeddedPkg = JSON.parse(fs.readFileSync(path.join(embeddedFrontend, "package.json"), "utf8"));
+  if (!embeddedPkg.dependencies?.["@digitalafarin/cms-admin"]) {
+    throw new Error("Embedded admin package was not installed into the host frontend");
+  }
+  if (!fs.existsSync(path.join(embeddedFrontend, "node_modules", "@digitalafarin", "cms-admin"))) {
+    throw new Error("Embedded admin package is not present in the host node_modules");
+  }
+
+  const embeddedEnv = fs.readFileSync(path.join(embeddedFrontend, ".env.local"), "utf8");
+  if (!embeddedEnv.includes("NEXT_PUBLIC_API_URL=/cms/api-proxy")) throw new Error("Embedded Admin proxy URL missing");
+  if (!embeddedEnv.includes("DIGITALAFARIN_CMS_API_URL=https://api.example.com/api/cms/v1")) throw new Error("Embedded Admin upstream URL missing");
+
+  const embeddedLayout = fs.readFileSync(path.join(embeddedFrontend, "app", "cms", "layout.tsx"), "utf8");
+  if (embeddedLayout.includes("@/digitalafarin-cms-admin")) throw new Error("Embedded Admin unexpectedly requires a host @/* alias");
+  const embeddedSidebar = fs.readFileSync(path.join(embeddedFrontend, "digitalafarin-cms-admin", "components", "Sidebar.tsx"), "utf8");
+  if (!embeddedSidebar.includes("adminPath(href)")) throw new Error("Embedded sidebar does not preserve /cms base path");
+
+  run(npm, ["run", "build"], embeddedFrontend);
+  console.log("@digitalafarin/cms-cli embedded admin integration/build OK");
 } finally {
   for (const tarball of tarballs) {
     try { fs.rmSync(tarball, { force: true }); } catch {}
