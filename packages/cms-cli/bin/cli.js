@@ -195,7 +195,7 @@ const djangoPackage = arg("--django-package", "digitalafarin-cms[all]");
 const nextPackage = arg("--next-package", "@digitalafarin/cms-next");
 const adminPackage = arg("--admin-package", "@digitalafarin/cms-admin");
 
-if (backend) {
+if (backend && command !== "admin") {
   if (!skipInstall) run(python, ["-m", "pip", "install", djangoPackage], { cwd: backend });
   const { settingsFile, urlsFile } = inferDjangoFiles(backend);
   appendBlock(
@@ -215,13 +215,16 @@ if (backend) {
 
 if (frontend) {
   if (!skipInstall) {
-    const packages = [nextPackage];
-    if (has("--with-admin") || command === "admin") packages.push(adminPackage);
+    const packages = command === "admin"
+      ? [adminPackage]
+      : [nextPackage, ...(has("--with-admin") ? [adminPackage] : [])];
     run("npm", ["install", ...packages], { cwd: frontend });
   }
-  ensureEnv(frontend);
-  ensureNextAdapter(frontend);
-  if (has("--with-public-route")) ensurePublicRoute(frontend);
+  if (command !== "admin") {
+    ensureEnv(frontend);
+    ensureNextAdapter(frontend);
+    if (has("--with-public-route")) ensurePublicRoute(frontend);
+  }
   if (has("--with-admin") || command === "admin") embedAdmin(frontend);
 } else if (has("--with-public-route") || has("--with-admin") || command === "admin") {
   throw new Error("The requested Next.js integration requires a detected or explicit frontend.");
