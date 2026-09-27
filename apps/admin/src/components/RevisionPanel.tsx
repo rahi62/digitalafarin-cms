@@ -55,7 +55,7 @@ function richTextBlockText(block: unknown) {
   return typeof data.text === "string" ? data.text : "";
 }
 
-function blocksSummary(value: unknown) {
+function blocksSummary(value: unknown): string {
   if (!Array.isArray(value)) return formatted(value);
   const lines: string[] = [];
   value.forEach((block, index) => {
@@ -78,7 +78,7 @@ function blocksSummary(value: unknown) {
   return lines.join("\n\n") || "—";
 }
 
-function formatted(value: unknown, field?: string) {
+function formatted(value: unknown, field?: string): string {
   if (value === null || value === undefined || value === "") return "—";
   if (field === "blocks") return blocksSummary(value);
   if (typeof value === "boolean") return value ? "true" : "false";
