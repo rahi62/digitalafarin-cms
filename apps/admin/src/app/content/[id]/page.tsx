@@ -24,6 +24,7 @@ export default function EditContent() {
   const [msg, setMsg] = useState("");
   const [previewing, setPreviewing] = useState(false);
   const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving" | "error">("saved");
+  const [recoveryDraft, setRecoveryDraft] = useState<any>(null);
   const lastSavedFingerprint = useRef("");
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
@@ -53,6 +54,10 @@ export default function EditContent() {
     return JSON.stringify(payloadFor(entry));
   }
 
+  function draftStorageKey() {
+    return `digitalafarin-cms:draft:${id}`;
+  }
+
   function cancelAutosaveTimer() {
     if (autosaveTimer.current) {
       clearTimeout(autosaveTimer.current);
@@ -66,6 +71,22 @@ export default function EditContent() {
       if (cancelled) return;
       const normalized = normalizeEntry(d);
       lastSavedFingerprint.current = fingerprint(normalized);
+
+      try {
+        const rawDraft = window.localStorage.getItem(draftStorageKey());
+        if (rawDraft) {
+          const parsedDraft = JSON.parse(rawDraft) as { payload?: Record<string, unknown> };
+          if (parsedDraft.payload) {
+            const recovered = normalizeEntry({ ...normalized, ...parsedDraft.payload });
+            if (fingerprint(recovered) !== fingerprint(normalized)) {
+              setRecoveryDraft(recovered);
+            }
+          }
+        }
+      } catch {
+        window.localStorage.removeItem(draftStorageKey());
+      }
+
       setF(normalized);
       setSaveState("saved");
       try {
@@ -79,6 +100,21 @@ export default function EditContent() {
     });
     return () => { cancelled = true; };
   }, [id]);
+
+  useEffect(() => {
+    if (!f) return;
+    const currentFingerprint = fingerprint(f);
+    if (currentFingerprint === lastSavedFingerprint.current) return;
+
+    try {
+      window.localStorage.setItem(draftStorageKey(), JSON.stringify({
+        savedAt: Date.now(),
+        payload: payloadFor(f),
+      }));
+    } catch {
+      // local recovery is best-effort; server autosave remains authoritative
+    }
+  }, [f, id]);
 
   useEffect(() => {
     if (!f) return;
@@ -130,6 +166,8 @@ export default function EditContent() {
         setF((current: any) => {
           if (!current || fingerprint(current) === submittedFingerprint) {
             setSaveState("saved");
+            setRecoveryDraft(null);
+            try { window.localStorage.removeItem(draftStorageKey()); } catch {}
             return normalized;
           }
           setSaveState("dirty");
@@ -188,6 +226,25 @@ export default function EditContent() {
         }</span><button type="button" className="btn secondary" onClick={preview} disabled={previewing}>{previewing ? "در حال ساخت..." : "پیش‌نمایش"}</button></div>}
       />
       <form className="form" onSubmit={submit}>
+        {recoveryDraft && (
+          <div className="recoveryNotice">
+            <div>
+              <strong>تغییرات ذخیره‌نشده پیدا شد</strong>
+              <span>یک نسخه محلی از این نوشته قبل از آخرین ذخیره روی سرور باقی مانده است.</span>
+            </div>
+            <div>
+              <button type="button" className="btn small" onClick={() => {
+                setF(recoveryDraft);
+                setRecoveryDraft(null);
+                setSaveState("dirty");
+              }}>بازیابی تغییرات</button>
+              <button type="button" className="btn secondary small" onClick={() => {
+                try { window.localStorage.removeItem(draftStorageKey()); } catch {}
+                setRecoveryDraft(null);
+              }}>نادیده گرفتن</button>
+            </div>
+          </div>
+        )}
         {msg && <div className={msg.includes("شد") || msg.includes("ساخته") ? "notice" : "error"}>{msg}</div>}
         <div className="formGrid">
           <div className="field"><label>عنوان</label><input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
