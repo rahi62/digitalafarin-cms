@@ -2,8 +2,6 @@ name: Release
 
 on:
   push:
-    branches:
-      - "main"
     tags:
       - "v*"
 
@@ -12,7 +10,6 @@ permissions:
 
 jobs:
   verify:
-    if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-v0.5.0]'))
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -36,17 +33,12 @@ jobs:
       - name: Smoke test npm release tarballs
         run: node scripts/smoke-npm-packages.mjs
       - id: version
-        name: Resolve and verify release version
+        name: Verify tag matches package version
         shell: bash
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
           PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-            test "$VERSION" = "$PACKAGE_VERSION" || { echo "Tag $VERSION does not match package version $PACKAGE_VERSION"; exit 1; }
-          else
-            VERSION="$PACKAGE_VERSION"
-            test "$VERSION" = "0.5.0" || { echo "One-shot main release trigger is restricted to 0.5.0"; exit 1; }
-          fi
+          test "$VERSION" = "$PACKAGE_VERSION" || { echo "Tag $VERSION does not match package version $PACKAGE_VERSION"; exit 1; }
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
   publish-pypi:
