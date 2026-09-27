@@ -29,7 +29,7 @@ export default function Sidebar(){
   const path=stripAdminBasePath(pathname || "/");
   return <aside className="sidebar">
     <div className="brand"><div className="brandMark">D</div><div><strong>DigitalAfarin</strong><span>SEO CMS</span></div></div>
-    <nav>{links.map(([href,label,icon])=><Link key={href} href={href} className={isActive(path,href)?"active":""}><b>{icon}</b>{label}</Link>)}</nav>
+    <nav>{links.map(([href,label,icon])=><Link key={href} href={adminPath(href)} className={isActive(path,href)?"active":""}><b>{icon}</b>{label}</Link>)}</nav>
     <button className="logout" onClick={()=>{clearTokens();window.location.href=adminPath("/login")}}>خروج</button>
   </aside>
 }

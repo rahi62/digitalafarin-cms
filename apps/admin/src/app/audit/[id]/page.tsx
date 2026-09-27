@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import { apiFetch, Paginated } from "@/lib/api";
+import { adminPath } from "@/lib/admin-path";
 
 type RunSummary = {
   issues?: number; errors?: number; warnings?: number; notices?: number;
@@ -134,7 +135,7 @@ export default function AuditDetailPage() {
       <PageHeader
         title={`Audit: ${run.site_name}`}
         description={`${run.site_domain} · ${formatDate(run.started_at || run.created_at)}`}
-        action={<div className="auditDetailActions"><Link href="/audit" className="btn secondary">بازگشت</Link><button type="button" className="btn secondary" onClick={() => Promise.all([loadRun(), loadPages(), loadIssues()])}>↻ بروزرسانی</button></div>}
+        action={<div className="auditDetailActions"><Link href={adminPath("/audit")} className="btn secondary">بازگشت</Link><button type="button" className="btn secondary" onClick={() => Promise.all([loadRun(), loadPages(), loadIssues()])}>↻ بروزرسانی</button></div>}
       />
 
       {message && <div className="error">{message}</div>}

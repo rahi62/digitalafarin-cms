@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { apiFetch, Paginated } from "@/lib/api";
+import { adminPath } from "@/lib/admin-path";
 
 type Category = { id: string; site: string; name: string; slug: string; parent: string | null };
 type Tag = { id: string; site: string; name: string; slug: string };
@@ -74,7 +75,7 @@ export default function TaxonomyFields({
     <section className="taxonomyFields field full">
       <div className="taxonomyFieldsHeader">
         <div><strong>Taxonomies</strong><span>دسته‌بندی و برچسب‌های محتوا</span></div>
-        <Link href="/taxonomies" target="_blank" className="textButton">مدیریت دسته‌ها و تگ‌ها ↗</Link>
+        <Link href={adminPath("/taxonomies")} target="_blank" className="textButton">مدیریت دسته‌ها و تگ‌ها ↗</Link>
       </div>
       {message && <div className="error">{message}</div>}
       <div className="taxonomyColumns">

@@ -1,10 +1,51 @@
 # @digitalafarin/cms-admin
 
-Scaffoldable Next.js administration application for DigitalAfarin Headless SEO CMS.
+Embeddable visual Next.js administration package for DigitalAfarin Headless SEO CMS.
 
-The admin app is designed to run under a path such as `/cms` on the same public domain while talking to the Django CMS API.
+The default installation mode embeds the CMS Admin inside an existing Next.js App Router application, so the public website and `/cms` share the same Next.js runtime and the same `node_modules`.
 
-## Scaffold
+## Embedded mode (recommended)
+
+Install through the main CLI:
+
+```bash
+npx @digitalafarin/cms-cli admin \
+  --frontend frontend \
+  --admin-base-path /cms \
+  --admin-api-url https://api.example.com/api/cms/v1
+```
+
+Or, after installing this package in the host frontend:
+
+```bash
+npm install @digitalafarin/cms-admin
+
+npx digitalafarin-cms-admin embed \
+  --frontend . \
+  --base-path /cms \
+  --api-url https://api.example.com/api/cms/v1
+```
+
+The embed command:
+
+- creates the Admin routes inside the host `app/cms` or `src/app/cms`;
+- keeps reusable Admin implementation files under `digitalafarin-cms-admin/` inside the host source root;
+- uses the host project's existing Next.js, React and `node_modules`;
+- creates the same-origin `/cms/api-proxy` route;
+- writes the required CMS Admin environment values into the host `.env.local`;
+- does not create a second Next.js application.
+
+Generated environment:
+
+```env
+NEXT_PUBLIC_DIGITALAFARIN_CMS_ADMIN_BASE_PATH=/cms
+NEXT_PUBLIC_API_URL=/cms/api-proxy
+DIGITALAFARIN_CMS_API_URL=https://api.example.com/api/cms/v1
+```
+
+## Standalone mode (optional)
+
+Process-isolated deployments remain available:
 
 ```bash
 npx @digitalafarin/cms-admin scaffold \
@@ -14,39 +55,10 @@ npx @digitalafarin/cms-admin scaffold \
   --port 3001
 ```
 
-The command creates a standalone Next.js application containing the DigitalAfarin CMS admin UI, `.env.local`, and an Nginx location snippet.
+Standalone mode creates its own Next.js app and therefore has its own `package.json` and `node_modules`. Use it only when a separate Admin process is intentionally required.
 
-## Generated environment
+## Professional editor
 
-```env
-NEXT_PUBLIC_DIGITALAFARIN_CMS_ADMIN_BASE_PATH=/cms
-NEXT_PUBLIC_API_URL=/cms/api-proxy
-DIGITALAFARIN_CMS_API_URL=https://api.example.com/api/cms/v1
-PORT=3001
-```
+The Admin includes the Tiptap-based Standard Editor with RTL/LTR, headings, formatting, links, tables, Media Library images, lists, quotes, code blocks, word count, focus mode, autosave/recovery and revision tooling.
 
-The browser talks only to the same-origin `/cms/api-proxy` route. The Next.js Admin server forwards those requests to `DIGITALAFARIN_CMS_API_URL`. This avoids exposing cross-origin CMS API calls in the browser and means the Admin does not need Django CORS access when the backend lives on an API subdomain.
-
-## Production path deployment
-
-Build and run the generated app:
-
-```bash
-npm run build
-PORT=3001 npm start
-```
-
-Then route the main website path to the admin process. The generated `deploy/nginx.cms.conf` contains the required example configuration.
-
-For a `/cms` deployment, keep `proxy_pass` without a trailing slash so the Next.js process receives the `/cms` prefix it was built with.
-
-The Django Admin remains available for technical maintenance, but editorial users should use the Next.js CMS Admin UI.
-
-
-## Professional editor (v0.5)
-
-New and compatible entries open in a Tiptap-based Standard Editor with RTL/LTR, headings, formatting, links, tables, Media Library images, lists, quotes, code blocks, word count and focus mode.
-
-The original structured Block Editor remains available as **Advanced Blocks**. CMS content is still stored as structured `blocks`; rich prose uses a typed `rich_text` block whose canonical body is Tiptap JSON.
-
-Existing advanced/custom blocks are preserved. Layouts that cannot round-trip safely are kept in Advanced mode rather than silently rewritten.
+The structured Block Editor remains available as **Advanced Blocks**. CMS content is stored as structured `blocks`; rich prose uses the typed `rich_text` block whose canonical body is Tiptap JSON.
