@@ -104,6 +104,14 @@ function embed() {
   const basePath = normalizeBasePath(arg("--base-path", "/cms")) || "/cms";
   const apiUrl = arg("--api-url", "http://127.0.0.1:8000/api/cms/v1");
   const force = has("--force");
+  const skipInstall = has("--skip-install");
+  const requiredDevDependencies = ["typescript", "@types/node", "@types/react", "@types/react-dom"];
+  const missingDevDependencies = requiredDevDependencies.filter(
+    (name) => !pkg.dependencies?.[name] && !pkg.devDependencies?.[name],
+  );
+  if (missingDevDependencies.length && !skipInstall) {
+    run("npm", ["install", "--save-dev", ...missingDevDependencies], frontend);
+  }
   const routeSegments = basePath.split("/").filter(Boolean);
   const routeDir = path.join(appDir, ...routeSegments);
   const embeddedRoot = path.join(sourceRoot, "digitalafarin-cms-admin");
@@ -179,6 +187,7 @@ export default function DigitalAfarinCmsLayout({ children }: { children: React.R
   console.log(`Frontend: ${frontend}`);
   console.log(`Route: ${basePath}/`);
   console.log("Runtime: host Next.js application (no separate CMS node_modules)");
+  if (missingDevDependencies.length) console.log(`TypeScript tooling ensured: ${missingDevDependencies.join(", ")}`);
   console.log(`Django upstream: ${apiUrl}`);
 }
 
