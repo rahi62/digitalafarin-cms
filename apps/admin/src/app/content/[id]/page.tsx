@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import type { ContentBlock } from "@/components/BlockEditor";
 import ProfessionalEditor from "@/components/ProfessionalEditor";
@@ -23,6 +23,10 @@ export default function EditContent() {
   const [contentType, setContentType] = useState<ContentType | null>(null);
   const [msg, setMsg] = useState("");
   const [previewing, setPreviewing] = useState(false);
+  const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving" | "error">("saved");
+  const lastSavedFingerprint = useRef("");
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
 
   function normalizeEntry(entry: any) {
     return {
@@ -34,11 +38,36 @@ export default function EditContent() {
     };
   }
 
+  function payloadFor(entry: any) {
+    const body = { ...entry };
+    delete body.author;
+    delete body.author_name;
+    delete body.content_type_slug;
+    delete body.created_at;
+    delete body.updated_at;
+    delete body.published_at;
+    return body;
+  }
+
+  function fingerprint(entry: any) {
+    return JSON.stringify(payloadFor(entry));
+  }
+
+  function cancelAutosaveTimer() {
+    if (autosaveTimer.current) {
+      clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = null;
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
     apiFetch<any>(`/content/entries/${id}/`).then(async (d) => {
       if (cancelled) return;
-      setF(normalizeEntry(d));
+      const normalized = normalizeEntry(d);
+      lastSavedFingerprint.current = fingerprint(normalized);
+      setF(normalized);
+      setSaveState("saved");
       try {
         const type = await apiFetch<ContentType>(`/content/types/${d.content_type}/`);
         if (!cancelled) setContentType(type);
@@ -51,26 +80,76 @@ export default function EditContent() {
     return () => { cancelled = true; };
   }, [id]);
 
-  function payload() {
-    const body = { ...f };
-    delete body.author;
-    delete body.author_name;
-    delete body.content_type_slug;
-    delete body.created_at;
-    delete body.updated_at;
-    delete body.published_at;
-    return body;
-  }
+  useEffect(() => {
+    if (!f) return;
 
-  async function saveEntry(showMessage = true) {
-    const saved = await apiFetch<any>(`/content/entries/${id}/`, { method: "PUT", body: JSON.stringify(payload()) });
-    setF(normalizeEntry(saved));
-    if (showMessage) setMsg("ذخیره شد");
-    return saved;
+    const currentFingerprint = fingerprint(f);
+    if (currentFingerprint === lastSavedFingerprint.current) {
+      if (saveState !== "saving") setSaveState("saved");
+      return;
+    }
+
+    setSaveState("dirty");
+    cancelAutosaveTimer();
+    autosaveTimer.current = setTimeout(() => {
+      autosaveTimer.current = null;
+      void saveEntry(false, f).catch(() => undefined);
+    }, 2500);
+
+    return cancelAutosaveTimer;
+  }, [f, id]);
+
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!f) return;
+      const hasUnsavedChanges = fingerprint(f) !== lastSavedFingerprint.current || saveState === "saving";
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [f, saveState]);
+
+  function saveEntry(showMessage = true, entrySnapshot = f) {
+    if (!entrySnapshot) return Promise.resolve(null);
+
+    const body = payloadFor(entrySnapshot);
+    const submittedFingerprint = JSON.stringify(body);
+    setSaveState("saving");
+
+    const operation = saveQueue.current
+      .catch(() => undefined)
+      .then(() => apiFetch<any>(`/content/entries/${id}/`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }))
+      .then((saved) => {
+        const normalized = normalizeEntry(saved);
+        lastSavedFingerprint.current = submittedFingerprint;
+        setF((current: any) => {
+          if (!current || fingerprint(current) === submittedFingerprint) {
+            setSaveState("saved");
+            return normalized;
+          }
+          setSaveState("dirty");
+          return current;
+        });
+        if (showMessage) setMsg("ذخیره شد");
+        return saved;
+      })
+      .catch((error) => {
+        setSaveState("error");
+        throw error;
+      });
+
+    saveQueue.current = operation;
+    return operation;
   }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    cancelAutosaveTimer();
     try {
       await saveEntry(true);
     } catch (err: any) {
@@ -82,6 +161,7 @@ export default function EditContent() {
     setPreviewing(true);
     setMsg("");
     try {
+      cancelAutosaveTimer();
       await saveEntry(false);
       const data = await apiFetch<{ frontend_url: string; expires_in: number }>(`/content/entries/${id}/preview/`, { method: "POST", body: "{}" });
       window.open(data.frontend_url, "_blank", "noopener,noreferrer");
@@ -100,7 +180,12 @@ export default function EditContent() {
       <PageHeader
         title={`ویرایش: ${f.title}`}
         description={`${f.path}${contentType ? ` · ${contentType.name}` : ""}`}
-        action={<button type="button" className="btn secondary" onClick={preview} disabled={previewing}>{previewing ? "در حال ساخت..." : "پیش‌نمایش"}</button>}
+        action={<div className="contentHeaderActions"><span className={`autosaveStatus ${saveState}`}>{
+          saveState === "saving" ? "در حال ذخیره..." :
+          saveState === "dirty" ? "تغییرات ذخیره‌نشده" :
+          saveState === "error" ? "خطا در ذخیره خودکار" :
+          "ذخیره شد"
+        }</span><button type="button" className="btn secondary" onClick={preview} disabled={previewing}>{previewing ? "در حال ساخت..." : "پیش‌نمایش"}</button></div>}
       />
       <form className="form" onSubmit={submit}>
         {msg && <div className={msg.includes("شد") || msg.includes("ساخته") ? "notice" : "error"}>{msg}</div>}
