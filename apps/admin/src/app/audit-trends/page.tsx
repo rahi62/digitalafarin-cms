@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import { apiFetch, Paginated } from "@/lib/api";
+import { adminPath } from "@/lib/admin-path";
 
 type Site = { id: string; name: string; domain: string };
 type Run = {
@@ -103,7 +104,7 @@ export default function AuditTrendsPage() {
       <PageHeader
         title="Audit Trends"
         description="مقایسه Crawlها برای تشخیص Issueهای جدید، رفع‌شده و ماندگار"
-        action={<Link href="/audit" className="btn secondary">SEO Audit</Link>}
+        action={<Link href={adminPath("/audit")} className="btn secondary">SEO Audit</Link>}
       />
 
       {message && <div className="error">{message}</div>}
