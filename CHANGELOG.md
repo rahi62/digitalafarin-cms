@@ -4,6 +4,21 @@ All notable changes to DigitalAfarin CMS are documented here.
 
 The project uses synchronized versions for the Django package, Next.js SDK, Admin and CLI.
 
+## [0.5.1] - 2026-09-27
+
+### Fixed
+
+- Public Next.js route scaffolds now distinguish confirmed CMS 404 responses from transient/network/server failures, preventing upstream outages from being misreported as content 404s.
+- `@digitalafarin/cms-next` now exposes typed `CmsRequestError` errors with HTTP status/body metadata plus `isCmsNotFoundError()`.
+- SEO analysis now understands `rich_text` blocks, counts prose once, inspects Tiptap JSON headings/images, and detects internal links from link marks.
+- Advanced Editor now protects the leading `rich_text` block from invalid reordering/duplication and rejects incompatible raw-JSON layouts.
+
+### Validation
+
+- Added SDK regression tests for HTTP error typing and 404 detection.
+- Added Django regression tests for rich-text SEO metrics.
+- Extended Playwright coverage for protected rich-text block actions.
+
 ## [0.5.0] - 2026-09-21
 
 ### Added
