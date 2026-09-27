@@ -100,7 +100,7 @@ def _seo_block_metrics(blocks):
         "text": " ".join(part for part in text_parts if part),
         "h1_count": h1_count,
         "h2_text": h2_text,
-        "image_count": image_count,
+        "image_count": len(images),
         "missing_alt": missing_alt,
         "internal_links": internal_links,
     }
@@ -122,7 +122,7 @@ class SeoMetaViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 
         metrics = _seo_block_metrics(entry.blocks)
         text = " ".join([entry.title, entry.excerpt, metrics["text"]]).lower()
-        words = re.findall(r"\\w+", text, flags=re.UNICODE)
+        words = re.findall(r"\w+", text, flags=re.UNICODE)
         h1_count = metrics["h1_count"]
         h2_text = metrics["h2_text"]
         image_count = metrics["image_count"]
@@ -148,7 +148,7 @@ class SeoMetaViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
             "metrics": {
                 "word_count": len(words),
                 "h1_count": h1_count,
-                "image_count": len(images),
+                "image_count": image_count,
                 "missing_alt": missing_alt,
                 "internal_links": internal_links,
             },
