@@ -8,8 +8,8 @@ const __filename = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(__filename), "..");
 const args = process.argv.slice(2);
 const command = args[0] || "init";
-if (!["init", "doctor", "admin"].includes(command)) {
-  console.error("Usage: digitalafarin-cms [init|doctor|admin] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--with-admin] [--admin-dir DIR] [--admin-base-path /cms] [--admin-api-url URL] [--admin-port 3001]");
+if (!["init", "doctor", "admin", "admin-standalone"].includes(command)) {
+  console.error("Usage: digitalafarin-cms [init|doctor|admin|admin-standalone] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--with-admin] [--admin-base-path /cms] [--admin-api-url URL]");
   process.exit(2);
 }
 
@@ -134,19 +134,29 @@ function ensurePublicRoute(frontend) {
 
   return { routeFile, rendererFile };
 }
-function scaffoldAdmin() {
+function embedAdmin(frontend) {
+  if (!frontend) throw new Error("--with-admin requires a detected or explicit Next.js frontend.");
+  const adminBasePath = arg("--admin-base-path", "/cms");
+  const adminApiUrl = arg("--admin-api-url", "http://localhost:8000/api/cms/v1");
+  const commandArgs = [
+    "exec", "--", "digitalafarin-cms-admin", "embed",
+    "--frontend", ".",
+    "--base-path", adminBasePath,
+    "--api-url", adminApiUrl,
+  ];
+  if (has("--force-admin")) commandArgs.push("--force");
+  run("npm", commandArgs, { cwd: frontend });
+}
+
+function scaffoldStandaloneAdmin() {
   const adminPackage = arg("--admin-package", "@digitalafarin/cms-admin");
   const adminDir = arg("--admin-dir", "cms-admin");
   const adminBasePath = arg("--admin-base-path", "/cms");
   const adminApiUrl = arg("--admin-api-url", "http://localhost:8000/api/cms/v1");
   const adminPort = arg("--admin-port", "3001");
   const commandArgs = [
-    "exec",
-    "--yes",
-    `--package=${adminPackage}`,
-    "--",
-    "digitalafarin-cms-admin",
-    "scaffold",
+    "exec", "--yes", `--package=${adminPackage}`, "--",
+    "digitalafarin-cms-admin", "scaffold",
     "--dir", adminDir,
     "--base-path", adminBasePath,
     "--api-url", adminApiUrl,
@@ -166,9 +176,13 @@ if (command === "doctor") {
   process.exit(backend || frontend ? 0 : 1);
 }
 
-if (command === "admin") {
-  scaffoldAdmin();
+if (command === "admin-standalone") {
+  scaffoldStandaloneAdmin();
   process.exit(0);
+}
+
+if (command === "admin" && !frontend) {
+  throw new Error("The embedded Admin command requires a detected or explicit Next.js frontend.");
 }
 
 if (!backend && !frontend && !has("--with-admin")) {
@@ -179,6 +193,7 @@ const skipInstall = has("--skip-install");
 const python = arg("--python", process.env.PYTHON || "python");
 const djangoPackage = arg("--django-package", "digitalafarin-cms[all]");
 const nextPackage = arg("--next-package", "@digitalafarin/cms-next");
+const adminPackage = arg("--admin-package", "@digitalafarin/cms-admin");
 
 if (backend) {
   if (!skipInstall) run(python, ["-m", "pip", "install", djangoPackage], { cwd: backend });
@@ -199,18 +214,21 @@ if (backend) {
 }
 
 if (frontend) {
-  if (!skipInstall) run("npm", ["install", nextPackage], { cwd: frontend });
+  if (!skipInstall) {
+    const packages = [nextPackage];
+    if (has("--with-admin") || command === "admin") packages.push(adminPackage);
+    run("npm", ["install", ...packages], { cwd: frontend });
+  }
   ensureEnv(frontend);
   ensureNextAdapter(frontend);
   if (has("--with-public-route")) ensurePublicRoute(frontend);
-} else if (has("--with-public-route")) {
-  throw new Error("--with-public-route requires a detected or explicit Next.js frontend.");
+  if (has("--with-admin") || command === "admin") embedAdmin(frontend);
+} else if (has("--with-public-route") || has("--with-admin") || command === "admin") {
+  throw new Error("The requested Next.js integration requires a detected or explicit frontend.");
 }
-
-if (has("--with-admin")) scaffoldAdmin();
 
 console.log("\nDigitalAfarin CMS wiring complete.");
 console.log("Backend API default: /api/cms/v1/");
 console.log("Next adapter: lib/digitalafarin-cms.ts (or src/lib/...)");
 if (has("--with-public-route")) console.log("Public CMS route: app/[[...cms_path]]/page.tsx (or src/app/...)");
-if (has("--with-admin")) console.log(`CMS Admin: ${arg("--admin-base-path", "/cms")} on port ${arg("--admin-port", "3001")}`);
+if (has("--with-admin") || command === "admin") console.log(`CMS Admin embedded in host Next.js app at: ${arg("--admin-base-path", "/cms")}`);
