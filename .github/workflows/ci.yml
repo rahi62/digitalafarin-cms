@@ -37,6 +37,7 @@ jobs:
         run: |
           python -m django check
           python -m django makemigrations --check --dry-run
+          python scripts/verify-routing-migration.py
       - name: Build Python distributions
         if: matrix.python-version == '3.13'
         run: python -m build packages/cms-django --outdir dist/python
