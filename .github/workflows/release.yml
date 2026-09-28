@@ -19,17 +19,25 @@ jobs:
         with:
           node-version: "22"
           package-manager-cache: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
       - run: npm ci --ignore-scripts
       - run: npm run check:versions
       - run: npm --workspace packages/cms-next run build
       - run: npm --workspace packages/cms-next run typecheck
       - run: npm --workspace packages/cms-next run test:rich-text
+      - run: npm run test:integration
       - run: npm --workspace apps/admin run typecheck
       - run: npm --workspace apps/admin run build
       - run: npm --workspace examples/next-site run build
       - name: Install Chromium for editor browser tests
         run: npx playwright install --with-deps chromium
       - run: npm run test:e2e:editor
+      - name: Install Django package for host integration E2E
+        run: python -m pip install -e "./packages/cms-django[all]"
+      - run: npm run test:e2e:host
+      - run: python scripts/verify-routing-migration.py
       - name: Smoke test npm release tarballs
         run: node scripts/smoke-npm-packages.mjs
       - id: version
