@@ -429,5 +429,5 @@ def robots_txt(request):
         site = Site.objects.get(domain=domain, is_active=True)
     except Site.DoesNotExist:
         return HttpResponse("Site not found", status=404)
-    body = f"User-agent: *\nAllow: /\nSitemap: https://{site.domain}/sitemap.xml\n"
+    body = f"User-agent: *\\nAllow: /\\nSitemap: {frontend_base_for(site)}/sitemap.xml\\n"
     return HttpResponse(body, content_type="text/plain")
