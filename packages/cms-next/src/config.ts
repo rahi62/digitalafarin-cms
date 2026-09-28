@@ -18,9 +18,9 @@ export function withDigitalAfarinCms(config: NextConfig = {}): NextConfig {
       return {
         beforeFiles: [...excludePreview(grouped.beforeFiles), {
           // Exclude infrastructure so images and API calls never become page previews.
-          source: "/:cms_path((?!api(?:/|$)|media(?:/|$)|_next(?:/|$)|__cms_preview(?:/|$)|cms(?:/|$)|admin(?:/|$)).*)",
+          source: "/:cms_path((?!api(?:/|$)|media(?:/|$)|_next(?:/|$)|digitalafarin-cms-preview(?:/|$)|cms(?:/|$)|admin(?:/|$)).*)",
           has: [{ type: "query" as const, key: "cms_preview" }],
-          destination: "/__cms_preview/:cms_path*",
+          destination: "/digitalafarin-cms-preview/:cms_path*",
         }],
         afterFiles: excludePreview(grouped.afterFiles),
         fallback: excludePreview(grouped.fallback),
@@ -29,7 +29,7 @@ export function withDigitalAfarinCms(config: NextConfig = {}): NextConfig {
     async headers() {
       return [...(await config.headers?.() || []),
         { source: "/:path*", has: [{ type: "query" as const, key: "cms_preview" }], headers: previewHeaders },
-        { source: "/__cms_preview/:path*", headers: previewHeaders },
+        { source: "/digitalafarin-cms-preview/:path*", headers: previewHeaders },
       ];
     },
   };
