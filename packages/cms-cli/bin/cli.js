@@ -102,7 +102,7 @@ function ensurePublicRoute(frontend) {
     throw new Error("--with-public-route requires a Next.js App Router project with app/ or src/app/.");
   }
 
-  const routeName = "[[...cms_path]]";
+  const routeName = "[...cms_path]";
   const conflictingCatchAll = fs.readdirSync(appDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -250,5 +250,5 @@ if (frontend) {
 console.log("\nCMS scaffolding prepared. Review .digitalafarin/integration.json; existing route data sources require explicit integration and runtime verification.");
 console.log("Backend API default: /api/cms/v1/");
 console.log("Next adapter: lib/digitalafarin-cms.ts (or src/lib/...)");
-if (has("--with-public-route")) console.log("Public CMS route: app/[[...cms_path]]/page.tsx (or src/app/...). Existing pages retain priority.");
+if (has("--with-public-route")) console.log("Public CMS route: app/[...cms_path]/page.tsx (or src/app/...). Existing pages retain priority.");
 if (has("--with-admin") || command === "admin") console.log(`CMS Admin embedded in host Next.js app at: ${arg("--admin-base-path", "/cms")}`);
