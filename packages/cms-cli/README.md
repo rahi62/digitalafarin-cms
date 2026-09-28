@@ -34,7 +34,7 @@ npx @digitalafarin/cms-cli init \
   --with-public-route
 ```
 
-This creates `app/[[...cms_path]]/page.tsx` (or `src/app/...`) plus a reusable block renderer. The generated renderer uses the SDK's safe Tiptap JSON renderer. If the application already has a root catch-all route, the CLI stops and asks you to integrate `cms.resolve()` into the existing route instead of creating a conflicting route.
+This creates `app/[...cms_path]/page.tsx` (or `src/app/...`) plus a reusable block renderer. The non-optional catch-all intentionally leaves an existing `app/page.tsx` homepage in control; homepage draft preview is handled by the signed preview rewrite. The generated renderer uses the SDK's safe Tiptap JSON renderer. If the application already has a root catch-all route, the CLI stops and asks you to integrate `cms.resolve()` into the existing route instead of creating a conflicting route.
 
 ## Existing `/blog` routes
 
