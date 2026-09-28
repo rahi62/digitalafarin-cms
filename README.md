@@ -4,7 +4,7 @@
 
 DigitalAfarin CMS combines a reusable Django/DRF content backend, a Next.js SDK, a visual Next.js Admin application and an installer CLI. It is designed for teams that want WordPress-like content management and SEO workflows without coupling rendering to WordPress.
 
-> Status: **0.6.0 / Community Edition (pre-1.0)**. The public API can still change before 1.0.
+> Status: **0.7.0 / Community Edition (pre-1.0)**. The public API can still change before 1.0.
 
 ## Packages
 
@@ -44,7 +44,7 @@ npx @digitalafarin/cms-cli init \\
   --with-public-route
 ```
 
-The optional public route scaffold creates a safe CMS catch-all only when it will not conflict with an existing root catch-all.
+The optional public route scaffold creates a non-optional CMS catch-all only when it will not conflict with an existing root catch-all. An existing homepage keeps ownership of `/`; signed homepage preview uses the dedicated preview rewrite.
 
 Wire the backend/frontend **and embed the visual Admin inside the existing Next.js application** under `/cms`:
 
@@ -134,7 +134,7 @@ Create a client:
 ```ts
 import { createCmsClientFromEnv } from "@digitalafarin/cms-next";
 
-export const cms = createCmsClientFromEnv({ revalidate: 60 });
+export const cms = createCmsClientFromEnv();
 ```
 
 Resolve a page:
@@ -142,6 +142,28 @@ Resolve a page:
 ```ts
 const page = await cms.resolve("/services/seo/");
 ```
+
+For existing routes such as `/blog` and `/blog/[slug]`, use the public collection/detail APIs instead of relying on a catch-all:
+
+```ts
+const list = await cms.listEntries({ content_type: "post", page: 1 });
+const article = await cms.resolveForRoute("/blog/example/");
+```
+
+The CLI can inventory existing routes and generate reviewable adapters without overwriting host files:
+
+```bash
+npx @digitalafarin/cms-cli@0.7.0 init \
+  --frontend frontend \
+  --with-collection \
+  --collection-path /blog \
+  --content-type post
+
+npx @digitalafarin/cms-cli@0.7.0 apply-integration --frontend frontend
+npx @digitalafarin/cms-cli@0.7.0 doctor --frontend frontend
+```
+
+See `docs/UPGRADE-0.7.0.fa.md` for media, preview, Wagtail and migration details.
 
 The resolver returns the page payload together with SEO metadata and sanitized site-level SEO context. The SDK also exposes helpers for Next.js metadata and JSON-LD rendering.
 
@@ -248,7 +270,7 @@ npm run typecheck
 Versions are synchronized across Python, npm packages (including CMS Admin) and lockfile metadata.
 
 ```bash
-npm run version:set -- 0.5.0
+npm run version:set -- 0.7.0
 npm run check:versions
 ```
 

@@ -23,8 +23,9 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   const media = await upload.json();
   const created = await request.post(api + '/content/entries/', { headers, data: {
     site: site.id, content_type: kind.id, title: 'CMS Persian article', slug: 'مقاله', path: '/blog/',
-    blocks: [{ type: 'image', data: { src: media.url, alt: 'Uploaded image' } }, { type: 'rich_text', data: { format: 'tiptap-json', version: 1,
-      doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Rich text body' }] }, { type: 'image', attrs: { src: media.url, alt: 'Rich image' } }] }, html: '', text: 'Rich text body' } }],
+    blocks: [{ type: 'rich_text', data: { format: 'tiptap-json', version: 1,
+      doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Rich text body' }] }, { type: 'image', attrs: { src: media.url, alt: 'Rich image' } }] }, html: '', text: 'Rich text body' } },
+      { type: 'image', data: { src: media.url, alt: 'Uploaded image' } }],
     custom_fields: { featured_image: media.url },
   } });
   expect(created.status()).toBe(201);
@@ -55,11 +56,11 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   await expect(page.getByRole('link', { name: entry.title })).toHaveAttribute('href', entry.path);
   await page.getByRole('link', { name: entry.title }).click();
   await expect(page.getByRole('heading', { name: entry.title })).toBeVisible();
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'http://127.0.0.1:3197' + encodeURI(entry.path));
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'http://127.0.0.1:3197' + entry.path);
   expect((await request.get('/media/does-not-exist.png')).status()).toBe(404);
   expect((await request.get('/blog/does-not-exist')).status()).toBe(404);
   await page.goto(entry.path + '?cms_preview=invalid');
-  await expect(page.getByRole('alert')).toContainText('invalid, expired');
+  await expect(page.getByRole('alert').filter({ hasText: 'This preview link is invalid, expired' })).toBeVisible();
   await expect(page.getByRole('heading', { name: entry.title })).toHaveCount(0);
   const changed = await request.patch(`${api}/content/entries/${entry.id}/`, { headers, data: { slug: 'renamed', title: 'Changed immediately' } });
   expect(changed.ok()).toBeTruthy();

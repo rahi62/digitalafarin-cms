@@ -101,7 +101,7 @@ const nextConfig = { /* تنظیمات فعلی میزبان */ };
 export default withDigitalAfarinCms(nextConfig);
 ```
 
-در config تابعی، wrapper را روی object نهاییِ خروجی تابع اعمال کنید. CLI config سفارشی را خودکار بازنویسی نمی‌کند. wrapper با `beforeFiles` درخواست دارای `cms_preview` را به renderer اختصاصی می‌برد؛ route فیزیکی آن `app/%5F%5Fcms_preview/[[...cms_path]]/page.tsx` است. استفاده از `app/__cms_preview` اشتباه است چون Next آن را پوشهٔ خصوصی می‌داند.
+در config تابعی، wrapper را روی object نهاییِ خروجی تابع اعمال کنید. CLI config سفارشی را خودکار بازنویسی نمی‌کند. wrapper با `beforeFiles` درخواست دارای `cms_preview` را به renderer اختصاصی می‌برد؛ route فیزیکی آن `app/digitalafarin-cms-preview/[[...cms_path]]/page.tsx` است. این نام عمداً بدون prefix خصوصی Next انتخاب شده تا رفتار route در buildهای مختلف پایدار باشد.
 
 امضا در Django با site، entry، path و انقضا بررسی می‌شود. عمر پیش‌فرض ۹۰۰ ثانیه است (`DIGITALAFARIN_CMS_PREVIEW_MAX_AGE`). لینک‌های قدیمی 0.6.0 که path امضاشده ندارند باید دوباره ساخته شوند. تغییر مسیر نیز لینک قبلی را نامعتبر می‌کند. پاسخ API پیش‌نمایش `private,no-store`، `X-Robots-Tag: noindex,nofollow` و `Referrer-Policy: no-referrer` دارد؛ HTML نیز همین محافظت‌ها و metadata را دارد. لینک نامعتبر پیام واضح نمایش می‌دهد.
 

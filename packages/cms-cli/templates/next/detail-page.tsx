@@ -5,10 +5,16 @@ import { DigitalAfarinBlockRenderer } from "__CMS_RENDERER__";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ cms_preview?: string }> };
+
+function routeSlug(value: string) {
+  try { return decodeURIComponent(value); }
+  catch { return value; }
+}
+
 async function resolve(props: Props) {
   const { slug } = await props.params;
   const { cms_preview } = await props.searchParams;
-  const path = `__CMS_COLLECTION__/${encodeURIComponent(slug)}/`;
+  const path = `__CMS_COLLECTION__/${routeSlug(slug)}/`;
   const page = await cms.resolveForRoute(path, { previewToken: cms_preview });
   if (page) return page;
   const rule = await cms.resolveRedirect(path);

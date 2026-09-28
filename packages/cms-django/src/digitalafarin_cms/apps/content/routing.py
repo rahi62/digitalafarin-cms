@@ -27,7 +27,7 @@ def normalize_path(value, *, reserved=True):
         value += "/"
     if len(value) > 500:
         raise ValidationError("Path exceeds 500 characters.")
-    roots = {"api", "media", "static", "_next", "cms", "admin", "__cms_preview", "sitemap.xml", "robots.txt", "favicon.ico"}
+    roots = {"api", "media", "static", "_next", "cms", "admin", "__cms_preview", "digitalafarin-cms-preview", "sitemap.xml", "robots.txt", "favicon.ico"}
     roots.update(str(p).strip("/").split("/")[0] for p in getattr(settings, "DIGITALAFARIN_CMS_RESERVED_PATHS", []))
     if reserved and value.strip("/").split("/")[0].lower() in roots:
         raise ValidationError("This path is reserved for infrastructure or administration.")

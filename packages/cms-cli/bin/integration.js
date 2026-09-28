@@ -49,7 +49,7 @@ export function scaffoldIntegration(frontend, root, templates, options = {}) {
   const app = path.join(root, "app");
   if (!fs.existsSync(app)) throw new Error("CMS integration currently requires the Next.js App Router.");
   put(path.join(app, "media/[...path]/route.ts"), 'import { createCmsMediaHandler } from "@digitalafarin/cms-next/server";\nexport const dynamic = "force-dynamic";\nexport const GET = createCmsMediaHandler();\nexport const HEAD = GET;\n');
-  put(path.join(app, "%5F%5Fcms_preview/[[...cms_path]]/page.tsx"), fs.readFileSync(path.join(templates, "preview-page.tsx"), "utf8"));
+  put(path.join(app, "digitalafarin-cms-preview/[[...cms_path]]/page.tsx"), fs.readFileSync(path.join(templates, "preview-page.tsx"), "utf8"));
   put(path.join(root, "components/digitalafarin-cms/BlockRenderer.tsx"), fs.readFileSync(path.join(templates, "BlockRenderer.tsx"), "utf8"));
   const configs = ["next.config.ts", "next.config.mjs", "next.config.js"].filter((name) => fs.existsSync(path.join(frontend, name)));
   if (!configs.length) {
@@ -151,6 +151,18 @@ export function frontendDoctor(frontend, root) {
   for (const warning of plan.warnings) { console.log(`Review: ${warning}`); }
   const config = ["next.config.ts", "next.config.mjs", "next.config.js"].map((name) => path.join(frontend, name)).find(fs.existsSync);
   if (!config || !fs.readFileSync(config, "utf8").includes("withDigitalAfarinCms")) { console.log("Preview config composition is pending."); issues++; }
+  const mediaRoute = path.join(root, "app", "media", "[...path]", "route.ts");
+  const mediaRouteJs = path.join(root, "app", "media", "[...path]", "route.js");
+  if (!fs.existsSync(mediaRoute) && !fs.existsSync(mediaRouteJs)) {
+    console.log("CMS media route is missing: add app/media/[...path]/route so /media never falls into page resolution.");
+    issues++;
+  }
+  const previewRoute = path.join(root, "app", "digitalafarin-cms-preview", "[[...cms_path]]", "page.tsx");
+  const previewRouteJs = path.join(root, "app", "digitalafarin-cms-preview", "[[...cms_path]]", "page.js");
+  if (!fs.existsSync(previewRoute) && !fs.existsSync(previewRouteJs)) {
+    console.log("CMS preview renderer is missing: existing routes cannot be previewed safely.");
+    issues++;
+  }
   const envFile = path.join(frontend, ".env.local");
   const env = fs.existsSync(envFile) ? fs.readFileSync(envFile, "utf8") : "";
   if (!process.env.DIGITALAFARIN_CMS_MEDIA_UPSTREAM && !/^DIGITALAFARIN_CMS_MEDIA_UPSTREAM=\S+/m.test(env)) { console.log("Set DIGITALAFARIN_CMS_MEDIA_UPSTREAM for same-origin media."); issues++; }

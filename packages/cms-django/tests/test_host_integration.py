@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from digitalafarin_cms.apps.content.models import ContentEntry, ContentTypeDefinition
+from digitalafarin_cms.apps.content.models import Category, ContentEntry, ContentTypeDefinition, Tag
 from digitalafarin_cms.apps.seo.models import Redirect
 from digitalafarin_cms.apps.sites.models import Membership, Organization, Site
 
@@ -124,6 +124,38 @@ class HostIntegrationTests(TestCase):
         self.assertEqual(self.listing(page=0).status_code, 400)
         self.assertEqual(self.resolve("/secret/").status_code, 404)
         self.assertEqual(self.resolve("/other/").status_code, 404)
+
+    def test_public_search_taxonomy_and_pagination_are_site_scoped(self):
+        category = Category.objects.create(site=self.site, name="Guides", slug="guides")
+        tag = Tag.objects.create(site=self.site, name="SEO", slug="seo")
+        first = self.create(title="SEO first", slug="first").data
+        second = self.create(title="Other second", slug="second").data
+        for item in [first, second]:
+            self.admin.post(f'/api/cms/v1/content/entries/{item["id"]}/publish/')
+        entry = ContentEntry.objects.get(pk=first["id"])
+        entry.categories.add(category)
+        entry.tags.add(tag)
+
+        searched = self.listing(content_type="news", search="SEO")
+        self.assertEqual(searched.data["count"], 1)
+        self.assertEqual(searched.data["results"][0]["id"], first["id"])
+
+        categorized = self.listing(category="guides")
+        self.assertEqual(categorized.data["count"], 1)
+        self.assertEqual(categorized.data["results"][0]["id"], first["id"])
+
+        tagged = self.listing(tag="seo")
+        self.assertEqual(tagged.data["count"], 1)
+        self.assertEqual(tagged.data["results"][0]["id"], first["id"])
+
+        page1 = self.listing(page=1, page_size=1)
+        page2 = self.listing(page=2, page_size=1)
+        self.assertEqual(page1.data["count"], 2)
+        self.assertEqual(page1.data["next"], 2)
+        self.assertIsNone(page1.data["previous"])
+        self.assertEqual(page2.data["previous"], 1)
+        self.assertIsNone(page2.data["next"])
+        self.assertNotEqual(page1.data["results"][0]["id"], page2.data["results"][0]["id"])
 
     def test_invalid_empty_expired_and_wrong_path_preview_never_falls_back(self):
         entry = self.create().data

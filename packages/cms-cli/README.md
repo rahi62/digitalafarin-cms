@@ -34,7 +34,28 @@ npx @digitalafarin/cms-cli init \
   --with-public-route
 ```
 
-This creates `app/[[...cms_path]]/page.tsx` (or `src/app/...`) plus a reusable block renderer. The generated renderer uses the SDK's safe Tiptap JSON renderer. If the application already has a root catch-all route, the CLI stops and asks you to integrate `cms.resolve()` into the existing route instead of creating a conflicting route.
+This creates `app/[...cms_path]/page.tsx` (or `src/app/...`) plus a reusable block renderer. The non-optional catch-all intentionally leaves an existing `app/page.tsx` homepage in control; homepage draft preview is handled by the signed preview rewrite. The generated renderer uses the SDK's safe Tiptap JSON renderer. If the application already has a root catch-all route, the CLI stops and asks you to integrate `cms.resolve()` into the existing route instead of creating a conflicting route.
+
+## Existing `/blog` routes
+
+A catch-all cannot replace an existing `/blog` or `/blog/[slug]` page. Generate a review plan instead:
+
+```bash
+npx @digitalafarin/cms-cli@0.7.0 init \
+  --frontend frontend \
+  --with-collection \
+  --collection-path /blog \
+  --content-type post
+```
+
+The CLI inventories host routes and writes conflicting changes under `.digitalafarin/proposals/`. Review them first, then apply only if the original file hash still matches:
+
+```bash
+npx @digitalafarin/cms-cli@0.7.0 apply-integration --frontend frontend
+npx @digitalafarin/cms-cli@0.7.0 doctor --frontend frontend
+```
+
+The generated detail adapter gives CMS published content priority, falls back to the host loader only on a normal public CMS 404, and never falls back for preview or upstream errors. Collection pagination is not merged with legacy arrays; the generated adapter keeps the legacy list explicitly available via `?cms_source=legacy`.
 
 ## Add the visual CMS Admin under `/cms`
 
@@ -100,6 +121,9 @@ npx @digitalafarin/cms-cli doctor
 --django-package SPEC
 --next-package SPEC
 --with-public-route
+--with-collection
+--collection-path /blog
+--content-type post
 --with-admin
 --admin-package SPEC
 --admin-base-path /cms
@@ -118,11 +142,11 @@ Package override flags are useful when testing local release artifacts.
 ## Local archives
 
 ```bash
-npx ./digitalafarin-cms-cli-0.5.0.tgz init \
-  --django-package ../digitalafarin_cms-0.5.0-py3-none-any.whl \
-  --next-package ../digitalafarin-cms-next-0.5.0.tgz \
+npx ./digitalafarin-cms-cli-0.7.0.tgz init \
+  --django-package ../digitalafarin_cms-0.7.0-py3-none-any.whl \
+  --next-package ../digitalafarin-cms-next-0.7.0.tgz \
   --with-admin \
-  --admin-package ../digitalafarin-cms-admin-0.5.0.tgz
+  --admin-package ../digitalafarin-cms-admin-0.7.0.tgz
 ```
 
 The release CI installs packed SDK, CLI and Admin packages into a clean temporary consumer, executes the installed binaries and verifies that `/cms` scaffolding is complete.
