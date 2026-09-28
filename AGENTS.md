@@ -5,8 +5,8 @@ Build a reusable multi-site Headless CMS + SEO platform for Next.js products. Do
 
 ## Non-negotiable architecture
 - Django REST Framework owns content, SEO, taxonomy, permissions, revisions and integrations.
-- Next.js admin is a separate client.
-- Public Next.js applications consume the resolver API or `@digitalafarin/cms-next`.
+- The Next.js Admin is a reusable client package that can be embedded in the host App Router or deployed standalone; public rendering must never depend on the Admin.
+- Public Next.js applications consume typed public APIs through `@digitalafarin/cms-next`; existing host routes must be explicitly integrated rather than assumed to be covered by a catch-all.
 - Content body is structured block JSON, never a single rendered HTML blob.
 - Every tenant-aware feature must ultimately scope through Organization -> Site.
 - SEO data is URL/content-entry level and can evolve independently from block content.
@@ -35,7 +35,9 @@ Build a reusable multi-site Headless CMS + SEO platform for Next.js products. Do
 ## Development rules
 - Add migrations for every model change before merging.
 - Add API tests for resolver and tenant isolation.
-- Keep resolver backward compatible or version it.
+- Keep resolver/public-list contracts backward compatible or version them.
+- Treat API upstream, public frontend origin, and media/storage origin as separate configuration domains.
+- Never overwrite existing host routes without an explicit review/apply step.
 - Never make public pages depend on the admin app.
 - Prefer typed contracts in the SDK over frontend-specific duplication.
 - Avoid storing generated page HTML as the source of truth.
