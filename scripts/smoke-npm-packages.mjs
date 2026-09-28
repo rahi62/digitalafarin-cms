@@ -82,7 +82,12 @@ try {
 
   const cliBin = binPath(app, "digitalafarin-cms");
   if (!fs.existsSync(cliBin)) throw new Error("digitalafarin-cms bin shim was not installed");
-  run(cliBin, ["doctor", "--frontend", frontend], app);
+  const preDoctor = spawnSync(cliBin, ["doctor", "--frontend", frontend], {
+    cwd: app, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], shell: false,
+  });
+  if (preDoctor.status === 0 || !/Integration plan missing/.test((preDoctor.stdout || "") + (preDoctor.stderr || ""))) {
+    throw new Error("doctor must fail clearly before host integration is prepared");
+  }
   console.log("@digitalafarin/cms-cli installed tarball executable OK");
 
   run(cliBin, [
@@ -91,6 +96,8 @@ try {
     "--skip-install",
     "--with-public-route",
   ], app);
+  fs.appendFileSync(path.join(frontend, ".env.local"), "DIGITALAFARIN_CMS_MEDIA_UPSTREAM=http://127.0.0.1:8000/media/\n");
+  run(cliBin, ["doctor", "--frontend", frontend], app);
   for (const expected of [
     "lib/digitalafarin-cms.ts",
     "app/[[...cms_path]]/page.tsx",
