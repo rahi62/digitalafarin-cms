@@ -100,14 +100,14 @@ try {
   run(cliBin, ["doctor", "--frontend", frontend], app);
   for (const expected of [
     "lib/digitalafarin-cms.ts",
-    "app/[[...cms_path]]/page.tsx",
+    "app/[...cms_path]/page.tsx",
     "components/digitalafarin-cms/BlockRenderer.tsx",
   ]) {
     if (!fs.existsSync(path.join(frontend, expected))) {
       throw new Error(`cms-cli --with-public-route missing ${expected}`);
     }
   }
-  const publicRoute = fs.readFileSync(path.join(frontend, "app", "[[...cms_path]]", "page.tsx"), "utf8");
+  const publicRoute = fs.readFileSync(path.join(frontend, "app", "[...cms_path]", "page.tsx"), "utf8");
   if (!publicRoute.includes("cms.resolve")) throw new Error("Generated public route does not resolve CMS content");
   const publicRenderer = fs.readFileSync(path.join(frontend, "components", "digitalafarin-cms", "BlockRenderer.tsx"), "utf8");
   if (!publicRenderer.includes("renderCmsRichTextHtml")) throw new Error("Generated public renderer does not use safe rich text helper");
