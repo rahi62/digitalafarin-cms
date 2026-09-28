@@ -26,6 +26,9 @@ test('installation inventories existing home/blog/detail and preserves custom so
   assert.equal(manifest.status, 'review-required');
   assert.ok(manifest.routes.some((r) => r.url === '/blog/[slug]'));
   assert.match(fs.readFileSync(path.join(dir, '.digitalafarin/proposals/app/blog/page.tsx.txt'), 'utf8'), /listEntries/);
+  const detailProposal = fs.readFileSync(path.join(dir, '.digitalafarin/proposals/app/blog/[slug]/page.tsx.txt'), 'utf8');
+  assert.match(detailProposal, /decodeURIComponent/);
+  assert.doesNotMatch(detailProposal, /encodeURIComponent\(slug\)/);
   assert.doesNotMatch(result.stdout, /wiring complete/);
   const doctor = spawnSync(process.execPath, [cli, 'doctor', '--frontend', dir], { cwd: dir, encoding: 'utf8' });
   assert.equal(doctor.status, 1);
