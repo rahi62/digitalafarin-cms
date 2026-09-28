@@ -4,6 +4,32 @@ All notable changes to DigitalAfarin CMS are documented here.
 
 The project uses synchronized versions for the Django package, Next.js SDK, Admin and CLI.
 
+## [0.7.0] - 2026-09-28
+
+### Added
+
+- Content Type routing contracts with `collection_path` and `entry_path_pattern`, including backend-computed canonical entry paths and Unicode slug support.
+- Public, site-bound collection API for published content with search, taxonomy filters and bounded pagination.
+- SDK helpers for existing host routes: `listEntries()`, `resolveForRoute()`, fixed-upstream media handling and Next.js preview config composition.
+- Reviewable CLI integration plans for existing `/blog` and detail routes, with hash-checked proposals, backups and explicit apply step.
+- Signed preview flow that validates site, entry and path, bypasses public fallback and emits no-store/noindex/no-referrer protections.
+- Media URL normalization for same-origin, CDN and explicitly configured legacy origins.
+- Django/CLI doctor checks for route ordering, migrations, Wagtail compatibility and media configuration.
+- Regression coverage for routing, tenant isolation, preview expiry, media normalization, host fallback and real Next.js host integration.
+
+### Changed
+
+- New CMS content routes default to `no-store`; optional SDK revalidation remains opt-in.
+- Published URL moves create permanent redirects while existing custom/manual paths remain unchanged unless explicitly migrated.
+- Preview routing now uses the stable internal route `/digitalafarin-cms-preview/*` instead of an encoded/private-folder workaround.
+- CI and release verification now gate the host-integration unit tests, routing migration compatibility test and real browser E2E scenario.
+
+### Migration
+
+- Adds `ContentEntry.path_mode`.
+- Adds `ContentTypeDefinition.collection_path` and `entry_path_pattern`.
+- Existing entries retain their stored path and default to manual routing.
+
 ## [0.6.0] - 2026-09-27
 
 ### Added
