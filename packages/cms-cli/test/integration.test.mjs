@@ -52,7 +52,7 @@ test('JavaScript host routes receive JavaScript adapters and changes after revie
 });
 
 test("generated detail adapter decodes the Next route segment and leaves query encoding to the SDK", () => {
-  const template = fs.readFileSync(path.join(root, "packages/cms-cli/templates/next/detail-page.tsx"), "utf8");
+  const template = fs.readFileSync(fileURLToPath(new URL("../templates/next/detail-page.tsx", import.meta.url)), "utf8");
   assert.match(template, /decodeURIComponent\(slug\)/);
   assert.doesNotMatch(template, /encodeURIComponent\(slug\)/);
 });
