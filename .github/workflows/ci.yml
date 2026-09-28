@@ -70,6 +70,7 @@ jobs:
       - run: npm --workspace packages/cms-next run build
       - run: npm --workspace packages/cms-next run typecheck
       - run: npm --workspace packages/cms-next run test:rich-text
+      - run: npm run test:integration
       - run: npm --workspace apps/admin run typecheck
       - run: npm --workspace apps/admin run build
       - run: npm --workspace examples/next-site run build
@@ -78,6 +79,11 @@ jobs:
       - run: npm run test:e2e:editor
       - name: Smoke test installed npm tarballs
         run: node scripts/smoke-npm-packages.mjs
+      - name: Run existing-host integration E2E
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "./packages/cms-django[all]"
+          npm run test:e2e:host
       - name: Inspect npm package contents
         run: |
           npm --workspace apps/admin run pack:check
