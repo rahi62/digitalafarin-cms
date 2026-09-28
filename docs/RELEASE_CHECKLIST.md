@@ -14,10 +14,10 @@ Use this checklist before creating any `v*` tag.
 npm run check:versions
 ```
 
-Expected for v0.5:
+Expected for v0.7:
 
 ```text
-All publishable packages and lockfile metadata are synchronized at 0.5.0.
+All publishable packages and lockfile metadata are synchronized at 0.7.0.
 ```
 
 The synchronized npm workspaces now include:
@@ -35,11 +35,13 @@ npm ci --ignore-scripts
 npm --workspace packages/cms-next run build
 npm --workspace packages/cms-next run typecheck
 npm --workspace packages/cms-next run test:rich-text
+npm run test:integration
 npm --workspace apps/admin run typecheck
 npm --workspace apps/admin run build
 npm --workspace examples/next-site run build
 npx playwright install --with-deps chromium
 npm run test:e2e:editor
+npm run test:e2e:host
 npm --workspace apps/admin run pack:check
 npm --workspace packages/cms-next run pack:check
 npm --workspace packages/cms-cli run pack:check
@@ -51,6 +53,8 @@ node scripts/smoke-npm-packages.mjs
 - [ ] Safe rich-text renderer tests pass.
 - [ ] Example public Next.js consumer build passes.
 - [ ] Playwright Professional Editor tests pass.
+- [ ] Existing-host E2E passes for homepage, `/blog`, `/blog/[slug]`, preview, media, publish/move/unpublish and legacy fallback.
+- [ ] `scripts/verify-routing-migration.py` confirms 0.6 paths remain manual/unchanged after migration.
 - [ ] Packed SDK imports successfully from a clean consumer project.
 - [ ] Installed CLI binary runs from the packed package.
 - [ ] Packed `@digitalafarin/cms-admin` installs in a clean consumer project.
@@ -58,6 +62,9 @@ node scripts/smoke-npm-packages.mjs
 - [ ] Generated Admin contains `/cms/api-proxy`, `.env.local`, and `deploy/nginx.cms.conf`.
 - [ ] `digitalafarin-cms admin` can scaffold the Admin through the main CLI.
 - [ ] `digitalafarin-cms init --with-public-route` creates the App Router catch-all and safe renderer in a clean frontend.
+- [ ] `--with-collection` inventories existing routes, writes reviewable proposals, and `apply-integration` refuses changed host files.
+- [ ] Same-origin `/media/` bypasses the content resolver and missing media remains 404.
+- [ ] Signed preview overrides existing filesystem routes and invalid/expired preview never falls back.
 
 ## 3. Python validation
 
@@ -92,7 +99,7 @@ python scripts/smoke-python-package.py
 
 ## 5. Trusted Publishing
 
-All publishable packages already exist from the v0.4.x line. v0.5 must publish through the configured GitHub environments/OIDC workflow; do not bootstrap or manually publish a package version.
+All publishable packages already exist from the v0.4.x line. v0.7 must publish through the configured GitHub environments/OIDC workflow; do not bootstrap or manually publish a package version.
 
 Verify npm Trusted Publishing for all three packages:
 
@@ -116,7 +123,7 @@ permissions: publish
 - [ ] GitHub environment `npm` exists.
 - [ ] GitHub environment `pypi` exists.
 - [ ] PyPI Trusted Publisher points to owner `rahi62`, repository `digitalafarin-cms`, workflow `release.yml`, environment `pypi`.
-- [ ] `0.5.0` does not already exist in npm/PyPI before tagging.
+- [ ] `0.7.0` does not already exist in npm/PyPI before tagging.
 
 ## 6. Pre-tag product checks
 
@@ -150,8 +157,8 @@ Only after all checks above are green and Trusted Publishing has been verified:
 git checkout main
 git pull --ff-only
 npm run check:versions
-git tag v0.5.0
-git push origin v0.5.0
+git tag v0.7.0
+git push origin v0.7.0
 ```
 
 The tag triggers `.github/workflows/release.yml`.
@@ -163,23 +170,23 @@ Do not manually republish a version that already exists in npm or PyPI.
 Python:
 
 ```bash
-pip install "digitalafarin-cms[all]==0.5.0"
+pip install "digitalafarin-cms[all]==0.7.0"
 python -c "import digitalafarin_cms; print(digitalafarin_cms.__version__)"
 ```
 
 npm:
 
 ```bash
-npm view "@digitalafarin/cms-next@0.5.0" version
-npm view "@digitalafarin/cms-cli@0.5.0" version
-npm view "@digitalafarin/cms-admin@0.5.0" version
-npx "@digitalafarin/cms-cli@0.5.0" doctor
+npm view "@digitalafarin/cms-next@0.7.0" version
+npm view "@digitalafarin/cms-cli@0.7.0" version
+npm view "@digitalafarin/cms-admin@0.7.0" version
+npx "@digitalafarin/cms-cli@0.7.0" doctor
 ```
 
 Admin scaffold smoke check:
 
 ```bash
-npx "@digitalafarin/cms-admin@0.5.0" scaffold \
+npx "@digitalafarin/cms-admin@0.7.0" scaffold \
   --dir cms-admin-release-test \
   --base-path /cms \
   --api-url https://api.example.com/api/cms/v1 \
@@ -187,7 +194,7 @@ npx "@digitalafarin/cms-admin@0.5.0" scaffold \
   --skip-install
 ```
 
-- [ ] PyPI shows `0.5.0`.
-- [ ] npm `latest` points to `0.5.0` for SDK, CLI and Admin.
-- [ ] GitHub Release `v0.5.0` exists.
+- [ ] PyPI shows `0.7.0`.
+- [ ] npm `latest` points to `0.7.0` for SDK, CLI and Admin.
+- [ ] GitHub Release `v0.7.0` exists.
 - [ ] Install instructions in README match the published packages.
