@@ -34,7 +34,7 @@ test('preview config precedes filesystem and keeps host rewrites excluding previ
   const { withDigitalAfarinCms } = await import('../dist/config.js');
   const config = withDigitalAfarinCms({ async rewrites() { return [{ source: '/legacy', destination: '/old' }]; } });
   const rules = await config.rewrites();
-  assert.ok(rules.beforeFiles.some((r) => r.destination === '/__cms_preview/:cms_path*' && r.has[0].key === 'cms_preview'));
+  assert.ok(rules.beforeFiles.some((r) => r.destination === '/digitalafarin-cms-preview/:cms_path*' && r.has[0].key === 'cms_preview'));
   assert.equal(rules.afterFiles[0].destination, '/old');
   const headers = await config.headers();
   assert.ok(headers.some((r) => r.headers.some((h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer')));
