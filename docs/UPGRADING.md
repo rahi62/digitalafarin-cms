@@ -1,5 +1,26 @@
 # Upgrading DigitalAfarin CMS
 
+## 0.6.0 -> 0.7.0
+
+v0.7 fixes integration with existing Django + Next.js hosts: canonical content routing, public collection/detail APIs, media delivery, signed preview on existing routes, Wagtail redirect compatibility and reviewable CLI adapters.
+
+Use the full Persian migration guide: [UPGRADE-0.7.0.fa.md](UPGRADE-0.7.0.fa.md).
+
+Minimum upgrade sequence:
+
+```bash
+python -m pip install --upgrade "digitalafarin-cms[all]==0.7.0"
+python manage.py migrate
+python manage.py check
+python manage.py cms_doctor
+
+npm install --save-exact @digitalafarin/cms-next@0.7.0 @digitalafarin/cms-admin@0.7.0
+npx @digitalafarin/cms-cli@0.7.0 init --frontend . --skip-install --with-collection --collection-path /blog --content-type post
+```
+
+Review `.digitalafarin/integration.json` and generated proposals before running `apply-integration`. Existing route files are never silently overwritten. Existing content paths remain manual until explicitly moved.
+
+
 ## 0.4.2 -> 0.5.0
 
 v0.5 introduces the Professional Content Editor, typed `rich_text` blocks, a safe SDK renderer, browser-level editor tests and an optional public App Router catch-all scaffold.
