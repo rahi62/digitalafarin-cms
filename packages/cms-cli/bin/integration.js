@@ -49,7 +49,7 @@ export function scaffoldIntegration(frontend, root, templates, options = {}) {
   const app = path.join(root, "app");
   if (!fs.existsSync(app)) throw new Error("CMS integration currently requires the Next.js App Router.");
   put(path.join(app, "media/[...path]/route.ts"), 'import { createCmsMediaHandler } from "@digitalafarin/cms-next/server";\nexport const dynamic = "force-dynamic";\nexport const GET = createCmsMediaHandler();\nexport const HEAD = GET;\n');
-  put(path.join(app, "%5F%5Fcms_preview/[[...cms_path]]/page.tsx"), fs.readFileSync(path.join(templates, "preview-page.tsx"), "utf8"));
+  put(path.join(app, "digitalafarin-cms-preview/[[...cms_path]]/page.tsx"), fs.readFileSync(path.join(templates, "preview-page.tsx"), "utf8"));
   put(path.join(root, "components/digitalafarin-cms/BlockRenderer.tsx"), fs.readFileSync(path.join(templates, "BlockRenderer.tsx"), "utf8"));
   const configs = ["next.config.ts", "next.config.mjs", "next.config.js"].filter((name) => fs.existsSync(path.join(frontend, name)));
   if (!configs.length) {
