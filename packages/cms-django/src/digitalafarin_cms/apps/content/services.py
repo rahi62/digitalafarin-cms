@@ -12,6 +12,7 @@ def create_revision(entry, user=None, note=""):
         "title": entry.title,
         "slug": entry.slug,
         "path": entry.path,
+        "path_mode": entry.path_mode,
         "excerpt": entry.excerpt,
         "blocks": entry.blocks,
         "custom_fields": entry.custom_fields,

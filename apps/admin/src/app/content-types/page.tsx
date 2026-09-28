@@ -13,6 +13,8 @@ type ContentType = {
   slug: string;
   icon: string;
   is_public: boolean;
+  collection_path: string;
+  entry_path_pattern: string;
   schema: ContentTypeSchema;
 };
 
@@ -57,7 +59,7 @@ const presets: Record<string, CustomFieldDefinition[]> = {
 };
 
 function emptyType(site = ""): ContentType {
-  return { site, name: "", slug: "", icon: "", is_public: true, schema: { fields: [] } };
+  return { site, name: "", slug: "", icon: "", is_public: true, collection_path: "", entry_path_pattern: "", schema: { fields: [] } };
 }
 
 function slugify(value: string) {
@@ -166,6 +168,8 @@ export default function ContentTypesPage() {
         slug: editing.slug.trim(),
         icon: editing.icon.trim(),
         is_public: editing.is_public,
+        collection_path: editing.collection_path || "",
+        entry_path_pattern: editing.entry_path_pattern || "",
         schema: { ...editing.schema, fields },
       };
       const saved = editing.id
@@ -241,6 +245,8 @@ export default function ContentTypesPage() {
             }} placeholder="مثلاً Tour" /></div>
             <div className="field"><label>Slug</label><input dir="ltr" value={editing.slug} onChange={(e) => setEditing({ ...editing, slug: slugify(e.target.value) })} placeholder="tour" /></div>
             <div className="field"><label>Icon</label><input value={editing.icon} onChange={(e) => setEditing({ ...editing, icon: e.target.value })} placeholder="✈" /></div>
+            <div className="field"><label>مسیر فهرست</label><input dir="ltr" placeholder="/blog" value={editing.collection_path || ""} onChange={(e) => setEditing({ ...editing, collection_path: e.target.value })} /></div>
+            <div className="field"><label>الگوی آدرس محتوا</label><input dir="ltr" placeholder="/blog/{slug}/" value={editing.entry_path_pattern || ""} onChange={(e) => setEditing({ ...editing, entry_path_pattern: e.target.value })} /><small>برای Page و صفحهٔ اصلی هر دو فیلد مسیر را خالی بگذارید. تغییر الگو، آدرس محتوای موجود را جابه‌جا نمی‌کند.</small></div>
             <label className="contentTypePublic"><input type="checkbox" checked={editing.is_public} onChange={(e) => setEditing({ ...editing, is_public: e.target.checked })} /><span><strong>Public</strong><small>قابل استفاده در خروجی عمومی سایت</small></span></label>
           </div>
 

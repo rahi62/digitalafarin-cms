@@ -13,9 +13,10 @@ import RevisionPanel from "@/components/RevisionPanel";
 import SchemaBuilder from "@/components/SchemaBuilder";
 import SeoPanel from "@/components/SeoPanel";
 import TaxonomyFields from "@/components/TaxonomyFields";
+import ContentPathFields, { ContentRouting } from "@/components/ContentPathFields";
 import { apiFetch } from "@/lib/api";
 
-type ContentType = { id: string; name: string; slug: string; schema: ContentTypeSchema };
+type ContentType = ContentRouting & { id: string; name: string; slug: string; schema: ContentTypeSchema };
 
 export default function EditContent() {
   const { id } = useParams<{ id: string }>();
@@ -162,7 +163,7 @@ export default function EditContent() {
       }))
       .then((saved) => {
         const normalized = normalizeEntry(saved);
-        lastSavedFingerprint.current = submittedFingerprint;
+        lastSavedFingerprint.current = fingerprint(normalized);
         setF((current: any) => {
           if (!current || fingerprint(current) === submittedFingerprint) {
             setSaveState("saved");
@@ -249,7 +250,7 @@ export default function EditContent() {
         <div className="formGrid">
           <div className="field"><label>عنوان</label><input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
           <div className="field"><label>Slug</label><input value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value })} /></div>
-          <div className="field full"><label>Path</label><input dir="ltr" value={f.path} onChange={(e) => setF({ ...f, path: e.target.value })} /></div>
+          <ContentPathFields entry={f} contentType={contentType} onChange={(patch) => setF({ ...f, ...patch })} />
           <div className="field full"><label>خلاصه</label><textarea style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right" }} value={f.excerpt} onChange={(e) => setF({ ...f, excerpt: e.target.value })} /></div>
           <div className="field"><label>وضعیت Workflow</label><input value={f.status} readOnly className="readonlyField" /></div>
           <ParentEntryField siteId={f.site} entryId={id} value={f.parent || null} onChange={(parent) => setF({ ...f, parent })} />
@@ -263,7 +264,7 @@ export default function EditContent() {
         <div className="actions"><button className="btn">ذخیره تغییرات</button></div>
       </form>
 
-      <EditorialWorkflowPanel entryId={id} onUpdated={(entry) => setF(normalizeEntry(entry))} />
+      <EditorialWorkflowPanel entryId={id} beforeAction={async () => { cancelAutosaveTimer(); await saveEntry(false); }} onUpdated={(entry) => { const normalized = normalizeEntry(entry); lastSavedFingerprint.current = fingerprint(normalized); setF(normalized); }} />
       <SeoPanel entryId={id} pageTitle={f.title} pagePath={f.path} />
       <SchemaBuilder entryId={id} pageTitle={f.title} pagePath={f.path} blocks={f.blocks || []} />
       <InternalLinksPanel entryId={id} />

@@ -1,6 +1,8 @@
 import re
 
 from django.utils import timezone
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
 from rest_framework import serializers
 from .models import ContentTypeDefinition, ContentEntry, ContentRevision, Category, Tag, ReusableBlock, Menu, MenuItem
 
@@ -29,6 +31,27 @@ class ContentTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContentTypeDefinition
         fields = "__all__"
+
+    def validate(self, attrs):
+        from .routing import validate_type_routing, validate_collection_claim
+        try:
+            collection, pattern = validate_type_routing(
+                attrs.get("collection_path", getattr(self.instance, "collection_path", "")),
+                attrs.get("entry_path_pattern", getattr(self.instance, "entry_path_pattern", "")),
+            )
+            site = attrs.get("site", getattr(self.instance, "site", None))
+            if site:
+                validate_collection_claim(site.pk, collection, self.instance)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"entry_path_pattern": exc.messages})
+        attrs.update(collection_path=collection, entry_path_pattern=pattern)
+        return attrs
+
+    def save(self, **kwargs):
+        try:
+            return super().save(**kwargs)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(getattr(exc, "message_dict", {"collection_path": exc.messages}))
 
     def validate_schema(self, value):
         if value in (None, ""):
@@ -77,19 +100,30 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 class ContentEntrySerializer(serializers.ModelSerializer):
+    url=serializers.SerializerMethodField()
     content_type_slug=serializers.CharField(source="content_type.slug",read_only=True)
     author=serializers.PrimaryKeyRelatedField(read_only=True)
     author_name=serializers.CharField(source="author.username",read_only=True)
+    def get_url(self, obj):
+        from .views import frontend_base_for
+        return frontend_base_for(obj.site) + obj.path
     class Meta:
         model=ContentEntry
         fields="__all__"
         read_only_fields=["published_at"]
+        extra_kwargs={"path": {"required": False, "allow_blank": True}}
+        validators=[]  # The final computed route is validated below and under a site lock on save.
 
     def validate_path(self,value):
-        if not value.startswith("/"): value="/"+value
-        if "?" in value or "#" in value: raise serializers.ValidationError("Path must not contain query strings or fragments.")
-        if value != "/" and not value.endswith("/"): value += "/"
         return value
+
+    def save(self, **kwargs):
+        try:
+            return super().save(**kwargs)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(getattr(exc, "message_dict", {"path": exc.messages}))
+        except IntegrityError:
+            raise serializers.ValidationError({"path": "A conflicting content record already exists."})
 
     def validate_blocks(self,value):
         if not isinstance(value,list): raise serializers.ValidationError("blocks must be a list")
@@ -129,7 +163,25 @@ class ContentEntrySerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"scheduled_at": "Scheduled content requires scheduled_at."})
             if scheduled_at <= timezone.now():
                 raise serializers.ValidationError({"scheduled_at": "scheduled_at must be in the future."})
+        if site and ctype:
+            from .routing import validate_entry_route
+            mode = attrs.get("path_mode", getattr(self.instance, "path_mode", "auto" if ctype.entry_path_pattern else "manual"))
+            candidate = ContentEntry(
+                pk=getattr(self.instance, "pk", None), site=site, content_type=ctype,
+                slug=attrs.get("slug", getattr(self.instance, "slug", "")),
+                path=attrs.get("path", getattr(self.instance, "path", "")), path_mode=mode,
+            )
+            try:
+                attrs["path"] = validate_entry_route(candidate, self.instance)
+                attrs["slug"] = candidate.slug
+                attrs["path_mode"] = mode
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError(getattr(exc, "message_dict", {"path": exc.messages}))
         return attrs
+
+    def to_representation(self, instance):
+        from digitalafarin_cms.media import normalize_media_data
+        return normalize_media_data(super().to_representation(instance))
 
 
 class ContentRevisionSerializer(serializers.ModelSerializer):

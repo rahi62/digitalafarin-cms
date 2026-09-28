@@ -1,6 +1,6 @@
 {
   "name": "digitalafarin-seo-cms",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "workspaces": [
     "apps/admin",
@@ -19,7 +19,9 @@
     "version:set": "node scripts/set-version.mjs",
     "pack:all": "node scripts/pack-all.mjs",
     "release:check": "node scripts/check-versions.mjs && npm run typecheck",
-    "test:e2e:editor": "playwright test --config=e2e/playwright.config.ts"
+    "test:e2e:editor": "playwright test --config=e2e/playwright.config.ts",
+    "test:integration": "npm --workspace packages/cms-next run build && node --test packages/cms-next/test/*.test.mjs packages/cms-cli/test/*.test.mjs",
+    "test:e2e:host": "npm --workspace packages/cms-next run build && playwright test --config=e2e/host/playwright.config.ts"
   },
   "description": "SEO-first headless CMS monorepo for Django and Next.js",
   "license": "Apache-2.0",

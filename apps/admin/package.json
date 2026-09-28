@@ -1,6 +1,6 @@
 {
   "name": "@digitalafarin/cms-admin",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Embeddable and standalone Next.js admin package for DigitalAfarin Headless SEO CMS",
   "type": "module",
   "bin": {

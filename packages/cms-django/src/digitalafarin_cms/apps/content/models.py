@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from digitalafarin_cms.apps.common.models import UUIDTimeStampedModel
 from digitalafarin_cms.apps.sites.models import Site
@@ -11,8 +11,18 @@ class ContentTypeDefinition(UUIDTimeStampedModel):
     schema=models.JSONField(default=dict,blank=True, help_text="Custom field definitions")
     icon=models.CharField(max_length=50,blank=True)
     is_public=models.BooleanField(default=True)
+    collection_path=models.CharField(max_length=500,blank=True,default="")
+    entry_path_pattern=models.CharField(max_length=500,blank=True,default="")
     class Meta: constraints=[models.UniqueConstraint(fields=["site","slug"],name="unique_content_type_site_slug")]
     def __str__(self): return f"{self.site.domain}:{self.slug}"
+    def save(self, *args, **kwargs):
+        from .routing import validate_type_routing, validate_collection_claim
+        self.collection_path, self.entry_path_pattern = validate_type_routing(self.collection_path, self.entry_path_pattern)
+        with transaction.atomic():
+            Site.objects.select_for_update().get(pk=self.site_id)
+            previous = type(self).objects.filter(pk=self.pk).first() if not self._state.adding else None
+            validate_collection_claim(self.site_id, self.collection_path, previous)
+            return super().save(*args, **kwargs)
 
 class Category(UUIDTimeStampedModel):
     site=models.ForeignKey(Site,on_delete=models.CASCADE,related_name="categories")
@@ -35,8 +45,9 @@ class ContentEntry(UUIDTimeStampedModel):
     site=models.ForeignKey(Site,on_delete=models.CASCADE,related_name="entries")
     content_type=models.ForeignKey(ContentTypeDefinition,on_delete=models.PROTECT,related_name="entries")
     title=models.CharField(max_length=255)
-    slug=models.SlugField(max_length=255)
+    slug=models.SlugField(max_length=255,allow_unicode=True)
     path=models.CharField(max_length=500,help_text="Canonical site path, e.g. /blog/example/")
+    path_mode=models.CharField(max_length=10,choices=[("manual","Manual"),("auto","Automatic")],default="manual")
     excerpt=models.TextField(blank=True)
     blocks=models.JSONField(default=list,blank=True)
     custom_fields=models.JSONField(default=dict,blank=True)
@@ -52,6 +63,26 @@ class ContentEntry(UUIDTimeStampedModel):
         constraints=[models.UniqueConstraint(fields=["site","path"],name="unique_entry_site_path")]
         ordering=["-published_at","-created_at"]
     def __str__(self): return self.title
+    def save(self, *args, **kwargs):
+        from .routing import validate_entry_route
+        from digitalafarin_cms.apps.seo.models import Redirect, SeoMeta
+        with transaction.atomic():
+            # Serializes route claims for one site, including legacy encoded aliases.
+            Site.objects.select_for_update().get(pk=self.site_id)
+            previous = type(self).objects.filter(pk=self.pk).first() if not self._state.adding else None
+            self.path = validate_entry_route(self, previous)
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"path"}
+            result = super().save(*args, **kwargs)
+            if previous and previous.path != self.path and (previous.published_at or previous.status == self.Status.PUBLISHED):
+                Redirect.objects.filter(site_id=self.site_id, destination_path=previous.path, is_active=True).update(destination_path=self.path)
+                Redirect.objects.update_or_create(site_id=self.site_id, source_path=previous.path,
+                    defaults={"destination_path": self.path, "redirect_type": "301", "is_active": True})
+                # Explicit external canonicals remain an SEO decision. Local self-canonicals follow moves.
+                from .views import frontend_base_for
+                base = frontend_base_for(self.site)
+                SeoMeta.objects.filter(entry=self, canonical_url=base + previous.path).update(canonical_url=base + self.path)
+            return result
     def publish(self):
         self.status=self.Status.PUBLISHED
         self.published_at=self.published_at or timezone.now()

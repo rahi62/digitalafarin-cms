@@ -1,11 +1,21 @@
 {
   "name": "@digitalafarin/cms-next",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Next.js SDK for DigitalAfarin Headless CMS + SEO",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "default": "./dist/server.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js",
+      "default": "./dist/config.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",

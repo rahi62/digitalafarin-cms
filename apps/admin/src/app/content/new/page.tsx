@@ -7,18 +7,19 @@ import CustomFieldsEditor, { ContentTypeSchema, customFieldDefaults } from "@/co
 import PageHeader from "@/components/PageHeader";
 import ParentEntryField from "@/components/ParentEntryField";
 import TaxonomyFields from "@/components/TaxonomyFields";
+import ContentPathFields, { ContentRouting } from "@/components/ContentPathFields";
 import { apiFetch, Paginated } from "@/lib/api";
 import { adminPath } from "@/lib/admin-path";
 
 type Site = { id: string; name: string };
-type ContentType = { id: string; site: string; name: string; slug: string; schema: ContentTypeSchema };
+type ContentType = ContentRouting & { id: string; site: string; name: string; slug: string; schema: ContentTypeSchema };
 
 export default function NewContent() {
   const [sites, setSites] = useState<Site[]>([]);
   const [types, setTypes] = useState<ContentType[]>([]);
   const [msg, setMsg] = useState("");
   const [f, setF] = useState<any>({
-    site: "", content_type: "", title: "", slug: "", path: "/", excerpt: "",
+    site: "", content_type: "", title: "", slug: "", path: "", excerpt: "",
     status: "draft", parent: null, is_featured: false, categories: [], tags: [], custom_fields: {},
     blocks: [] as ContentBlock[],
   });
@@ -44,7 +45,7 @@ export default function NewContent() {
 
   function selectType(typeId: string) {
     const type = types.find((item) => item.id === typeId);
-    setF({ ...f, content_type: typeId, custom_fields: customFieldDefaults(type?.schema) });
+    setF({ ...f, content_type: typeId, path_mode: type?.entry_path_pattern ? "auto" : "manual", custom_fields: customFieldDefaults(type?.schema) });
   }
 
   async function submit(e: FormEvent) {
@@ -68,7 +69,7 @@ export default function NewContent() {
           <div className="field"><label>نوع محتوا</label><select value={f.content_type} onChange={(e) => selectType(e.target.value)}>{siteTypes.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>{siteTypes.length === 0 && <small>برای این سایت ابتدا یک Content Type بسازید.</small>}</div>
           <div className="field"><label>عنوان</label><input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
           <div className="field"><label>Slug</label><input value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value })} /></div>
-          <div className="field full"><label>Path</label><input dir="ltr" value={f.path} onChange={(e) => setF({ ...f, path: e.target.value })} /></div>
+          <ContentPathFields entry={f} contentType={selectedType} onChange={(patch) => setF({ ...f, ...patch })} />
           <div className="field full"><label>خلاصه</label><textarea style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right" }} value={f.excerpt} onChange={(e) => setF({ ...f, excerpt: e.target.value })} /></div>
           <div className="field"><label>وضعیت اولیه</label><select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}><option value="draft">Draft</option><option value="review">In Review</option></select><small>Published و Scheduled بعد از ایجاد از Editorial Workflow انجام می‌شوند.</small></div>
           <ParentEntryField siteId={f.site} value={f.parent || null} onChange={(parent) => setF({ ...f, parent })} />

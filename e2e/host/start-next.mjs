@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('../../', import.meta.url));
+const fixture = fs.readFileSync(root + '/.tmp/host-integration/active-path.txt', 'utf8');
+const next = root + '/node_modules/next/dist/bin/next';
+const build = spawnSync(process.execPath, [next, 'build', '--webpack'], { cwd: fixture, stdio: 'inherit' });
+if (build.status !== 0) process.exit(build.status || 1);
+const processNext = spawn(process.execPath, [next, 'start', '--hostname', '127.0.0.1', '--port', '3197'], { cwd: fixture, stdio: 'inherit' });
+processNext.on('exit', (code) => process.exit(code || 0));
+process.on('SIGTERM', () => processNext.kill());

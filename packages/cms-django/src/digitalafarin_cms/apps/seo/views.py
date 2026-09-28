@@ -316,7 +316,16 @@ def resolve_redirect(request):
         site = Site.objects.get(domain=domain, is_active=True)
     except Site.DoesNotExist:
         return Response({"detail": "Site not found"}, status=404)
-    redirect = Redirect.objects.filter(site=site, source_path=path, is_active=True).first()
+    from digitalafarin_cms.apps.content.routing import normalize_path
+    from django.core.exceptions import ValidationError
+    from django.db.models import Q
+    try:
+        normalized = normalize_path(path, reserved=False)
+    except ValidationError:
+        return Response({"match": False})
+    redirect = Redirect.objects.filter(site=site, is_active=True).filter(
+        Q(source_path=path) | Q(source_path=normalized) | Q(source_path=normalized.rstrip("/"))
+    ).first()
     if not redirect:
         return Response({"match": False})
     Redirect.objects.filter(pk=redirect.pk).update(hits=redirect.hits + 1)

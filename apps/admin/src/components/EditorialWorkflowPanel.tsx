@@ -17,6 +17,7 @@ type Workflow = {
 
 type Props = {
   entryId: string;
+  beforeAction?: () => Promise<void>;
   onUpdated: (entry: any) => void;
 };
 
@@ -45,7 +46,7 @@ function dateLabel(value: string | null) {
   }
 }
 
-export default function EditorialWorkflowPanel({ entryId, onUpdated }: Props) {
+export default function EditorialWorkflowPanel({ entryId, onUpdated, beforeAction }: Props) {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [scheduleAt, setScheduleAt] = useState("");
   const [message, setMessage] = useState("");
@@ -67,6 +68,7 @@ export default function EditorialWorkflowPanel({ entryId, onUpdated }: Props) {
     setBusy(action);
     setMessage("");
     try {
+      await beforeAction?.();
       const entry = await apiFetch<any>(`/content/entries/${entryId}/${action}/`, {
         method: "POST",
         body: JSON.stringify(body),

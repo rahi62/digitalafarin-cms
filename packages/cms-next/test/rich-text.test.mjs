@@ -54,7 +54,7 @@ test("CMS client preserves HTTP status on request failures", async () => {
       (error) => {
         assert.ok(error instanceof CmsRequestError);
         assert.equal(error.status, 503);
-        assert.equal(error.body, "upstream down");
+        assert.equal(error.body, "CMS request failed (503).");
         assert.equal(isCmsNotFoundError(error), false);
         return true;
       },

@@ -10,7 +10,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path?: s
   const { path = [] } = await context.params;
   const incomingUrl = new URL(request.url);
   const suffix = path.map((segment) => encodeURIComponent(segment)).join("/");
-  const suffixWithTrailingSlash = suffix && incomingUrl.pathname.endsWith("/") ? `${suffix}/` : suffix;
+  // Host Next.js may strip the browser's trailing slash. DRF's CMS routes require it.
+  const suffixWithTrailingSlash = suffix ? `${suffix}/` : "";
   const target = `${upstreamBaseUrl()}/${suffixWithTrailingSlash}${incomingUrl.search}`;
 
   const headers = new Headers();

@@ -16,10 +16,19 @@ export type CmsBlock={id?:string;type:string;data:Record<string,unknown>};
 export type CmsRichTextBlock=Omit<CmsBlock,"type"|"data"> & {type:"rich_text";data:CmsRichTextData};
 export type CmsSeo={title:string;description:string;canonical_url:string;robots_index:boolean;robots_follow:boolean;og_title:string;og_description:string;og_image:string;twitter_card:string;focus_keyword?:string;secondary_keywords?:string[];seo_score?:number};
 export type CmsSchema={id:string;schema_type:string;data:Record<string,unknown>;is_active:boolean};
-export type CmsEntry={id:string;title:string;slug:string;path:string;excerpt:string;status:string;blocks:CmsBlock[];custom_fields:Record<string,unknown>;content_type_slug:string;published_at:string|null;updated_at:string};
+export type CmsEntry={id:string;title:string;slug:string;path:string;url?:string;excerpt:string;status:string;blocks:CmsBlock[];custom_fields:Record<string,unknown>;content_type_slug:string;published_at:string|null;updated_at:string};
 export type CmsMenuItem={id:string;menu:string;label:string;url:string;parent:string|null;sort_order:number;is_external:boolean;children:CmsMenuItem[]};
 export type CmsMenu={id:string;site:string;name:string;key:string;items:CmsMenuItem[]};
 export type CmsSeoDefaults={site_name:string;title_template:string;default_description?:string;default_og_image?:string;twitter_card:"summary"|"summary_large_image";robots_index:boolean;robots_follow:boolean};
 export type CmsOrganizationSchema=Record<string,unknown> & {"@context":"https://schema.org";"@type":string;name:string};
 export type CmsSiteContext={name:string;domain:string;language:string;timezone?:string;seo_defaults:CmsSeoDefaults;organization_schema:CmsOrganizationSchema|null};
 export type ResolvedPage={preview?:boolean;site:CmsSiteContext;content:CmsEntry;blocks:CmsBlock[];seo:CmsSeo|null;schemas:CmsSchema[];breadcrumbs:{title:string;path:string}[];related_content:{id:string;title:string;path:string;excerpt:string}[]};
+
+export type CmsPublicEntry = CmsEntry & {
+  url: string;
+  is_featured: boolean;
+  categories: { id: string; name: string; slug: string }[];
+  tags: { id: string; name: string; slug: string }[];
+};
+export type CmsEntryQuery = { content_type?: string; search?: string; category?: string; tag?: string; page?: number; page_size?: number };
+export type CmsEntryPage = { count: number; page: number; page_size: number; next: number | null; previous: number | null; results: CmsPublicEntry[] };

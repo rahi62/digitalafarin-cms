@@ -3,12 +3,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { scaffoldIntegration, applyIntegration, frontendDoctor } from "./integration.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(__filename), "..");
 const args = process.argv.slice(2);
 const command = args[0] || "init";
-if (!["init", "doctor", "admin", "admin-standalone"].includes(command)) {
+if (!["init", "doctor", "admin", "admin-standalone", "apply-integration"].includes(command)) {
   console.error("Usage: digitalafarin-cms [init|doctor|admin|admin-standalone] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--with-admin] [--admin-base-path /cms] [--admin-api-url URL]");
   process.exit(2);
 }
@@ -90,7 +91,7 @@ function ensureNextAdapter(frontend) {
   fs.mkdirSync(lib, { recursive: true });
   const file = path.join(lib, "digitalafarin-cms.ts");
   if (!exists(file)) {
-    fs.writeFileSync(file, `import { createCmsClientFromEnv } from "@digitalafarin/cms-next";\n\nexport const cms = createCmsClientFromEnv({ revalidate: 60 });\n`);
+    fs.writeFileSync(file, `import { createCmsClientFromEnv } from "@digitalafarin/cms-next";\n\nexport const cms = createCmsClientFromEnv();\n`);
   }
 }
 
@@ -101,7 +102,7 @@ function ensurePublicRoute(frontend) {
     throw new Error("--with-public-route requires a Next.js App Router project with app/ or src/app/.");
   }
 
-  const routeName = "[[...cms_path]]";
+  const routeName = "[...cms_path]";
   const conflictingCatchAll = fs.readdirSync(appDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -150,7 +151,7 @@ function embedAdmin(frontend) {
 }
 
 function scaffoldStandaloneAdmin() {
-  const adminPackage = arg("--admin-package", "@digitalafarin/cms-admin");
+  const adminPackage = arg("--admin-package", `@digitalafarin/cms-admin@${readJson(path.join(packageRoot, "package.json")).version}`);
   const adminDir = arg("--admin-dir", "cms-admin");
   const adminBasePath = arg("--admin-base-path", "/cms");
   const adminApiUrl = arg("--admin-api-url", "http://localhost:8000/api/cms/v1");
@@ -174,7 +175,18 @@ console.log(`Django: ${backend || "not detected"}`);
 console.log(`Next.js: ${frontend || "not detected"}`);
 
 if (command === "doctor") {
-  process.exit(backend || frontend ? 0 : 1);
+  let issues = frontend ? frontendDoctor(frontend, sourceRoot(frontend)) : 0;
+  if (backend) {
+    const result = spawnSync(arg("--python", process.env.PYTHON || "python"), ["manage.py", "cms_doctor"], { cwd: backend, stdio: "inherit", shell: process.platform === "win32" });
+    if (result.status !== 0) issues++;
+  }
+  process.exit(issues || (!backend && !frontend) ? 1 : 0);
+}
+
+if (command === "apply-integration") {
+  if (!frontend) throw new Error("Pass --frontend for the reviewed integration plan.");
+  applyIntegration(frontend);
+  process.exit(0);
 }
 
 if (command === "admin-standalone") {
@@ -192,9 +204,10 @@ if (!backend && !frontend && !has("--with-admin")) {
 
 const skipInstall = has("--skip-install");
 const python = arg("--python", process.env.PYTHON || "python");
-const djangoPackage = arg("--django-package", "digitalafarin-cms[all]");
-const nextPackage = arg("--next-package", "@digitalafarin/cms-next");
-const adminPackage = arg("--admin-package", "@digitalafarin/cms-admin");
+const releaseVersion = readJson(path.join(packageRoot, "package.json")).version;
+const djangoPackage = arg("--django-package", `digitalafarin-cms[all]==${releaseVersion}`);
+const nextPackage = arg("--next-package", `@digitalafarin/cms-next@${releaseVersion}`);
+const adminPackage = arg("--admin-package", `@digitalafarin/cms-admin@${releaseVersion}`);
 
 if (backend && command !== "admin") {
   if (!skipInstall) run(python, ["-m", "pip", "install", djangoPackage], { cwd: backend });
@@ -209,7 +222,7 @@ if (backend && command !== "admin") {
     urlsFile,
     "# BEGIN DIGITALAFARIN CMS",
     "# END DIGITALAFARIN CMS",
-    `from django.urls import include as _digitalafarin_cms_include, path as _digitalafarin_cms_path\nurlpatterns += [_digitalafarin_cms_path("api/cms/v1/", _digitalafarin_cms_include("digitalafarin_cms.urls"))]`
+    `from django.urls import include as _digitalafarin_cms_include, path as _digitalafarin_cms_path\nurlpatterns = [_digitalafarin_cms_path("api/cms/v1/", _digitalafarin_cms_include("digitalafarin_cms.urls"))] + urlpatterns`
   );
   if (!has("--skip-migrate")) run(python, ["manage.py", "migrate"], { cwd: backend });
 }
@@ -225,14 +238,17 @@ if (frontend) {
     ensureEnv(frontend);
     ensureNextAdapter(frontend);
     if (has("--with-public-route")) ensurePublicRoute(frontend);
+    scaffoldIntegration(frontend, sourceRoot(frontend), path.join(packageRoot, "templates/next"), {
+      collection: has("--with-collection"), collectionPath: arg("--collection-path", "/blog"), contentType: arg("--content-type", "post"),
+    });
   }
   if (has("--with-admin") || command === "admin") embedAdmin(frontend);
 } else if (has("--with-public-route") || has("--with-admin") || command === "admin") {
   throw new Error("The requested Next.js integration requires a detected or explicit frontend.");
 }
 
-console.log("\nDigitalAfarin CMS wiring complete.");
+console.log("\nCMS scaffolding prepared. Review .digitalafarin/integration.json; existing route data sources require explicit integration and runtime verification.");
 console.log("Backend API default: /api/cms/v1/");
 console.log("Next adapter: lib/digitalafarin-cms.ts (or src/lib/...)");
-if (has("--with-public-route")) console.log("Public CMS route: app/[[...cms_path]]/page.tsx (or src/app/...)");
+if (has("--with-public-route")) console.log("Public CMS route: app/[...cms_path]/page.tsx (or src/app/...). Existing pages retain priority.");
 if (has("--with-admin") || command === "admin") console.log(`CMS Admin embedded in host Next.js app at: ${arg("--admin-base-path", "/cms")}`);

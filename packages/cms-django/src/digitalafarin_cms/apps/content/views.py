@@ -2,13 +2,14 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.core import signing
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from xml.sax.saxutils import escape as xml_escape
 from rest_framework import status as drf_status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
@@ -24,6 +25,9 @@ from digitalafarin_cms.apps.sites.models import Membership, Site
 from .models import Category, ContentEntry, ContentRevision, ContentTypeDefinition, Menu, ReusableBlock, Tag
 from .serializers import CategorySerializer, ContentEntrySerializer, ContentRevisionSerializer, ContentTypeSerializer, MenuSerializer, ReusableBlockSerializer, TagSerializer
 from .services import create_revision
+from .routing import normalize_path
+from .public import PublicEntrySerializer, public_entries
+from digitalafarin_cms.media import normalize_media_data
 
 
 PREVIEW_SALT = "digitalafarin-cms-preview"
@@ -108,6 +112,17 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     search_fields = ["title", "slug", "path", "excerpt"]
     ordering_fields = ["created_at", "updated_at", "published_at", "scheduled_at", "title"]
     tenant_filter = "site__organization_id"
+
+    @action(detail=False, methods=["post"], url_path="path-preview")
+    def path_preview(self, request):
+        instance = None
+        if request.data.get("id"):
+            from django.shortcuts import get_object_or_404
+            instance = get_object_or_404(self.get_queryset(), pk=request.data["id"])
+        serializer = self.get_serializer(instance, data=request.data, partial=bool(instance))
+        serializer.is_valid(raise_exception=True)
+        self.validate_tenant_serializer(serializer, require_write=True)
+        return Response({"path": serializer.validated_data["path"], "path_mode": serializer.validated_data["path_mode"]})
 
     def perform_create(self, serializer):
         self.validate_tenant_serializer(serializer, require_write=True)
@@ -212,7 +227,7 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     def preview(self, request, pk=None):
         entry = self.get_object()
         token = signing.dumps(
-            {"entry_id": str(entry.pk), "site_id": str(entry.site_id)},
+            {"entry_id": str(entry.pk), "site_id": str(entry.site_id), "path": entry.path},
             salt=PREVIEW_SALT,
             compress=True,
         )
@@ -234,9 +249,11 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         if target_status in PROTECTED_STATUSES:
             _require_publisher(request.user, entry)
 
-        for key in ["title", "slug", "path", "excerpt", "blocks", "custom_fields", "status", "is_featured"]:
-            if key in snapshot:
-                setattr(entry, key, snapshot[key])
+        restore_data = {key: snapshot[key] for key in ["title", "slug", "path", "path_mode", "excerpt", "blocks", "custom_fields", "status", "is_featured"] if key in snapshot}
+        restore_data.setdefault("path_mode", "manual")
+        serializer = self.get_serializer(entry, data=restore_data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        entry = serializer.save()
 
         if "parent_id" in snapshot:
             parent_id = snapshot.get("parent_id")
@@ -286,69 +303,97 @@ class MenuViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 
 
 @api_view(["GET"])
+@authentication_classes([])
 @permission_classes([AllowAny])
 def resolve_path(request):
+    response = _resolve_path(request)
+    response["Cache-Control"] = "private, no-store" if "preview" in request.query_params else "no-store"
+    if "preview" in request.query_params:
+        response["X-Robots-Tag"] = "noindex, nofollow"
+        response["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+def _resolve_path(request):
     domain = request.query_params.get("site")
     path = request.query_params.get("path", "/")
     preview_token = request.query_params.get("preview", "")
     if not domain:
         return Response({"detail": "site query parameter is required"}, status=400)
+    raw_path = path
+    try:
+        path = normalize_path(path)
+    except ValidationError:
+        return Response({"detail": "Content not found"}, status=404)
     try:
         site = Site.objects.get(domain=domain, is_active=True)
     except Site.DoesNotExist:
         return Response({"detail": "Site not found"}, status=404)
 
-    if preview_token:
+    if "preview" in request.query_params:
         try:
             payload = signing.loads(preview_token, salt=PREVIEW_SALT, max_age=preview_max_age())
         except signing.SignatureExpired:
             return Response({"detail": "Preview token expired"}, status=403)
         except signing.BadSignature:
             return Response({"detail": "Invalid preview token"}, status=403)
-        if str(payload.get("site_id")) != str(site.pk):
+        if not isinstance(payload, dict) or str(payload.get("site_id")) != str(site.pk):
             return Response({"detail": "Preview token does not match this site"}, status=403)
+        try:
+            signed_path = normalize_path(payload.get("path"))
+        except ValidationError:
+            signed_path = None
+        if signed_path != path:
+            return Response({"detail": "Preview token does not match this path; create a new preview link"}, status=403)
         try:
             entry = ContentEntry.objects.select_related("content_type", "author", "parent").prefetch_related("categories", "tags").get(
                 pk=payload.get("entry_id"),
                 site=site,
-                path=path,
+                path=payload["path"],
             )
         except ContentEntry.DoesNotExist:
             return Response({"detail": "Preview content not found"}, status=404)
     else:
         try:
-            entry = ContentEntry.objects.select_related("content_type", "author", "parent").prefetch_related("categories", "tags").get(
-                site=site,
-                path=path,
-                status=ContentEntry.Status.PUBLISHED,
-                content_type__is_public=True,
-            )
+            entry = public_entries(site).select_related("site", "content_type", "author", "parent").prefetch_related("categories", "tags").filter(
+                Q(path=path) | Q(path=raw_path) | Q(path=path.rstrip("/") or "/")
+            ).order_by("path").first()
+            if entry is None:
+                # Compatibility fallback for legacy encoded/NFD paths, without rewriting stored URLs.
+                for entry_id, stored_path in public_entries(site).values_list("pk", "path").iterator():
+                    try:
+                        matches = normalize_path(stored_path) == path
+                    except ValidationError:
+                        matches = False
+                    if matches:
+                        entry = public_entries(site).select_related("site", "content_type", "author", "parent").prefetch_related("categories", "tags").get(pk=entry_id)
+                        break
+            if entry is None:
+                raise ContentEntry.DoesNotExist
         except ContentEntry.DoesNotExist:
             return Response({"detail": "Content not found"}, status=404)
 
     seo = SeoMeta.objects.filter(entry=entry).first()
     schemas = SchemaMarkup.objects.filter(entry=entry, is_active=True)
-    related = ContentEntry.objects.filter(
-        site=site,
-        status=ContentEntry.Status.PUBLISHED,
-        content_type__is_public=True,
-        content_type=entry.content_type,
-    ).exclude(pk=entry.pk)[:4]
+    related = public_entries(site).filter(content_type=entry.content_type).exclude(pk=entry.pk)[:4]
 
     chain = []
     current = entry
     seen = set()
     while current and current.pk not in seen:
         seen.add(current.pk)
-        chain.append({"title": current.title, "path": current.path})
+        if current.site_id != site.id:
+            break
+        if current.pk == entry.pk or (current.status == ContentEntry.Status.PUBLISHED and current.content_type.is_public):
+            chain.append({"title": current.title, "path": current.path})
         current = current.parent
 
     return Response({
         "preview": bool(preview_token),
         "site": {"name": site.name, "domain": site.domain, "language": site.default_language},
         "content": ContentEntrySerializer(entry).data,
-        "blocks": entry.blocks,
-        "seo": SeoMetaSerializer(seo).data if seo else None,
+        "blocks": normalize_media_data(entry.blocks),
+        "seo": normalize_media_data(SeoMetaSerializer(seo).data) if seo else None,
         "schemas": SchemaMarkupSerializer(schemas, many=True).data,
         "breadcrumbs": list(reversed(chain)),
         "related_content": [
@@ -366,12 +411,8 @@ def sitemap(request):
         site = Site.objects.get(domain=domain, is_active=True)
     except Site.DoesNotExist:
         return HttpResponse("Site not found", status=404)
-    entries = ContentEntry.objects.filter(
-        site=site,
-        status=ContentEntry.Status.PUBLISHED,
-        content_type__is_public=True,
-    ).exclude(seo_meta__robots_index=False).order_by("path")
-    base = f"https://{site.domain}"
+    entries = public_entries(site).exclude(seo_meta__robots_index=False).order_by("path")
+    base = frontend_base_for(site)
     rows = [
         f"<url><loc>{xml_escape(base + entry.path)}</loc><lastmod>{entry.updated_at.date().isoformat()}</lastmod></url>"
         for entry in entries

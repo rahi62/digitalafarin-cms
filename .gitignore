@@ -16,3 +16,7 @@ dist/
 
 *.egg-info/
 build/
+/.tmp/
+/test-results/
+/playwright-report/
+*.tsbuildinfo

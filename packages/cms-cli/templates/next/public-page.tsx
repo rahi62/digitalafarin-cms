@@ -12,11 +12,13 @@ function cmsPath(segments?: string[]) {
   return segments?.length ? `/${segments.join("/")}/` : "/";
 }
 
-async function resolveCmsPage(path: string) {
+export const dynamic = "force-dynamic";
+
+async function resolveCmsPage(path: string, previewToken?: string) {
   try {
-    return await cms.resolve(path);
+    return await cms.resolve(path, { previewToken });
   } catch (error) {
-    if (!isCmsNotFoundError(error)) throw error;
+    if (previewToken !== undefined || !isCmsNotFoundError(error)) throw error;
 
     let rule: { match: boolean; type?: number; destination?: string | null } | null = null;
     try {
@@ -36,24 +38,30 @@ async function resolveCmsPage(path: string) {
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ cms_path?: string[] }>;
+  searchParams: Promise<{ cms_preview?: string }>;
 }) {
   const path = cmsPath((await params).cms_path);
   try {
-    return toNextMetadata(await cms.resolve(path));
+    return toNextMetadata(await cms.resolve(path, { previewToken: (await searchParams).cms_preview }));
   } catch (error) {
-    if (isCmsNotFoundError(error)) return {};
+    if ((await searchParams).cms_preview === undefined && isCmsNotFoundError(error)) return {};
     throw error;
   }
 }
 
 export default async function DigitalAfarinCmsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ cms_path?: string[] }>;
+  searchParams: Promise<{ cms_preview?: string }>;
 }) {
-  const page = await resolveCmsPage(cmsPath((await params).cms_path));
+  const segments = (await params).cms_path;
+  if (["media", "api", "_next", "static"].includes(segments?.[0] || "")) notFound();
+  const page = await resolveCmsPage(cmsPath(segments), (await searchParams).cms_preview);
 
   return (
     <>

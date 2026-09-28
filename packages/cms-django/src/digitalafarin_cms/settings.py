@@ -43,3 +43,9 @@ def apply_defaults(namespace: dict) -> None:
     namespace["SIMPLE_JWT"] = simple_jwt
 
     namespace.setdefault("DIGITALAFARIN_CMS_API_PREFIX", "api/cms/v1/")
+    if "MIDDLEWARE" in namespace:
+        namespace["MIDDLEWARE"] = [
+            "digitalafarin_cms.middleware.cms_aware_wagtail_redirect"
+            if item == "wagtail.contrib.redirects.middleware.RedirectMiddleware" else item
+            for item in namespace["MIDDLEWARE"]
+        ]

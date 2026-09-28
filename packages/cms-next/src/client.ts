@@ -1,4 +1,4 @@
-import type { CmsMenu, CmsSiteContext, ResolvedPage } from "./types.js";
+import type { CmsMenu, CmsSiteContext, ResolvedPage, CmsEntryPage, CmsEntryQuery } from "./types.js";
 
 export type CmsClientOptions = {
   baseUrl: string;
@@ -18,11 +18,12 @@ export class CmsRequestError extends Error {
   status: number;
   body: string;
 
-  constructor(status: number, body: string) {
-    super(`CMS request failed: ${status} ${body}`);
+  constructor(status: number, _body = "", preview = false) {
+    const message = preview ? "CMS preview is invalid, expired or unavailable. Create a new preview link." : `CMS request failed (${status}).`;
+    super(message);
     this.name = "CmsRequestError";
     this.status = status;
-    this.body = body;
+    this.body = message;
   }
 }
 
@@ -44,19 +45,32 @@ export function createCmsClient(options: CmsClientOptions) {
     if (options.token) headers.set("Authorization", `Bearer ${options.token}`);
 
     const requestInit: NextRequestInit = { ...init, headers };
+    if (init.cache === undefined && (options.revalidate === undefined || options.revalidate === 0)) {
+      requestInit.cache = "no-store";
+    }
     if (
-      typeof options.revalidate === "number" &&
+      typeof options.revalidate === "number" && options.revalidate > 0 &&
       init.cache !== "no-store" &&
       typeof init.next?.revalidate !== "number"
     ) {
       requestInit.next = { ...(init.next || {}), revalidate: options.revalidate };
     }
 
-    const res = await fetch(`${base}${path}`, requestInit);
+    let res: Response;
+    try { res = await fetch(`${base}${path}`, requestInit); }
+    catch { throw new CmsRequestError(503, "", /[?&]preview=/.test(path)); }
     if (!res.ok) {
-      throw new CmsRequestError(res.status, await res.text());
+      // Do not retain HTML debug pages, SQL errors, tokens or upstream configuration.
+      // Next may tee fetch responses; awaiting one branch's cancellation can deadlock
+      // until its cache branch is consumed. Cleanup must not delay the public error.
+      void res.body?.cancel().catch(() => undefined);
+      throw new CmsRequestError(res.status, "", /[?&]preview=/.test(path));
     }
-    return res.json() as Promise<T>;
+    try {
+      return await res.json() as T;
+    } catch {
+      throw new CmsRequestError(502);
+    }
   }
 
   function getSiteContext(init: NextRequestInit = {}) {
@@ -66,22 +80,40 @@ export function createCmsClient(options: CmsClientOptions) {
     );
   }
 
-  return {
-    resolve: async (path: string, resolveOptions: ResolveOptions = {}) => {
+  async function resolve(path: string, resolveOptions: ResolveOptions = {}) {
       const qs = new URLSearchParams({ site: options.site, path });
-      if (resolveOptions.previewToken) qs.set("preview", resolveOptions.previewToken);
-      const pageInit: NextRequestInit = resolveOptions.previewToken ? { cache: "no-store" } : {};
+      const preview = resolveOptions.previewToken !== undefined;
+      if (preview) qs.set("preview", resolveOptions.previewToken!);
+      const pageInit: NextRequestInit = preview ? { cache: "no-store" } : {};
       const [page, siteContext] = await Promise.all([
         request<ResolvedPage>(`/content/resolve/?${qs.toString()}`, pageInit),
-        getSiteContext(),
+        getSiteContext(pageInit),
       ]);
       return { ...page, site: { ...page.site, ...siteContext } } as ResolvedPage;
+  }
+
+  return {
+    resolve,
+    resolveForRoute: async (path: string, resolveOptions: ResolveOptions = {}) => {
+      try { return await resolve(path, resolveOptions); }
+      catch (error) {
+        if (resolveOptions.previewToken === undefined && isCmsNotFoundError(error)) return null;
+        throw error;
+      }
+    },
+    listEntries: (params: CmsEntryQuery = {}) => {
+      const qs = new URLSearchParams({ site: options.site });
+      for (const key of ["content_type", "search", "category", "tag", "page", "page_size"] as const) {
+        if (params[key] !== undefined) qs.set(key, String(params[key]));
+      }
+      return request<CmsEntryPage>(`/content/public-entries/?${qs}`);
     },
     getSiteContext,
     getMenu: (key: string) => {
       const qs = new URLSearchParams({ site: options.site, key });
       return request<CmsMenu>(`/content/menu-resolve/?${qs.toString()}`);
     },
+    /** @deprecated Authenticated management API. Use listEntries for public websites. */
     getEntries: (params: Record<string, string | number | boolean | null | undefined> = {}) => {
       const qs = new URLSearchParams();
       Object.entries(params).forEach(([key, value]) => {

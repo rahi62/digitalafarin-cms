@@ -31,8 +31,9 @@ export function toNextMetadata(page: ResolvedPage): Metadata {
   return {
     title,
     description,
-    alternates: seo?.canonical_url ? { canonical: seo.canonical_url } : undefined,
-    robots: { index: robotsIndex, follow: robotsFollow },
+    alternates: { canonical: seo?.canonical_url || (page.content as { url?: string }).url || `https://${page.site.domain}${page.content.path}` },
+    robots: { index: page.preview ? false : robotsIndex, follow: page.preview ? false : robotsFollow },
+    ...(page.preview ? { referrer: "no-referrer" as const } : {}),
     openGraph: {
       title: ogTitle,
       description: ogDescription,
