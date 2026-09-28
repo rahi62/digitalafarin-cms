@@ -147,7 +147,7 @@ try {
   if (!env.includes("NEXT_PUBLIC_API_URL=/cms/api-proxy")) throw new Error("Same-origin browser API proxy URL was not scaffolded");
   if (!env.includes("DIGITALAFARIN_CMS_API_URL=https://api.example.com/api/cms/v1")) throw new Error("Django upstream API URL was not scaffolded");
   const proxyRoute = fs.readFileSync(path.join(directAdmin, "src", "app", "api-proxy", "[...path]", "route.ts"), "utf8");
-  if (!proxyRoute.includes('incomingUrl.pathname.endsWith("/")')) throw new Error("Admin API proxy does not preserve trailing slashes");
+  if (!proxyRoute.includes('const suffixWithTrailingSlash = suffix ? `${suffix}/` : "";')) throw new Error("Admin API proxy does not enforce DRF trailing slashes");
   const nginx = fs.readFileSync(path.join(directAdmin, "deploy", "nginx.cms.conf"), "utf8");
   if (!nginx.includes("location /cms/")) throw new Error("Nginx /cms route missing");
   console.log("@digitalafarin/cms-admin installed tarball scaffold OK");
