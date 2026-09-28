@@ -60,6 +60,9 @@ jobs:
         with:
           node-version: "22"
           package-manager-cache: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
       - name: Verify locked Node toolchain
         run: |
           node --version
