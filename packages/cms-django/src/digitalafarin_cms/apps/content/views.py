@@ -404,6 +404,7 @@ def _resolve_path(request):
 
 
 @api_view(["GET"])
+@authentication_classes([])
 @permission_classes([AllowAny])
 def sitemap(request):
     domain = request.query_params.get("site")
@@ -422,6 +423,7 @@ def sitemap(request):
 
 
 @api_view(["GET"])
+@authentication_classes([])
 @permission_classes([AllowAny])
 def robots_txt(request):
     domain = request.query_params.get("site")
@@ -429,5 +431,5 @@ def robots_txt(request):
         site = Site.objects.get(domain=domain, is_active=True)
     except Site.DoesNotExist:
         return HttpResponse("Site not found", status=404)
-    body = f"User-agent: *\\nAllow: /\\nSitemap: {frontend_base_for(site)}/sitemap.xml\\n"
+    body = f"User-agent: *\nAllow: /\nSitemap: {frontend_base_for(site)}/sitemap.xml\n"
     return HttpResponse(body, content_type="text/plain")
