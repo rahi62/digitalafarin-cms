@@ -44,7 +44,7 @@ npx @digitalafarin/cms-cli init \\
   --with-public-route
 ```
 
-The optional public route scaffold creates a safe CMS catch-all only when it will not conflict with an existing root catch-all.
+The optional public route scaffold creates a non-optional CMS catch-all only when it will not conflict with an existing root catch-all. An existing homepage keeps ownership of `/`; signed homepage preview uses the dedicated preview rewrite.
 
 Wire the backend/frontend **and embed the visual Admin inside the existing Next.js application** under `/cms`:
 
