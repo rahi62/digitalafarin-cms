@@ -4,6 +4,40 @@ All notable changes to DigitalAfarin CMS are documented here.
 
 The project uses synchronized versions for the Django package, Next.js SDK, Admin and CLI.
 
+## [0.7.0] - unreleased
+
+### Added
+
+- Content-type routing contract with `collection_path` and `entry_path_pattern`, plus per-entry `path_mode`.
+- Backend-owned final-path calculation, normalization and conflict validation for Unicode slugs, reserved paths, collection URLs and redirect-owned URLs.
+- Automatic permanent redirects when a published entry moves, while preserving existing/manual paths until an explicit routing change.
+- Anonymous tenant-safe public collection API with content-type, search, category, tag and pagination filters.
+- Existing-host integration planner in `@digitalafarin/cms-cli` that inventories App Router pages, writes reviewable proposals and refuses to overwrite changed host files.
+- Dedicated same-origin media route backed by a fixed upstream, plus support for public CDN/storage URLs and explicitly configured legacy media origins.
+- Signed preview routing that can supersede existing host routes without falling back to published or legacy content on invalid/expired tokens.
+- Host compatibility diagnostics for URL ordering, pending CMS/Wagtail migrations, missing Wagtail tables and media wiring.
+- End-to-end fixture covering an existing homepage, `/blog`, `/blog/[slug]`, draft preview, media, publication, route moves, unpublish and legacy fallback.
+
+### Changed
+
+- New routed content uses one canonical final path for resolver output, collection cards, canonical metadata, redirects and sitemap generation.
+- The SDK adds `listEntries()` for public collections and `resolveForRoute()` for CMS-first detail resolution with public-404-only host fallback.
+- SDK errors no longer retain upstream HTML/debug bodies or internal URLs.
+- Public reads default to `no-store`; generated integration pages are dynamic so publish/edit/move/unpublish are visible on the next request unless the host explicitly opts into revalidation caching.
+- Media URLs are normalized from stored blocks, rich text and custom fields without rewriting stored JSON.
+- Preview responses are no-store, noindex and no-referrer and validate site, entry, signed path and expiry.
+
+### Migration
+
+- Adds `ContentTypeDefinition.collection_path`, `ContentTypeDefinition.entry_path_pattern` and `ContentEntry.path_mode`.
+- Enables Unicode slugs on `ContentEntry.slug`.
+- Existing rows remain on `path_mode=manual`; stored paths are not bulk-rewritten.
+
+### Upgrade
+
+- Existing `/blog` and `/blog/[slug]` routes must be explicitly integrated; a root catch-all alone does not replace route-specific loaders.
+- See `docs/UPGRADE-0.7.0.fa.md` for the reviewed migration and host-integration workflow.
+
 ## [0.6.0] - 2026-09-27
 
 ### Added

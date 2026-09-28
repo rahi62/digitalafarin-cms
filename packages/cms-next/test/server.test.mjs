@@ -9,13 +9,14 @@ test('media proxy preserves missing media 404, never follows redirects or forwar
     return new Response('<html>private debug</html>', { status: 404 });
   });
   const handler = createCmsMediaHandler({ upstream: 'http://storage.internal/uploads/' });
-  const result = await handler(new Request('https://host.test/media/cms/missing.png?url=http://evil.test', { headers: { cookie: 'secret', authorization: 'Bearer secret' } }), { params: Promise.resolve({ path: ['cms', 'missing.png'] }) });
+  const result = await handler(new Request('https://host.test/media/cms/missing.png?url=http://evil.test', { headers: { cookie: 'secret', authorization: 'Bearer secret', 'if-none-match': 'cached-secret' } }), { params: Promise.resolve({ path: ['cms', 'missing.png'] }) });
   assert.equal(result.status, 404);
   assert.doesNotMatch(await result.text(), /private debug/);
   assert.equal(calls[0].url, 'http://storage.internal/uploads/cms/missing.png');
   assert.equal(calls[0].init.redirect, 'manual');
   assert.equal(new Headers(calls[0].init.headers).get('cookie'), null);
   assert.equal(new Headers(calls[0].init.headers).get('authorization'), null);
+  assert.equal(new Headers(calls[0].init.headers).get('if-none-match'), null);
 });
 
 test('media traversal and upstream redirects fail closed', async (t) => {
@@ -34,7 +35,7 @@ test('preview config precedes filesystem and keeps host rewrites excluding previ
   const { withDigitalAfarinCms } = await import('../dist/config.js');
   const config = withDigitalAfarinCms({ async rewrites() { return [{ source: '/legacy', destination: '/old' }]; } });
   const rules = await config.rewrites();
-  assert.ok(rules.beforeFiles.some((r) => r.destination === '/__cms_preview/:cms_path*' && r.has[0].key === 'cms_preview'));
+  assert.ok(rules.beforeFiles.some((r) => r.destination === '/digitalafarin-cms-preview/:cms_path*' && r.has[0].key === 'cms_preview'));
   assert.equal(rules.afterFiles[0].destination, '/old');
   const headers = await config.headers();
   assert.ok(headers.some((r) => r.headers.some((h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer')));

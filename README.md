@@ -4,7 +4,7 @@
 
 DigitalAfarin CMS combines a reusable Django/DRF content backend, a Next.js SDK, a visual Next.js Admin application and an installer CLI. It is designed for teams that want WordPress-like content management and SEO workflows without coupling rendering to WordPress.
 
-> Status: **0.6.0 / Community Edition (pre-1.0)**. The public API can still change before 1.0.
+> Status: **0.7.0 source / Community Edition (pre-1.0)**. Registry publication is separate from source readiness; the public API can still change before 1.0.
 
 ## Packages
 
@@ -44,7 +44,28 @@ npx @digitalafarin/cms-cli init \\
   --with-public-route
 ```
 
-The optional public route scaffold creates a safe CMS catch-all only when it will not conflict with an existing root catch-all.
+The optional public route scaffold covers otherwise-unowned URLs. It **does not** override existing routes such as `/blog` or `/blog/[slug]`. For an existing collection, use the reviewed integration workflow below.
+
+### Existing routes such as /blog
+
+When the host already owns `/blog` and `/blog/[slug]`, connect those routes explicitly instead of relying on the CMS catch-all:
+
+```bash
+npx @digitalafarin/cms-cli@0.7.0 init \
+  --frontend frontend \
+  --with-collection \
+  --collection-path /blog \
+  --content-type post
+```
+
+The CLI inventories the host, creates `.digitalafarin/integration.json`, adds non-conflicting media/preview infrastructure, and writes proposals for existing route files instead of overwriting them. Review the proposals, then apply them with:
+
+```bash
+npx @digitalafarin/cms-cli@0.7.0 apply-integration --frontend frontend
+npx @digitalafarin/cms-cli@0.7.0 doctor --frontend frontend
+```
+
+The generated detail adapter uses CMS first and falls back to the legacy detail loader only for a normal public CMS 404. Preview errors, authorization failures, network failures and server failures never fall back. See `docs/UPGRADE-0.7.0.fa.md` for media, cache, Wagtail and migration details.
 
 Wire the backend/frontend **and embed the visual Admin inside the existing Next.js application** under `/cms`:
 
@@ -127,6 +148,7 @@ Set:
 ```env
 DIGITALAFARIN_CMS_URL=http://localhost:8000/api/cms/v1
 DIGITALAFARIN_CMS_SITE=example.com
+DIGITALAFARIN_CMS_MEDIA_UPSTREAM=http://django:8000/media/
 ```
 
 Create a client:
@@ -141,6 +163,7 @@ Resolve a page:
 
 ```ts
 const page = await cms.resolve("/services/seo/");
+const posts = await cms.listEntries({ content_type: "post", page: 1 });
 ```
 
 The resolver returns the page payload together with SEO metadata and sanitized site-level SEO context. The SDK also exposes helpers for Next.js metadata and JSON-LD rendering.
@@ -248,7 +271,7 @@ npm run typecheck
 Versions are synchronized across Python, npm packages (including CMS Admin) and lockfile metadata.
 
 ```bash
-npm run version:set -- 0.5.0
+npm run version:set -- 0.7.0
 npm run check:versions
 ```
 

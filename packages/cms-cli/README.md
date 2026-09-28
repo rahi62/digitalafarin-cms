@@ -1,47 +1,74 @@
 # @digitalafarin/cms-cli
 
-Installer/wiring CLI for adding DigitalAfarin CMS to existing Django + Next.js projects.
+Installer and reviewed integration CLI for DigitalAfarin CMS in Django + Next.js projects.
 
-## Basic usage
+## Basic wiring
 
 ```bash
-npx @digitalafarin/cms-cli init
+npx @digitalafarin/cms-cli@0.7.0 init --backend backend --frontend frontend
 ```
 
-For split folders:
+The CLI installs synchronized packages, mounts the Django API before host catch-alls, runs migrations unless skipped, creates the public SDK adapter, and never treats an existing route as integrated merely because a catch-all exists.
+
+## Existing /blog and /blog/[slug]
 
 ```bash
-npx @digitalafarin/cms-cli init --backend backend --frontend frontend
-```
-
-The CLI:
-
-1. installs `digitalafarin-cms[all]` through pip;
-2. adds the CMS settings helper to Django;
-3. mounts `/api/cms/v1/`;
-4. runs Django migrations unless `--skip-migrate` is used;
-5. installs `@digitalafarin/cms-next` into the host frontend;
-6. creates `.env.local` defaults and a Next.js CMS client adapter;
-7. with `--with-admin`, installs `@digitalafarin/cms-admin` into that same frontend and embeds `/cms` into the host App Router.
-
-By default it does **not** overwrite an existing Next.js route or page renderer.
-
-For an App Router site that should expose CMS-created paths directly, add:
-
-```bash
-npx @digitalafarin/cms-cli init \
+npx @digitalafarin/cms-cli@0.7.0 init \
   --frontend frontend \
-  --with-public-route
+  --with-collection \
+  --collection-path /blog \
+  --content-type post
 ```
 
-This creates `app/[[...cms_path]]/page.tsx` (or `src/app/...`) plus a reusable block renderer. The generated renderer uses the SDK's safe Tiptap JSON renderer. If the application already has a root catch-all route, the CLI stops and asks you to integrate `cms.resolve()` into the existing route instead of creating a conflicting route.
+The CLI inventories App Router pages and writes:
 
-## Add the visual CMS Admin under `/cms`
+```text
+.digitalafarin/integration.json
+.digitalafarin/INTEGRATION.md
+.digitalafarin/proposals/...
+```
 
-The default Admin mode is **embedded**. It uses the existing Next.js application and the same `node_modules`:
+Existing route files are not overwritten. Review the generated proposal, then:
 
 ```bash
-npx @digitalafarin/cms-cli init \
+npx @digitalafarin/cms-cli@0.7.0 apply-integration --frontend frontend
+npx @digitalafarin/cms-cli@0.7.0 doctor --frontend frontend
+```
+
+`apply-integration` verifies the original file hash before replacing a reviewed route and stores a backup/legacy page beside the route when required. If the host file changed after proposal generation, apply stops.
+
+The default detail policy is CMS first, redirect second, legacy detail only after a normal public CMS 404. Preview and upstream failures do not fall back. The generated collection keeps one authoritative paginated source; the legacy collection remains available explicitly rather than merging two incompatible pagination counts.
+
+## Public catch-all
+
+```bash
+npx @digitalafarin/cms-cli@0.7.0 init --frontend frontend --with-public-route
+```
+
+The catch-all serves otherwise-unowned CMS paths. It does not override dedicated routes such as `/blog` or `/blog/[slug]`.
+
+## Media and preview infrastructure
+
+The integration planner creates non-conflicting infrastructure where possible:
+
+- `app/media/[...path]/route.ts` using the fixed-upstream media handler;
+- `app/digitalafarin-cms-preview/[[...cms_path]]/page.tsx` as the internal preview renderer;
+- the shared block renderer.
+
+If a custom `next.config.*` exists, the CLI reports that `withDigitalAfarinCms()` composition needs review instead of rewriting the host config blindly.
+
+Required frontend values for same-origin media:
+
+```env
+DIGITALAFARIN_CMS_URL=http://localhost:8000/api/cms/v1
+DIGITALAFARIN_CMS_SITE=localhost:3000
+DIGITALAFARIN_CMS_MEDIA_UPSTREAM=http://localhost:8000/media/
+```
+
+## Embedded Admin
+
+```bash
+npx @digitalafarin/cms-cli@0.7.0 init \
   --backend backend \
   --frontend frontend \
   --with-admin \
@@ -49,45 +76,15 @@ npx @digitalafarin/cms-cli init \
   --admin-api-url https://api.example.com/api/cms/v1
 ```
 
-To install only the embedded Admin into an existing frontend:
-
-```bash
-npx @digitalafarin/cms-cli admin \
-  --frontend frontend \
-  --admin-base-path /cms \
-  --admin-api-url https://api.example.com/api/cms/v1
-```
-
-The host project remains one Next.js application:
-
-```text
-frontend/
-├─ app/ or src/app/
-│  └─ cms/
-├─ digitalafarin-cms-admin/ or src/digitalafarin-cms-admin/
-├─ node_modules/
-└─ package.json
-```
-
-No `cms-admin/node_modules` is created.
-
-For intentionally isolated deployments, the legacy standalone mode remains explicit:
-
-```bash
-npx @digitalafarin/cms-cli admin-standalone \
-  --admin-dir cms-admin \
-  --admin-base-path /cms \
-  --admin-api-url https://api.example.com/api/cms/v1 \
-  --admin-port 3001
-```
+The Admin is installed into the host frontend and uses its existing `node_modules`. Standalone mode remains available with `admin-standalone`.
 
 ## Doctor
 
 ```bash
-npx @digitalafarin/cms-cli doctor
+npx @digitalafarin/cms-cli@0.7.0 doctor --backend backend --frontend frontend
 ```
 
-`doctor` reports detected Django and Next.js application directories without modifying the project.
+Frontend doctor reports pending integration proposals, missing preview config composition and missing same-origin media upstream. Backend doctor checks CMS URL ownership, pending CMS/Wagtail migrations, missing Wagtail tables and media configuration.
 
 ## Useful flags
 
@@ -100,29 +97,21 @@ npx @digitalafarin/cms-cli doctor
 --django-package SPEC
 --next-package SPEC
 --with-public-route
+--with-collection
+--collection-path /blog
+--content-type post
 --with-admin
 --admin-package SPEC
 --admin-base-path /cms
 --admin-api-url URL
---admin-package SPEC
 --force-admin
+```
 
-Standalone-only flags:
+Standalone-only:
+
+```text
 --admin-dir DIR
 --admin-port 3001
---force-admin
 ```
 
-Package override flags are useful when testing local release artifacts.
-
-## Local archives
-
-```bash
-npx ./digitalafarin-cms-cli-0.5.0.tgz init \
-  --django-package ../digitalafarin_cms-0.5.0-py3-none-any.whl \
-  --next-package ../digitalafarin-cms-next-0.5.0.tgz \
-  --with-admin \
-  --admin-package ../digitalafarin-cms-admin-0.5.0.tgz
-```
-
-The release CI installs packed SDK, CLI and Admin packages into a clean temporary consumer, executes the installed binaries and verifies that `/cms` scaffolding is complete.
+For a 0.6.0 upgrade, follow `docs/UPGRADE-0.7.0.fa.md` in the repository.

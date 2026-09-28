@@ -1,5 +1,48 @@
 # Upgrading DigitalAfarin CMS
 
+## 0.6.0 -> 0.7.0
+
+v0.7 fixes integration with existing Next.js routes and adds an explicit content routing/media/preview contract.
+
+### Required package upgrade
+
+```bash
+python -m pip install --upgrade "digitalafarin-cms[all]==0.7.0"
+python manage.py migrate
+python manage.py check
+python manage.py cms_doctor
+
+npm install --save-exact @digitalafarin/cms-next@0.7.0 @digitalafarin/cms-admin@0.7.0
+```
+
+The Django migration is additive. Existing content paths remain unchanged and receive `path_mode=manual`; existing URLs are not bulk-moved.
+
+### Existing Next.js routes
+
+A CMS catch-all does not override dedicated pages such as `/blog` and `/blog/[slug]`. Generate a reviewed integration plan:
+
+```bash
+npx @digitalafarin/cms-cli@0.7.0 init \
+  --frontend . \
+  --skip-install \
+  --with-collection \
+  --collection-path /blog \
+  --content-type post
+
+npx @digitalafarin/cms-cli@0.7.0 apply-integration --frontend .
+npx @digitalafarin/cms-cli@0.7.0 doctor --frontend .
+```
+
+Review the proposal before applying it. The CLI will not silently overwrite a host route and refuses to apply if the host file changed after proposal creation.
+
+### Media and preview
+
+Configure the API, frontend origin and media/storage origin separately. For same-origin media, set `DIGITALAFARIN_CMS_MEDIA_UPSTREAM` and retain the generated `/media/[...path]` handler. Compose `withDigitalAfarinCms()` into the host Next config so signed preview requests reach the dedicated renderer even when a filesystem page already exists.
+
+Full Persian upgrade notes, cache policy, Wagtail diagnostics and acceptance tests are in `docs/UPGRADE-0.7.0.fa.md`.
+
+---
+
 ## 0.4.2 -> 0.5.0
 
 v0.5 introduces the Professional Content Editor, typed `rich_text` blocks, a safe SDK renderer, browser-level editor tests and an optional public App Router catch-all scaffold.

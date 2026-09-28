@@ -75,14 +75,13 @@ try {
     if (typeof renderCmsRichTextHtml !== "function") throw new Error("renderCmsRichTextHtml export missing");
     if (typeof isCmsRichTextBlock !== "function") throw new Error("isCmsRichTextBlock export missing");
     const client = createCmsClient({ baseUrl: "https://cms.example/api/cms/v1", site: "example.com" });
-    if (typeof client.resolve !== "function" || typeof client.getMenu !== "function") throw new Error("CMS client surface incomplete");
+    if (typeof client.resolve !== "function" || typeof client.getMenu !== "function" || typeof client.listEntries !== "function" || typeof client.resolveForRoute !== "function") throw new Error("CMS client surface incomplete");
     console.log("@digitalafarin/cms-next installed tarball import OK");
   `;
   run(process.execPath, ["--input-type=module", "-e", probe], app);
 
   const cliBin = binPath(app, "digitalafarin-cms");
   if (!fs.existsSync(cliBin)) throw new Error("digitalafarin-cms bin shim was not installed");
-  run(cliBin, ["doctor", "--frontend", frontend], app);
   console.log("@digitalafarin/cms-cli installed tarball executable OK");
 
   run(cliBin, [
@@ -93,14 +92,14 @@ try {
   ], app);
   for (const expected of [
     "lib/digitalafarin-cms.ts",
-    "app/[[...cms_path]]/page.tsx",
+    "app/[...cms_path]/page.tsx",
     "components/digitalafarin-cms/BlockRenderer.tsx",
   ]) {
     if (!fs.existsSync(path.join(frontend, expected))) {
       throw new Error(`cms-cli --with-public-route missing ${expected}`);
     }
   }
-  const publicRoute = fs.readFileSync(path.join(frontend, "app", "[[...cms_path]]", "page.tsx"), "utf8");
+  const publicRoute = fs.readFileSync(path.join(frontend, "app", "[...cms_path]", "page.tsx"), "utf8");
   if (!publicRoute.includes("cms.resolve")) throw new Error("Generated public route does not resolve CMS content");
   const publicRenderer = fs.readFileSync(path.join(frontend, "components", "digitalafarin-cms", "BlockRenderer.tsx"), "utf8");
   if (!publicRenderer.includes("renderCmsRichTextHtml")) throw new Error("Generated public renderer does not use safe rich text helper");
@@ -140,7 +139,7 @@ try {
   if (!env.includes("NEXT_PUBLIC_API_URL=/cms/api-proxy")) throw new Error("Same-origin browser API proxy URL was not scaffolded");
   if (!env.includes("DIGITALAFARIN_CMS_API_URL=https://api.example.com/api/cms/v1")) throw new Error("Django upstream API URL was not scaffolded");
   const proxyRoute = fs.readFileSync(path.join(directAdmin, "src", "app", "api-proxy", "[...path]", "route.ts"), "utf8");
-  if (!proxyRoute.includes('incomingUrl.pathname.endsWith("/")')) throw new Error("Admin API proxy does not preserve trailing slashes");
+  if (!proxyRoute.includes('suffix ? `${suffix}/` : ""')) throw new Error("Admin API proxy does not normalize DRF trailing slashes");
   const nginx = fs.readFileSync(path.join(directAdmin, "deploy", "nginx.cms.conf"), "utf8");
   if (!nginx.includes("location /cms/")) throw new Error("Nginx /cms route missing");
   console.log("@digitalafarin/cms-admin installed tarball scaffold OK");

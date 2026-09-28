@@ -4,6 +4,7 @@ from types import ModuleType
 from unittest.mock import patch
 
 from django.core.management import call_command
+from django.core.checks import run_checks
 from django.http import HttpResponse
 from django.test import SimpleTestCase, RequestFactory, override_settings
 
@@ -35,3 +36,7 @@ class HostCompatibilityTests(SimpleTestCase):
     def test_production_media_check_rejects_localhost(self):
         from digitalafarin_cms.checks import integration_checks
         self.assertIn("digitalafarin_cms.E001", [issue.id for issue in integration_checks(None)])
+
+    @override_settings(DEBUG=False, DIGITALAFARIN_CMS_MEDIA_PUBLIC_URL="http://localhost:8000/media/")
+    def test_registered_system_check_runs(self):
+        self.assertIn("digitalafarin_cms.E001", [issue.id for issue in run_checks()])

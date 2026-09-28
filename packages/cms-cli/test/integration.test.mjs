@@ -21,7 +21,7 @@ test('installation inventories existing home/blog/detail and preserves custom so
     assert.equal(fs.readFileSync(path.join(dir, route), 'utf8'), 'export default function Host() { return "legacy"; }');
   }
   assert.ok(fs.existsSync(path.join(dir, 'app/media/[...path]/route.ts')));
-  assert.ok(fs.existsSync(path.join(dir, 'app/%5F%5Fcms_preview/[[...cms_path]]/page.tsx')));
+  assert.ok(fs.existsSync(path.join(dir, 'app/digitalafarin-cms-preview/[[...cms_path]]/page.tsx')));
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, '.digitalafarin/integration.json'), 'utf8'));
   assert.equal(manifest.status, 'review-required');
   assert.ok(manifest.routes.some((r) => r.url === '/blog/[slug]'));
@@ -49,4 +49,10 @@ test('JavaScript host routes receive JavaScript adapters and changes after revie
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /changed since review/);
   assert.match(fs.readFileSync(path.join(dir, 'app/blog/page.jsx'), 'utf8'), /edited after review/);
+});
+
+test("generated detail adapter decodes the Next route segment and leaves query encoding to the SDK", () => {
+  const template = fs.readFileSync(fileURLToPath(new URL("../templates/next/detail-page.tsx", import.meta.url)), "utf8");
+  assert.match(template, /decodeURIComponent\(slug\)/);
+  assert.doesNotMatch(template, /encodeURIComponent\(slug\)/);
 });

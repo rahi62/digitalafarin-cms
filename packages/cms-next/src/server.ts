@@ -14,16 +14,19 @@ export function createCmsMediaHandler(options: { upstream?: string } = {}) {
     }
     base.pathname = base.pathname.replace(/\/?$/, "/") + segments.map(encodeURIComponent).join("/");
     const headers = new Headers();
-    for (const key of ["range", "if-none-match", "if-modified-since"]) {
-      const value = request.headers.get(key);
-      if (value) headers.set(key, value);
-    }
+    // Forward byte ranges, but deliberately terminate browser conditional caching at
+    // this proxy boundary. Some storage/Django 304 responses lose representation
+    // metadata when re-proxied, which can leave <img> elements without decoded data.
+    // A fresh upstream 200 is deterministic; public/CDN deployments can cache at the
+    // media origin directly.
+    const range = request.headers.get("range");
+    if (range) headers.set("range", range);
     let response: Response;
     try {
       response = await fetch(base, { method: request.method === "HEAD" ? "HEAD" : "GET", headers,
         redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(15000) });
     } catch { return new Response("Media upstream unavailable", { status: 502 }); }
-    if (![200, 206, 304].includes(response.status)) {
+    if (![200, 206].includes(response.status)) {
       void response.body?.cancel().catch(() => undefined);
       return new Response(response.status === 404 ? "Media not found" : "Media upstream unavailable", {
         status: response.status === 404 ? 404 : 502, headers: { "Cache-Control": "no-store" },
@@ -37,7 +40,7 @@ export function createCmsMediaHandler(options: { upstream?: string } = {}) {
     if (!/^(image\/(png|jpeg|webp|gif|avif)|video\/|audio\/)/.test(resultHeaders.get("content-type") || "")) {
       resultHeaders.set("Content-Disposition", "attachment");
     }
-    return new Response(request.method === "HEAD" || response.status === 304 ? null : response.body,
+    return new Response(request.method === "HEAD" ? null : response.body,
       { status: response.status, headers: resultHeaders });
   };
 }

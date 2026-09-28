@@ -8,7 +8,9 @@ type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ cms_pr
 async function resolve(props: Props) {
   const { slug } = await props.params;
   const { cms_preview } = await props.searchParams;
-  const path = `__CMS_COLLECTION__/${encodeURIComponent(slug)}/`;
+  let decodedSlug: string;
+  try { decodedSlug = decodeURIComponent(slug); } catch { decodedSlug = slug; }
+  const path = `__CMS_COLLECTION__/${decodedSlug}/`;
   const page = await cms.resolveForRoute(path, { previewToken: cms_preview });
   if (page) return page;
   const rule = await cms.resolveRedirect(path);
