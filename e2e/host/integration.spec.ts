@@ -23,8 +23,9 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   const media = await upload.json();
   const created = await request.post(api + '/content/entries/', { headers, data: {
     site: site.id, content_type: kind.id, title: 'CMS Persian article', slug: 'مقاله', path: '/blog/',
-    blocks: [{ type: 'image', data: { src: media.url, alt: 'Uploaded image' } }, { type: 'rich_text', data: { format: 'tiptap-json', version: 1,
-      doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Rich text body' }] }, { type: 'image', attrs: { src: media.url, alt: 'Rich image' } }] }, html: '', text: 'Rich text body' } }],
+    blocks: [{ type: 'rich_text', data: { format: 'tiptap-json', version: 1,
+      doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Rich text body' }] }, { type: 'image', attrs: { src: media.url, alt: 'Rich image' } }] }, html: '', text: 'Rich text body' } },
+      { type: 'image', data: { src: media.url, alt: 'Uploaded image' } }],
     custom_fields: { featured_image: media.url },
   } });
   expect(created.status()).toBe(201);
