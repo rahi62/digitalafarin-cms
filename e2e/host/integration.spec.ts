@@ -60,7 +60,7 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   expect((await request.get('/media/does-not-exist.png')).status()).toBe(404);
   expect((await request.get('/blog/does-not-exist')).status()).toBe(404);
   await page.goto(entry.path + '?cms_preview=invalid');
-  await expect(page.getByRole('alert')).toContainText('invalid, expired');
+  await expect(page.getByRole('alert').filter({ hasText: 'This preview link is invalid, expired' })).toBeVisible();
   await expect(page.getByRole('heading', { name: entry.title })).toHaveCount(0);
   const changed = await request.patch(`${api}/content/entries/${entry.id}/`, { headers, data: { slug: 'renamed', title: 'Changed immediately' } });
   expect(changed.ok()).toBeTruthy();
