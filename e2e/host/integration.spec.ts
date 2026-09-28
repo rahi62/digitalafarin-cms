@@ -56,7 +56,7 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   await expect(page.getByRole('link', { name: entry.title })).toHaveAttribute('href', entry.path);
   await page.getByRole('link', { name: entry.title }).click();
   await expect(page.getByRole('heading', { name: entry.title })).toBeVisible();
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'http://127.0.0.1:3197' + encodeURI(entry.path));
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'http://127.0.0.1:3197' + entry.path);
   expect((await request.get('/media/does-not-exist.png')).status()).toBe(404);
   expect((await request.get('/blog/does-not-exist')).status()).toBe(404);
   await page.goto(entry.path + '?cms_preview=invalid');
