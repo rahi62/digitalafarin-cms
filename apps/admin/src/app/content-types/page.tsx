@@ -101,6 +101,10 @@ export default function ContentTypesPage() {
   const [editing, setEditing] = useState<ContentType>(() => emptyType());
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [renameSource, setRenameSource] = useState("");
+  const [renameTarget, setRenameTarget] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameReport, setRenameReport] = useState<{ can_execute: boolean; total_entries: number; changed_entries: number; live_entries: number; issues: string[]; preview_token: string | null } | null>(null);
   const [checking, setChecking] = useState(false);
   const [impact, setImpact] = useState<{ safe: boolean; affected_entries: number; warnings: string[]; sample_entries: Array<{ id: string; title: string }> } | null>(null);
 
@@ -134,6 +138,8 @@ export default function ContentTypesPage() {
     () => (editing.schema?.fields || []).map(normalizeField),
     [editing.schema],
   );
+
+  useEffect(() => { setRenameSource(""); setRenameTarget(""); setRenameReport(null); }, [editing.id]);
 
   function setFields(next: CustomFieldDefinition[]) {
     setImpact(null);
@@ -179,6 +185,39 @@ export default function ContentTypesPage() {
       setImpact(report);
     } catch (error) { setMessage(error instanceof Error ? error.message : "گزارش اثر تغییر ساختار در دسترس نیست"); }
     finally { setChecking(false); }
+  }
+
+  async function renameField(mode: "preview" | "execute") {
+    if (!editing.id || !renameSource || !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(renameTarget)) {
+      setMessage("فیلد اصلی و شناسه جدید معتبر را وارد کنید."); return;
+    }
+    if (mode === "execute") {
+      if (!renameReport?.can_execute || !renameReport.preview_token) return;
+      if (!window.confirm(`شناسه «${renameSource}» به «${renameTarget}» تغییر کند؟ این تغییر در داده‌های ویرایشی اعمال می‌شود و نیازمند بررسی پیش از انتشار نسخه بعدی سایت است.`)) return;
+    }
+    setRenameBusy(true); setMessage("");
+    try {
+      if (mode === "preview") {
+        const report = await apiFetch<NonNullable<typeof renameReport>>(`/content/types/${editing.id}/schema-rename/`, {
+          method: "POST", body: JSON.stringify({
+            mode: "preview", source_key: renameSource, destination_key: renameTarget,
+          }),
+        });
+        setRenameReport(report);
+      } else {
+        await apiFetch(`/content/types/${editing.id}/schema-rename/`, {
+          method: "POST", body: JSON.stringify({
+            mode: "execute", confirm: true, source_key: renameSource,
+            destination_key: renameTarget, preview_token: renameReport?.preview_token,
+          }),
+        });
+        const updated = await apiFetch<ContentType>(`/content/types/${editing.id}/`);
+        setEditing(updated); setRenameReport(null); setRenameSource(""); setRenameTarget("");
+        setMessage("تغییر شناسه و انتقال داده‌های ویرایشی با موفقیت انجام شد.");
+        await loadTypes(updated.site);
+      }
+    } catch (error) { setRenameReport(null); setMessage(error instanceof Error ? error.message : "عملیات مهاجرت انجام نشد"); }
+    finally { setRenameBusy(false); }
   }
 
   async function save() {
@@ -318,6 +357,29 @@ export default function ContentTypesPage() {
             ))}
             {fields.length === 0 && <button type="button" className="fieldBuilderEmpty" onClick={addField}><strong>هنوز فیلدی تعریف نشده</strong><span>اولین Custom Field را اضافه کنید.</span></button>}
           </div>
+
+          {editing.id && <section className="cmsRenameWizard" aria-label="مهاجرت امن شناسه فیلد">
+            <h3>مهاجرت کنترل‌شده فیلد</h3>
+            <p>برای تغییر شناسه یک فیلد ریشه و انتقال مقدارهای قبلی، ابتدا بررسی ایمن انجام دهید. این عملیات برای ساختار دارای محتوای منتشرشده مسدود است و نسخه عمومی را تغییر نمی‌دهد.</p>
+            <div className="cmsRenameInputs">
+              <label className="field"><span>شناسه فعلی</span><select value={renameSource} onChange={(e) => { setRenameSource(e.target.value); setRenameReport(null); }}>
+                <option value="">یک فیلد انتخاب کنید</option>
+                {(editing.schema?.fields || []).map((field) => <option key={field.key} value={field.key}>{field.label || field.key} — {field.key}</option>)}
+              </select></label>
+              <label className="field"><span>شناسه جدید</span><input dir="ltr" value={renameTarget} placeholder="new_field_key"
+                onChange={(e) => { setRenameTarget(e.target.value); setRenameReport(null); }} /></label>
+            </div>
+            <div className="cmsRenameActions">
+              <button type="button" className="btn secondary" disabled={renameBusy || !renameSource || !renameTarget} onClick={() => renameField("preview")}>
+                {renameBusy ? "در حال بررسی..." : "پیش‌نمایش مهاجرت"}</button>
+              {renameReport?.can_execute && <button type="button" className="btn" disabled={renameBusy} onClick={() => renameField("execute")}>تأیید و اجرای مهاجرت</button>}
+            </div>
+            {renameReport && <div className={renameReport.can_execute ? "cmsSchemaImpact isSafe" : "cmsSchemaImpact"} role="status">
+              <strong>{renameReport.can_execute ? "آماده اجرای تأییدشده" : "مهاجرت ایمن نیست و مسدود شد"}</strong>
+              <span>{renameReport.total_entries.toLocaleString("fa-IR")} رکورد بررسی شد؛ {renameReport.changed_entries.toLocaleString("fa-IR")} رکورد نیازمند تغییر؛ {renameReport.live_entries.toLocaleString("fa-IR")} نسخه عمومی</span>
+              {renameReport.issues.length > 0 && <ul>{renameReport.issues.map((issue, index) => <li key={index} dir="ltr">{issue}</li>)}</ul>}
+            </div>}
+          </section>}
 
           {impact && <div className={impact.safe ? "cmsSchemaImpact isSafe" : "cmsSchemaImpact"} role="status">
             <strong>{impact.safe ? "تغییر ساختار از نظر سازگاری مجاز است" : "تغییر ناسازگار؛ ذخیره تا مهاجرت داده مسدود است"}</strong>

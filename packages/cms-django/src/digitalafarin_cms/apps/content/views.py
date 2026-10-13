@@ -29,6 +29,7 @@ from .services import create_revision
 from .field_schema import find_breaking_schema_changes, validate_schema_fields, relation_targets
 from .relations import find_relation_uses
 from .trash import move_to_trash, restore_from_trash
+from .schema_migration import preview_field_rename, execute_field_rename
 from .routing import normalize_path
 from .public import PublicEntrySerializer, public_entries, published_content
 from digitalafarin_cms.media import normalize_media_data
@@ -120,6 +121,25 @@ class ContentTypeViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
                 "referenced_by": dependencies[:10],
             })
         instance.delete()
+
+    @action(detail=True, methods=["post"], url_path="schema-rename")
+    def schema_rename(self, request, pk=None):
+        content_type = self.get_object()
+        ensure_organization_roles(
+            request.user, content_type.site.organization_id,
+            (Membership.Role.OWNER, Membership.Role.ADMIN),
+            "Only Owner and Admin can run schema migrations.",
+        )
+        source = request.data.get("source_key")
+        destination = request.data.get("destination_key")
+        if request.data.get("mode") == "preview":
+            return Response(preview_field_rename(content_type, source, destination))
+        if request.data.get("mode") != "execute" or request.data.get("confirm") is not True:
+            raise serializers.ValidationError({"confirm": "Explicit confirmation is required."})
+        result = execute_field_rename(
+            content_type, source, destination, request.data.get("preview_token"), request.user,
+        )
+        return Response(result)
 
     @action(detail=True, methods=["post"], url_path="schema-impact")
     def schema_impact(self, request, pk=None):
