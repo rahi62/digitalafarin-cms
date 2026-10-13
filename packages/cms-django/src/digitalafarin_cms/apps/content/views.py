@@ -9,7 +9,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from xml.sax.saxutils import escape as xml_escape
-from rest_framework import status as drf_status, viewsets
+from rest_framework import status as drf_status, viewsets, serializers
 from rest_framework.decorators import action, api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -26,6 +26,7 @@ from digitalafarin_cms.apps.sites.models import Membership, Site
 from .models import Category, ContentEntry, ContentRevision, ContentTypeDefinition, Menu, PublishedEntry, ReusableBlock, Tag
 from .serializers import CategorySerializer, ContentEntrySerializer, ContentRevisionSerializer, ContentTypeSerializer, MenuSerializer, ReusableBlockSerializer, TagSerializer
 from .services import create_revision
+from .field_schema import find_breaking_schema_changes, validate_schema_fields
 from .routing import normalize_path
 from .public import PublicEntrySerializer, public_entries, published_content
 from digitalafarin_cms.media import normalize_media_data
@@ -85,6 +86,32 @@ class ContentTypeViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     filterset_fields = ["site", "is_public"]
     search_fields = ["name", "slug"]
     tenant_filter = "site__organization_id"
+
+    @action(detail=True, methods=["post"], url_path="schema-impact")
+    def schema_impact(self, request, pk=None):
+        """Dry-run a field schema edit; never mutate content or schema here."""
+        entry_type = self.get_object()  # TenantScopedViewSetMixin enforces write role for POST.
+        schema = request.data.get("schema")
+        if not isinstance(schema, dict):
+            return Response({"schema": "Expected a schema object."}, status=400)
+        try:
+            validate_schema_fields(schema.get("fields", []))
+        except serializers.ValidationError as exc:
+            return Response({"schema": exc.detail}, status=400)
+        from .field_schema import find_breaking_schema_changes
+        count = entry_type.entries.count()
+        warnings = find_breaking_schema_changes(
+            (entry_type.schema or {}).get("fields", []),
+            schema.get("fields", []),
+        ) if count else []
+        samples = list(entry_type.entries.order_by("created_at").values("id", "title")[:5])
+        return Response({
+            "safe": not warnings,
+            "affected_entries": count,
+            "warnings": warnings,
+            "sample_entries": [{"id": str(row["id"]), "title": row["title"]} for row in samples],
+            "note": "Read-only dry-run. A breaking schema requires an explicit data migration.",
+        })
 
 
 class CategoryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
