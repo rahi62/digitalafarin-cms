@@ -122,3 +122,44 @@ class PublishedSnapshotTests(TestCase):
         self.assertTrue(PublishedEntry.objects.filter(entry=entry).exists())
         self.assertIsNotNone(entry.published_at)
         self.assertEqual(self.resolve("/imported/").data["content"]["title"], "Imported")
+
+
+    def test_live_route_cannot_be_taken_over_by_another_draft(self):
+        entry = self.create()
+        self.assertEqual(self.workflow(entry, "publish").status_code, 200)
+        renamed = self.client.patch(f"/api/cms/v1/content/entries/{entry.pk}/", {
+            "path": "/new/", "slug": "new",
+        }, format="json")
+        self.assertEqual(renamed.status_code, 200, renamed.data)
+        conflict = self.client.post("/api/cms/v1/content/entries/", {
+            "site": str(self.site.pk), "content_type": str(self.kind.pk),
+            "title": "Hijacker", "slug": "hijack", "path": "/old/", "path_mode": "manual",
+            "status": "draft",
+        }, format="json")
+        self.assertEqual(conflict.status_code, 400)
+        self.assertIn("path", conflict.data)
+        self.assertEqual(self.resolve("/old/").data["content"]["title"], "Live title")
+
+    def test_published_status_cannot_be_bypassed_by_direct_patch(self):
+        entry = self.create()
+        self.workflow(entry, "publish")
+        result = self.client.patch(f"/api/cms/v1/content/entries/{entry.pk}/", {
+            "status": "draft",
+        }, format="json")
+        self.assertEqual(result.status_code, 403)
+        self.assertEqual(self.resolve("/old/").status_code, 200)
+
+    def test_workflow_reports_live_snapshot_and_unpublished_changes(self):
+        entry = self.create()
+        self.workflow(entry, "publish")
+        url = f"/api/cms/v1/content/entries/{entry.pk}/workflow/"
+        first = self.client.get(url)
+        self.assertTrue(first.data["has_live_version"])
+        self.assertFalse(first.data["has_unpublished_changes"])
+        self.client.patch(f"/api/cms/v1/content/entries/{entry.pk}/", {
+            "title": "Later title",
+        }, format="json")
+        second = self.client.get(url)
+        self.assertTrue(second.data["has_unpublished_changes"])
+        self.assertEqual(second.data["live_path"], "/old/")
+        self.assertEqual(self.resolve("/old/").data["content"]["title"], "Live title")
