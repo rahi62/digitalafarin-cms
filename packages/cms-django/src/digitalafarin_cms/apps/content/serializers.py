@@ -44,6 +44,19 @@ class ContentTypeSerializer(serializers.ModelSerializer):
         except DjangoValidationError as exc:
             raise serializers.ValidationError({"entry_path_pattern": exc.messages})
         next_schema = attrs.get("schema")
+        if next_schema is not None and site is not None:
+            def relation_slugs(fields):
+                for field in fields:
+                    if field.get("type") == "relation":
+                        yield field["target_content_type"]
+                    if field.get("type") in {"group", "repeater"}:
+                        yield from relation_slugs(field.get("fields", []))
+            current_slug = attrs.get("slug", getattr(self.instance, "slug", None))
+            for target_slug in relation_slugs(next_schema.get("fields", [])):
+                if target_slug == current_slug:
+                    continue  # Self-reference is allowed.
+                if not ContentTypeDefinition.objects.filter(site_id=site.pk, slug=target_slug).exists():
+                    raise serializers.ValidationError({"schema": f"Related content type '{target_slug}' does not exist on this site."})
         if self.instance is not None and next_schema is not None:
             # Replacing a live schema silently would strand historical custom_fields.
             if self.instance.entries.exists():
