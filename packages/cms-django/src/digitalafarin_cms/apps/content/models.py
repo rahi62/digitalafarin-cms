@@ -5,6 +5,11 @@ from digitalafarin_cms.apps.common.models import UUIDTimeStampedModel
 from digitalafarin_cms.apps.sites.models import Site
 
 class ContentTypeDefinition(UUIDTimeStampedModel):
+    class Kind(models.TextChoices):
+        COLLECTION = "collection", "Collection"
+        SINGLETON = "singleton", "Singleton"
+
+    kind = models.CharField(max_length=16, choices=Kind.choices, default=Kind.COLLECTION)
     site=models.ForeignKey(Site,on_delete=models.CASCADE,related_name="content_types")
     name=models.CharField(max_length=120)
     slug=models.SlugField(max_length=120)
@@ -44,6 +49,7 @@ class ContentEntry(UUIDTimeStampedModel):
         DRAFT="draft","Draft"; REVIEW="review","Review"; SCHEDULED="scheduled","Scheduled"; PUBLISHED="published","Published"; ARCHIVED="archived","Archived"
     site=models.ForeignKey(Site,on_delete=models.CASCADE,related_name="entries")
     content_type=models.ForeignKey(ContentTypeDefinition,on_delete=models.PROTECT,related_name="entries")
+    singleton_slot=models.OneToOneField(ContentTypeDefinition,null=True,blank=True,editable=False,on_delete=models.PROTECT,related_name="singleton_entry")
     title=models.CharField(max_length=255)
     slug=models.SlugField(max_length=255,allow_unicode=True)
     path=models.CharField(max_length=500,help_text="Canonical site path, e.g. /blog/example/")
@@ -70,10 +76,15 @@ class ContentEntry(UUIDTimeStampedModel):
         with transaction.atomic():
             # Serializes route claims for one site, including legacy encoded aliases.
             Site.objects.select_for_update().get(pk=self.site_id)
+            content_type = ContentTypeDefinition.objects.get(pk=self.content_type_id)
+            self.singleton_slot_id = self.content_type_id if content_type.kind == ContentTypeDefinition.Kind.SINGLETON else None
+            if self.singleton_slot_id and self.path_mode != "manual":
+                from django.core.exceptions import ValidationError
+                raise ValidationError({"path_mode": "Singleton pages require a manually controlled route."})
             previous = type(self).objects.filter(pk=self.pk).first() if not self._state.adding else None
             self.path = validate_entry_route(self, previous)
             if kwargs.get("update_fields") is not None:
-                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"path"}
+                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"path", "singleton_slot"}
             result = super().save(*args, **kwargs)
             # Editing a published entry changes the working copy only. Route redirects and
             # the public representation are changed exclusively by explicit publication.
