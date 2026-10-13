@@ -172,6 +172,7 @@ function embed() {
     "route-explorer.css",
     "content-list.css",
     "dashboard.css",
+    "sites.css",
   ].map((name) => `import "${styleRoot}/${name}";`).join("\n");
 
   fs.writeFileSync(
