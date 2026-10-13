@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { ContentBlock } from "@/components/BlockEditor";
 import ProfessionalEditor from "@/components/ProfessionalEditor";
 import CustomFieldsEditor, { ContentTypeSchema, customFieldDefaults } from "@/components/CustomFieldsEditor";
@@ -18,6 +19,8 @@ export default function NewContent() {
   const [sites, setSites] = useState<Site[]>([]);
   const [types, setTypes] = useState<ContentType[]>([]);
   const [msg, setMsg] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [loadingError, setLoadingError] = useState("");
   const [f, setF] = useState<any>({
     site: "", content_type: "", title: "", slug: "", path: "", excerpt: "",
     status: "draft", parent: null, is_featured: false, categories: [], tags: [], custom_fields: {},
@@ -28,8 +31,8 @@ export default function NewContent() {
     apiFetch<Paginated<Site>>("/sites/").then((d) => {
       setSites(d.results);
       if (d.results[0]) setF((x: any) => ({ ...x, site: d.results[0].id }));
-    });
-    apiFetch<Paginated<ContentType>>("/content/types/").then((d) => setTypes(d.results));
+    }).catch((error) => setLoadingError(error instanceof Error ? error.message : "دریافت سایت‌ها ناموفق بود"));
+    apiFetch<Paginated<ContentType>>("/content/types/?page_size=100").then((d) => setTypes(d.results)).catch((error) => setLoadingError(error instanceof Error ? error.message : "دریافت نوع محتوا ناموفق بود"));
   }, []);
 
   const siteTypes = useMemo(() => types.filter((type) => type.site === f.site), [types, f.site]);
@@ -51,23 +54,28 @@ export default function NewContent() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setMsg("");
+    if (!f.site || !f.content_type || !f.title.trim()) { setMsg("سایت، نوع محتوا و عنوان الزامی هستند."); return; }
+    setSubmitting(true);
     try {
       const d: any = await apiFetch("/content/entries/", { method: "POST", body: JSON.stringify(f) });
       location.href = adminPath(`/content/${d.id}`);
     } catch (err: any) {
       setMsg(err.message);
-    }
+    } finally { setSubmitting(false); }
   }
 
   return (
     <>
-      <PageHeader title="محتوای جدید" description="ساخت Draft یا ارسال مستقیم برای Review؛ انتشار از Workflow انجام می‌شود." />
+      <PageHeader title="محتوای جدید" description="ساخت پیش‌نویس یا ارسال برای بررسی؛ انتشار از گردش کار انجام می‌شود."
+        action={<Link href={adminPath("/content")} className="btn secondary">بازگشت به محتواها</Link>} />
+      <div className="cmsNewContentHint">۱. سایت و نوع محتوا را انتخاب کنید. ۲. عنوان، مسیر و محتوا را تنظیم کنید. ۳. پیش‌نویس را ایجاد کنید و سپس از صفحه ویرایش، سئو، اسکیما و انتشار را مدیریت کنید.</div>
       <form className="form" onSubmit={submit}>
-        {msg && <div className="error">{msg}</div>}
+        {loadingError && <div className="error" role="alert">{loadingError}</div>}
+        {msg && <div className="error" role="alert">{msg}</div>}
         <div className="formGrid">
           <div className="field"><label>سایت</label><select value={f.site} onChange={(e) => setF({ ...f, site: e.target.value, content_type: "", parent: null, categories: [], tags: [], custom_fields: {} })}>{sites.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></div>
           <div className="field"><label>نوع محتوا</label><select value={f.content_type} onChange={(e) => selectType(e.target.value)}>{siteTypes.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>{siteTypes.length === 0 && <small>برای این سایت ابتدا یک Content Type بسازید.</small>}</div>
-          <div className="field"><label>عنوان</label><input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
+          <div className="field"><label>عنوان *</label><input required value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
           <div className="field"><label>Slug</label><input value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value })} /></div>
           <ContentPathFields entry={f} contentType={selectedType} onChange={(patch) => setF({ ...f, ...patch })} />
           <div className="field full"><label>خلاصه</label><textarea style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right" }} value={f.excerpt} onChange={(e) => setF({ ...f, excerpt: e.target.value })} /></div>
@@ -79,7 +87,8 @@ export default function NewContent() {
           <CustomFieldsEditor schema={selectedType?.schema} value={f.custom_fields || {}} siteId={f.site} onChange={(custom_fields) => setF({ ...f, custom_fields })} />
           <div className="field full contentEditorField"><label>محتوا</label><ProfessionalEditor siteId={f.site} value={f.blocks} onChange={(blocks) => setF({ ...f, blocks })} /></div>
         </div>
-        <div className="actions"><button className="btn" disabled={!f.content_type}>ایجاد محتوا</button></div>
+        <div className="actions cmsNewContentActions"><button className="btn" disabled={submitting || !f.site || !f.content_type || !f.title.trim()}>{submitting ? "در حال ایجاد..." : "ایجاد محتوا"}</button>
+          <Link className="btn secondary" href={adminPath("/content")}>انصراف</Link></div>
       </form>
     </>
   );
