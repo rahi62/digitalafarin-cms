@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import MediaPicker, { MediaAsset } from "@/components/MediaPicker";
+import AdvancedField from "@/components/AdvancedField";
 
 export type CustomFieldType =
   | "text"
@@ -14,7 +15,11 @@ export type CustomFieldType =
   | "email"
   | "select"
   | "media"
-  | "json";
+  | "json"
+  | "relation"
+  | "group"
+  | "repeater"
+  | "gallery";
 
 export type CustomFieldDefinition = {
   key: string;
@@ -25,6 +30,10 @@ export type CustomFieldDefinition = {
   placeholder?: string;
   default?: unknown;
   options?: Array<string | { label: string; value: string }>;
+  fields?: CustomFieldDefinition[];
+  target_content_type?: string;
+  min_items?: number;
+  max_items?: number;
 };
 
 export type ContentTypeSchema = {
@@ -44,6 +53,8 @@ export function customFieldDefaults(schema?: ContentTypeSchema | null) {
     if (!field.key) continue;
     if (field.default !== undefined && field.default !== null) result[field.key] = field.default;
     else if (field.type === "boolean") result[field.key] = false;
+    else if (field.type === "group") result[field.key] = customFieldDefaults({ fields: field.fields || [] });
+    else if (field.type === "repeater" || field.type === "gallery") result[field.key] = [];
     else result[field.key] = "";
   }
   return result;
@@ -110,9 +121,10 @@ function DynamicField({
   const label = field.label || field.key;
   const help = field.help_text || "";
   const placeholder = field.placeholder || "";
+  const isAdvanced = ["group", "repeater", "gallery", "relation"].includes(type);
 
   return (
-    <div className={`dynamicField ${type === "textarea" || type === "json" || type === "media" ? "wide" : ""}`}>
+    <div className={`dynamicField ${type === "textarea" || type === "json" || type === "media" || isAdvanced ? "wide" : ""}`}>
       <label>
         {label}
         {field.required && <span className="requiredMark">*</span>}
@@ -142,6 +154,12 @@ function DynamicField({
         </select>
       ) : type === "media" ? (
         <MediaCustomField siteId={siteId} value={stringValue(value)} onChange={onChange} />
+      ) : isAdvanced ? (
+        <AdvancedField field={field} value={value} onChange={onChange} siteId={siteId}
+          renderChildren={(children, values, change) => <div className="customFieldsGrid">
+            {children.map((child) => <DynamicField key={child.key} field={child} value={values[child.key]} siteId={siteId}
+              onChange={(next) => change({ ...values, [child.key]: next })} />)}
+          </div>} />
       ) : type === "json" ? (
         <JsonCustomField value={value} onChange={onChange} />
       ) : (
