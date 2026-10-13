@@ -177,6 +177,7 @@ function embed() {
     "editor-navigation.css",
     "nested-fields.css",
     "team.css",
+    "trash.css",
   ].map((name) => `import "${styleRoot}/${name}";`).join("\n");
 
   fs.writeFileSync(
