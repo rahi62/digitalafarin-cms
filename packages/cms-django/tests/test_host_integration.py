@@ -60,8 +60,13 @@ class HostIntegrationTests(TestCase):
         renamed = self.admin.patch(f"/api/cms/v1/content/entries/{entry_id}/", {"slug": "new"}, format="json")
         self.assertEqual(renamed.status_code, 200, renamed.data)
         self.assertEqual(renamed.data["path"], "/blog/new/")
-        self.assertEqual(Redirect.objects.get(site=self.site, source_path=path).destination_path, "/blog/new/")
+        # Editing the working copy never changes the public URL or creates a redirect.
+        self.assertFalse(Redirect.objects.filter(site=self.site, source_path=path).exists())
+        self.assertEqual(self.resolve(path).data["content"]["title"], "Article")
+        self.assertEqual(self.resolve("/blog/new/").status_code, 404)
         self.assertEqual(self.resolve("/blog/new/", preview=token).status_code, 403)
+        self.admin.post(f"/api/cms/v1/content/entries/{entry_id}/publish/")
+        self.assertEqual(Redirect.objects.get(site=self.site, source_path=path).destination_path, "/blog/new/")
         self.admin.post(f"/api/cms/v1/content/entries/{entry_id}/return-draft/")
         self.assertEqual(self.listing().data["count"], 0)
         self.assertEqual(self.resolve("/blog/new/").status_code, 404)
@@ -89,6 +94,8 @@ class HostIntegrationTests(TestCase):
         entry = self.create(slug="قدیمی").data
         self.admin.post(f'/api/cms/v1/content/entries/{entry["id"]}/publish/')
         self.admin.patch(f'/api/cms/v1/content/entries/{entry["id"]}/', {"slug": "new"}, format="json")
+        self.assertFalse(Redirect.objects.filter(site=self.site, source_path=entry["path"]).exists())
+        self.admin.post(f'/api/cms/v1/content/entries/{entry["id"]}/publish/')
         response = self.public.get("/api/cms/v1/seo/redirect-resolve/", {"site": self.site.domain, "path": quote(entry["path"].rstrip("/"))})
         self.assertTrue(response.data["match"])
         self.assertEqual(response.data["destination"], "/blog/new/")
@@ -135,6 +142,8 @@ class HostIntegrationTests(TestCase):
         entry = ContentEntry.objects.get(pk=first["id"])
         entry.categories.add(category)
         entry.tags.add(tag)
+        # Taxonomy edits on an already-live record take effect only after republish.
+        self.admin.post(f'/api/cms/v1/content/entries/{first["id"]}/publish/')
 
         searched = self.listing(content_type="news", search="SEO")
         self.assertEqual(searched.data["count"], 1)
