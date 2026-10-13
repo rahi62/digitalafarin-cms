@@ -22,7 +22,7 @@ from digitalafarin_cms.apps.common.tenancy import (
 from digitalafarin_cms.apps.seo.models import SchemaMarkup, SeoMeta
 from digitalafarin_cms.apps.seo.serializers import SchemaMarkupSerializer, SeoMetaSerializer
 from digitalafarin_cms.apps.sites.models import Membership, Site
-from .models import Category, ContentEntry, ContentRevision, ContentTypeDefinition, Menu, ReusableBlock, Tag
+from .models import Category, ContentEntry, ContentRevision, ContentTypeDefinition, Menu, PublishedEntry, ReusableBlock, Tag
 from .serializers import CategorySerializer, ContentEntrySerializer, ContentRevisionSerializer, ContentTypeSerializer, MenuSerializer, ReusableBlockSerializer, TagSerializer
 from .services import create_revision
 from .routing import normalize_path
@@ -184,7 +184,7 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         entry.status = ContentEntry.Status.DRAFT
         entry.scheduled_at = None
         entry.save(update_fields=["status", "scheduled_at", "updated_at"])
-        entry.published_copy.__class__.objects.filter(entry=entry).delete() if hasattr(entry, "published_copy") else None
+        PublishedEntry.objects.filter(entry=entry).delete()
         create_revision(entry, request.user, "Returned to draft")
         return Response(self.get_serializer(entry).data)
 
