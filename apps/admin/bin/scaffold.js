@@ -174,6 +174,7 @@ function embed() {
     "dashboard.css",
     "sites.css",
     "reusable-blocks.css",
+    "editor-navigation.css",
   ].map((name) => `import "${styleRoot}/${name}";`).join("\n");
 
   fs.writeFileSync(
