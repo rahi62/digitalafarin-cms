@@ -26,7 +26,7 @@ from digitalafarin_cms.apps.sites.models import Membership, Site
 from .models import Category, ContentEntry, ContentRevision, ContentTypeDefinition, Menu, PublishedEntry, ReusableBlock, Tag
 from .serializers import CategorySerializer, ContentEntrySerializer, ContentRevisionSerializer, ContentTypeSerializer, MenuSerializer, ReusableBlockSerializer, TagSerializer
 from .services import create_revision
-from .field_schema import find_breaking_schema_changes, validate_schema_fields
+from .field_schema import find_breaking_schema_changes, validate_schema_fields, relation_targets
 from .routing import normalize_path
 from .public import PublicEntrySerializer, public_entries, published_content
 from digitalafarin_cms.media import normalize_media_data
@@ -98,7 +98,11 @@ class ContentTypeViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
             validate_schema_fields(schema.get("fields", []))
         except serializers.ValidationError as exc:
             return Response({"schema": exc.detail}, status=400)
-        from .field_schema import find_breaking_schema_changes
+        for target_slug in relation_targets(schema.get("fields", [])):
+            if target_slug != entry_type.slug and not ContentTypeDefinition.objects.filter(
+                site_id=entry_type.site_id, slug=target_slug,
+            ).exists():
+                return Response({"schema": "Related content type does not exist in this site: " + target_slug}, status=400)
         count = entry_type.entries.count()
         warnings = find_breaking_schema_changes(
             (entry_type.schema or {}).get("fields", []),
