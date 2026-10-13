@@ -164,3 +164,18 @@ class NestedSchemaTests(TestCase):
             {"schema": {"fields": []}}, format="json",
         )
         self.assertEqual(hidden.status_code, 404)
+
+
+    def test_relation_schema_requires_same_site_content_type_target(self):
+        invalid = self.client.post("/api/cms/v1/content/types/", {
+            "site": str(self.site.pk), "name": "Invalid relation", "slug": "bad-relation",
+            "schema": {"fields": [{"key": "link", "type": "relation", "target_content_type": "foreign"}]},
+        }, format="json")
+        self.assertEqual(invalid.status_code, 400)
+        self.assertIn("schema", invalid.data)
+        # A self-relation is valid: the target type is currently being created.
+        self_link = self.client.post("/api/cms/v1/content/types/", {
+            "site": str(self.site.pk), "name": "People", "slug": "person",
+            "schema": {"fields": [{"key": "friend", "type": "relation", "target_content_type": "person"}]},
+        }, format="json")
+        self.assertEqual(self_link.status_code, 201, self_link.data)
