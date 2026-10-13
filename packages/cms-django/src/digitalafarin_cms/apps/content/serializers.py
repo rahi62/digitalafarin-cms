@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from rest_framework import serializers
 from .models import ContentTypeDefinition, ContentEntry, ContentRevision, Category, Tag, ReusableBlock, Menu, MenuItem
-from .field_schema import validate_schema_fields, validate_field_values, find_breaking_schema_changes
+from .field_schema import validate_schema_fields, validate_field_values, find_breaking_schema_changes, relation_targets
 
 
 def would_create_parent_cycle(instance, parent):
@@ -45,14 +45,8 @@ class ContentTypeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"entry_path_pattern": exc.messages})
         next_schema = attrs.get("schema")
         if next_schema is not None and site is not None:
-            def relation_slugs(fields):
-                for field in fields:
-                    if field.get("type") == "relation":
-                        yield field["target_content_type"]
-                    if field.get("type") in {"group", "repeater"}:
-                        yield from relation_slugs(field.get("fields", []))
             current_slug = attrs.get("slug", getattr(self.instance, "slug", None))
-            for target_slug in relation_slugs(next_schema.get("fields", [])):
+            for target_slug in relation_targets(next_schema.get("fields", [])):
                 if target_slug == current_slug:
                     continue  # Self-reference is allowed.
                 if not ContentTypeDefinition.objects.filter(site_id=site.pk, slug=target_slug).exists():
