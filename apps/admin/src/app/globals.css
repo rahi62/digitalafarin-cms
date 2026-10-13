@@ -22,3 +22,17 @@
 
 .mediaPagination,.mediaPickerPagination{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:16px}
 .mediaPagination span,.mediaPickerPagination span{font-size:12px;color:#667085}
+
+.mobileMenuToggle{display:none;background:#1d2939;color:#fff;border:1px solid #344054;border-radius:9px;padding:9px 12px;cursor:pointer;align-items:center;gap:8px;}
+@media(max-width:900px){
+  .sidebar{padding:12px 16px;}
+  .sidebarTop{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .sidebarTop .brand{padding:0;}
+  .mobileMenuToggle{display:inline-flex;}
+  .sidebar .sidebarNav{display:none;}
+  .sidebar .sidebarNav.isOpen{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:14px;}
+  .sidebar .sidebarNav a{min-width:0;justify-content:flex-start;}
+  .sidebar .logout{display:none;}
+  .sidebar.mobileExpanded .logout{display:block;margin-top:12px;}
+}
+@media(max-width:420px){.sidebar .sidebarNav.isOpen{grid-template-columns:1fr;}}
