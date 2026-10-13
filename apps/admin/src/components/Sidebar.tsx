@@ -9,6 +9,7 @@ import { adminPath, stripAdminBasePath } from "@/lib/admin-path";
 const links=[
   ["/","داشبورد","◫"],
   ["/content","محتوا","✎"],
+  ["/sites","مدیریت سایت‌ها","▣"],
   ["/content-types","ساختار محتوا","◇"],
   ["/route-explorer","کاوشگر مسیرها","◎"],
   ["/taxonomies","دسته‌ها و تگ‌ها","#"],
