@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { inventory, mapRoute, readRouteMap, validateRoutes } from '../bin/routes.js';
 
 function fixture(t, files) {
@@ -71,4 +72,29 @@ test('requiring a map reports missing configuration without modifying the host',
   const root = fixture(t, { 'app/page.tsx': 'host home' });
   assert.ok(validateRoutes(root, root, { requireMap: true }).errors.some((s) => s.includes('missing')));
   assert.ok(!fs.existsSync(path.join(root, '.digitalafarin')));
+});
+
+test('CLI commands expose read-only inventory and enforce explicit mapping', (t) => {
+  const root = fixture(t, {
+    'package.json': JSON.stringify({ dependencies: { next: '16.0.0' } }),
+    'app/page.tsx': 'export default function Home() {}',
+    'app/blog/page.tsx': 'cms.listEntries()',
+  });
+  const cli = new URL('../bin/cli.js', import.meta.url).pathname;
+  const run = (...args) => {
+    const result = spawnSync(process.execPath, [cli, ...args, '--frontend', root], { encoding: 'utf8', cwd: root });
+    return result;
+  };
+  const before = run('routes');
+  assert.equal(before.status, 0, before.stderr);
+  assert.match(before.stdout, /"url": "\/blog"/);
+  assert.ok(!fs.existsSync(path.join(root, '.digitalafarin')));
+  const unmapped = run('validate-routes');
+  assert.equal(unmapped.status, 1);
+  assert.match(unmapped.stdout, /Route mapping is missing/);
+  const mapped = run('map-route', '--route', '/blog', '--mode', 'collection', '--content-type', 'post');
+  assert.equal(mapped.status, 0, mapped.stderr);
+  const verified = run('validate-routes');
+  assert.equal(verified.status, 0, verified.stdout + verified.stderr);
+  assert.match(verified.stdout, /"errors": \[\]/);
 });
