@@ -18,7 +18,7 @@ function run(file, args) {
 const fixtureDir = fs.mkdtempSync(path.join(fixture, 'run-'));
 const files = {
   'package.json': JSON.stringify({ name: 'cms-host-fixture', private: true, type: 'module', dependencies: { next: '*', react: '*', 'react-dom': '*', '@digitalafarin/cms-next': '*' } }),
-  'app/layout.tsx': 'export default function Layout({children}:{children:React.ReactNode}) { return <html><body>{children}</body></html>; }',
+  'app/layout.tsx': 'export default function Layout({children}:{children:React.ReactNode}) { return <html><body><header id="host-panel" className="panel">HOST</header>{children}</body></html>; }',
   'app/page.tsx': 'export default function Home() { return <h1>Original host homepage</h1>; }',
   'app/blog/page.tsx': 'export default function Blog() { return <h1>Original legacy collection</h1>; }',
   'app/blog/[slug]/page.tsx': 'import { notFound } from "next/navigation"; export default async function Legacy({params}:{params:Promise<{slug:string}>}) { if ((await params).slug !== "legacy") notFound(); return <h1>Original legacy article</h1>; }',
