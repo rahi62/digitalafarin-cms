@@ -124,7 +124,7 @@ class ContentEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model=ContentEntry
         fields="__all__"
-        read_only_fields=["published_at", "singleton_slot"]
+        read_only_fields=["published_at", "singleton_slot", "deleted_at", "deleted_by"]
         extra_kwargs={"path": {"required": False, "allow_blank": True}}
         validators=[]  # The final computed route is validated below and under a site lock on save.
 
