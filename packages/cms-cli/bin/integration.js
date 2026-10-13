@@ -1,25 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { inventory } from "./routes.js";
+export { inventory } from "./routes.js";
 
 const slash = (p) => p.split(path.sep).join("/");
 const hash = (text) => createHash("sha256").update(text).digest("hex");
-export function inventory(frontend, root) {
-  const routes = [];
-  function walk(dir, segments = []) {
-    if (!fs.existsSync(dir)) return;
-    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (item.isDirectory() && !item.name.startsWith("_")) walk(path.join(dir, item.name), [...segments, item.name]);
-      if (item.isFile() && /^(page|route)\.(tsx?|jsx?)$/.test(item.name)) {
-        routes.push({ url: "/" + segments.filter((s) => !s.startsWith("(") && !s.startsWith("@")).join("/"),
-          file: slash(path.relative(frontend, path.join(dir, item.name))), kind: item.name.startsWith("page.") ? "page" : "route" });
-      }
-    }
-  }
-  walk(path.join(root, "app"));
-  return routes;
-}
-
 export function scaffoldIntegration(frontend, root, templates, options = {}) {
   const routes = inventory(frontend, root);
   const manifestFile = path.join(frontend, ".digitalafarin/integration.json");
