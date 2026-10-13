@@ -92,7 +92,7 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   // The published page remains unchanged until explicit republishing.
   await page.goto(entry.path);
   await expect(page.getByRole('heading', { name: entry.title })).toBeVisible();
-  expect(page.url()).toContain(entry.path.replace(/\/$/, ''));
+  expect(decodeURI(new URL(page.url()).pathname)).toContain(entry.path.replace(/\/$/, ''));
   expect((await request.get('/blog/renamed')).status()).toBe(404);
   expect((await request.post(`${api}/content/entries/${entry.id}/publish/`, { headers })).ok()).toBeTruthy();
   await page.goto(entry.path);
