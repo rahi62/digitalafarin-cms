@@ -29,6 +29,18 @@ class ContentTypeDefinition(UUIDTimeStampedModel):
             validate_collection_claim(self.site_id, self.collection_path, previous)
             return super().save(*args, **kwargs)
 
+class ContentSchemaMigration(UUIDTimeStampedModel):
+    """Audit trail for explicit, approved schema/data transformations."""
+    content_type=models.ForeignKey(ContentTypeDefinition,on_delete=models.PROTECT,related_name="schema_migrations")
+    operation=models.CharField(max_length=50)
+    source_key=models.CharField(max_length=120)
+    destination_key=models.CharField(max_length=120)
+    before_schema=models.JSONField(default=dict)
+    after_schema=models.JSONField(default=dict)
+    affected_entries=models.PositiveIntegerField(default=0)
+    executed_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True)
+
+
 class Category(UUIDTimeStampedModel):
     site=models.ForeignKey(Site,on_delete=models.CASCADE,related_name="categories")
     name=models.CharField(max_length=160)
