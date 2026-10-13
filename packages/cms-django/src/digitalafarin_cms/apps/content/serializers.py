@@ -197,6 +197,12 @@ class ContentEntrySerializer(serializers.ModelSerializer):
         status=attrs.get("status", getattr(self.instance,"status",ContentEntry.Status.DRAFT))
         scheduled_at=attrs.get("scheduled_at", getattr(self.instance,"scheduled_at",None))
 
+        if self.instance is not None and hasattr(self.instance, "published_copy"):
+            if site is not None and site.pk != self.instance.site_id:
+                raise serializers.ValidationError({"site": "Unpublish this entry before moving it to another site."})
+            if ctype is not None and ctype.pk != self.instance.content_type_id:
+                raise serializers.ValidationError({"content_type": "Unpublish this entry before changing its content type."})
+
         if site and ctype and ctype.site_id != site.id:
             raise serializers.ValidationError({"content_type":"Content type must belong to the same site."})
         if site and parent and parent.site_id != site.id:
