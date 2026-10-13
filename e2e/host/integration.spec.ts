@@ -12,7 +12,7 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   await page.addInitScript((token) => localStorage.setItem('cms_access_token', token), auth.access);
   await page.goto('/cms/route-explorer');
   await expect(page.getByRole('heading', { name: 'کاوشگر مسیرها' })).toBeVisible();
-  await expect(page.getByRole('alert')).toContainText('No route report exported');
+  await expect(page.locator('div.error[role="alert"]')).toContainText('No route report exported');
   const sites = await (await request.get(api + '/sites/', { headers })).json();
   const site = sites.results[0];
   const types = await (await request.get(api + '/content/types/', { headers })).json();
