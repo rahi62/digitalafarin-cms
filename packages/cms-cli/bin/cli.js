@@ -4,7 +4,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { scaffoldIntegration, applyIntegration, frontendDoctor } from "./integration.js";
-import { inventory, mapRoute, validateRoutes, routeMapFile } from "./routes.js";
+import { inventory, mapRoute, validateRoutes, routeMapFile, exportRouteReport } from "./routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(__filename), "..");
@@ -180,6 +180,7 @@ if (["routes", "map-route", "validate-routes"].includes(command)) {
   const root = sourceRoot(frontend);
   if (command === "routes") {
     const report = validateRoutes(frontend, root);
+    if (has("--export-report")) console.log(`Route Explorer snapshot: ${exportRouteReport(frontend, root).filename}`);
     console.log(JSON.stringify({ routes: report.routes, mappings: report.mappings, errors: report.errors, warnings: report.warnings }, null, 2));
     process.exit(report.errors.length ? 1 : 0);
   }
@@ -194,6 +195,7 @@ if (["routes", "map-route", "validate-routes"].includes(command)) {
     process.exit(0);
   }
   const report = validateRoutes(frontend, root, { requireMap: true });
+  if (has("--export-report")) console.log(`Route Explorer snapshot: ${exportRouteReport(frontend, root).filename}`);
   console.log(JSON.stringify({ errors: report.errors, warnings: report.warnings, mappings: report.mappings.length, routes: report.routes.length, note: "Static validation is not a runtime or Django content-type existence check." }, null, 2));
   process.exit(report.errors.length || report.warnings.length ? 1 : 0);
 }
