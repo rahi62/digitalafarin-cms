@@ -59,7 +59,7 @@ class NestedSchemaTests(TestCase):
             "location": str(self.target.pk),
             "summary": {"heading": "Highlights", "enabled": True},
             "days": [{"title": "Day One", "nights": 2, "links": [{"url": "https://example.test"}]}],
-            "photos": ["/media/tour.jpg"],
+            "photos": ["https://example.test/gallery/tour.jpg"],
         }
 
     def test_nested_content_round_trip(self):
