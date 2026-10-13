@@ -11,6 +11,7 @@ import "../styles/site-settings.css";
 import "../styles/search-performance.css";
 import "../styles/seo-opportunities.css";
 import "../styles/professional-editor.css";
+import "../styles/route-explorer.css";
 import Shell from "@/components/Shell";
 
 export const metadata: Metadata = {
