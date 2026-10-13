@@ -147,3 +147,20 @@ export function validateRoutes(frontend, root, { requireMap = false } = {}) {
   }
   return { version: 1, routes, mappings: map.mappings, errors, warnings, checked: mapExists };
 }
+
+
+/** Export an explicit static source snapshot for the authenticated Admin Route Explorer. */
+export function exportRouteReport(frontend, root) {
+  const report = validateRoutes(frontend, root);
+  const filename = path.join(frontend, ".digitalafarin", "routes-report.json");
+  const snapshot = {
+    version: 1,
+    generated_at: new Date().toISOString(),
+    routes: report.routes, mappings: report.mappings,
+    errors: report.errors, warnings: report.warnings, mapped: report.checked,
+    note: "Static source snapshot; mapping intent is not runtime Django integration.",
+  };
+  fs.mkdirSync(path.dirname(filename), { recursive: true });
+  fs.writeFileSync(filename, JSON.stringify(snapshot, null, 2) + "\n");
+  return { filename, snapshot };
+}
