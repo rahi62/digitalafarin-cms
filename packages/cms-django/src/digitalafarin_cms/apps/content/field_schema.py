@@ -83,8 +83,8 @@ def validate_field_values(fields, values, site, depth=0):
         kind = field.get("type", "text")
         required = bool(field.get("required"))
         if value is None or value == "" or (kind in {"repeater", "gallery"} and value == []):
-            if required:
-                errors[key] = "Required field."
+            if required or (kind in {"repeater", "gallery"} and field.get("min_items", 0) > 0):
+                errors[key] = "Required field or minimum items missing."
             continue
         if kind in {"text", "textarea", "media"}:
             if not isinstance(value, str):
