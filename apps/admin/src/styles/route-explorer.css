@@ -21,3 +21,7 @@
 .routeExplorerEmpty { text-align:center; color:#667085; padding:26px 10px; }
 @media(max-width:900px){.routeExplorerStats{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:600px){.routeExplorerStats{grid-template-columns:1fr 1fr;gap:8px;}.routeExplorerStats strong{font-size:22px;}.routeExplorerToolbar{flex-direction:column;}.routeExplorerToolbar input,.routeExplorerToolbar select{width:100%;flex:auto;}.routeExplorerMappingHeader{align-items:flex-start;flex-direction:column;}}
+
+.routeExplorerMappingControls{display:flex;align-items:end;gap:14px;flex-wrap:wrap;}
+.routeExplorerMappingControls .field{margin:8px 0;min-width:190px;flex:1;}
+.routeExplorerMappingControls .field input,.routeExplorerMappingControls .field select{width:100%;}
