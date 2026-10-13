@@ -173,6 +173,7 @@ function embed() {
     "content-list.css",
     "dashboard.css",
     "sites.css",
+    "reusable-blocks.css",
   ].map((name) => `import "${styleRoot}/${name}";`).join("\n");
 
   fs.writeFileSync(
