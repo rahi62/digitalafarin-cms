@@ -1,0 +1,23 @@
+.routeExplorerNotice { padding:14px 18px; border:1px solid #fedf89; border-radius:12px; background:#fffaeb; color:#7a2e0e; line-height:1.9; }
+.routeExplorerStats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-top:16px; }
+.routeExplorerStats .panel { margin:0; display:grid; gap:10px; }
+.routeExplorerStats small { color:#667085; font-size:12px; }
+.routeExplorerStats strong { font-size:28px; color:#101828; }
+.routeExplorerMeta { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin:16px 0 0; color:#667085; font-size:12px; }
+.routeExplorerIssue { margin:8px 0; border-radius:10px; padding:12px; font-family:ui-monospace,Consolas,monospace; direction:ltr; text-align:left; overflow-wrap:anywhere; }
+.routeExplorerWarning { border:1px solid #fedf89; background:#fffaeb; color:#7a2e0e; }
+.routeExplorerToolbar { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+.routeExplorerToolbar input { flex:1 1 280px; min-width:0; }
+.routeExplorerToolbar input,.routeExplorerToolbar select,.routeExplorerMapping input { border:1px solid #d0d5dd; border-radius:9px; background:white; padding:10px 12px; }
+.routeExplorerFile { display:inline-block; max-width:320px; overflow:hidden; text-overflow:ellipsis; vertical-align:middle; font-size:12px; }
+.routeExplorerTable code { color:#1d2939; }
+.routeExplorerTable td { white-space:nowrap; }
+.routeExplorerTable button:disabled { cursor:not-allowed; opacity:.5; }
+.routeExplorerMappingHeader { display:flex; gap:10px; align-items:center; justify-content:space-between; }
+.routeExplorerMappingHeader h2 { margin:0; overflow-wrap:anywhere; }
+.routeExplorerMapping .field { max-width:340px; margin:16px 0; }
+.routeExplorerMapping p { font-size:13px; line-height:1.9; }
+.routeExplorerCommand { padding:14px; white-space:pre-wrap; overflow-wrap:anywhere; overflow:auto; border-radius:10px; color:#e4e7ec; background:#101828; }
+.routeExplorerEmpty { text-align:center; color:#667085; padding:26px 10px; }
+@media(max-width:900px){.routeExplorerStats{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:600px){.routeExplorerStats{grid-template-columns:1fr 1fr;gap:8px;}.routeExplorerStats strong{font-size:22px;}.routeExplorerToolbar{flex-direction:column;}.routeExplorerToolbar input,.routeExplorerToolbar select{width:100%;flex:auto;}.routeExplorerMappingHeader{align-items:flex-start;flex-direction:column;}}
