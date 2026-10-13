@@ -22,7 +22,7 @@ export default function NewContent() {
   const [submitting, setSubmitting] = useState(false);
   const [loadingError, setLoadingError] = useState("");
   const [singletonCheck, setSingletonCheck] = useState(false);
-  const [singletonExisting, setSingletonExisting] = useState<{ entry_id: string; title: string; path: string } | null>(null);
+  const [singletonExisting, setSingletonExisting] = useState<{ entry_id: string; title: string; path: string; trashed: boolean } | null>(null);
   const [f, setF] = useState<any>({
     site: "", content_type: "", title: "", slug: "", path: "", excerpt: "",
     status: "draft", parent: null, is_featured: false, categories: [], tags: [], custom_fields: {},
@@ -52,8 +52,8 @@ export default function NewContent() {
     if (!selectedType || selectedType.kind !== "singleton") { setSingletonExisting(null); setSingletonCheck(false); return; }
     let active = true;
     setSingletonExisting(null); setSingletonCheck(true);
-    apiFetch<{ exists: boolean; entry_id: string | null; title: string | null; path: string | null }>(`/content/types/${selectedType.id}/singleton-entry/`)
-      .then((result) => { if (active) setSingletonExisting(result.exists && result.entry_id ? { entry_id: result.entry_id, title: result.title || "", path: result.path || "" } : null); })
+    apiFetch<{ exists: boolean; entry_id: string | null; title: string | null; path: string | null; trashed: boolean }>(`/content/types/${selectedType.id}/singleton-entry/`)
+      .then((result) => { if (active) setSingletonExisting(result.exists && result.entry_id ? { entry_id: result.entry_id, title: result.title || "", path: result.path || "", trashed: result.trashed } : null); })
       .catch((cause) => { if (active) setLoadingError(cause instanceof Error ? cause.message : "بررسی صفحه یکتا ناموفق بود"); })
       .finally(() => { if (active) setSingletonCheck(false); });
     return () => { active = false; };
@@ -83,7 +83,7 @@ export default function NewContent() {
       <PageHeader title="محتوای جدید" description="ساخت پیش‌نویس یا ارسال برای بررسی؛ انتشار از گردش کار انجام می‌شود."
         action={<Link href={adminPath("/content")} className="btn secondary">بازگشت به محتواها</Link>} />
       <div className="cmsNewContentHint">۱. سایت و نوع محتوا را انتخاب کنید. ۲. عنوان، مسیر و محتوا را تنظیم کنید. ۳. پیش‌نویس را ایجاد کنید و سپس از صفحه ویرایش، سئو، اسکیما و انتشار را مدیریت کنید.</div>
-      {selectedType?.kind === "singleton" && <div className="cmsSingletonHint" role="status">{singletonCheck ? "در حال بررسی صفحه یکتا..." : singletonExisting ? <><strong>این صفحه یکتا قبلاً ساخته شده است.</strong> <Link href={adminPath(`/content/${singletonExisting.entry_id}`)} className="btn secondary small">ویرایش {singletonExisting.title || singletonExisting.path}</Link></> : "این نوع محتوا فقط یک صفحه دارد. آدرس آن را به‌صورت دستی تعیین کنید."}</div>}
+      {selectedType?.kind === "singleton" && <div className="cmsSingletonHint" role="status">{singletonCheck ? "در حال بررسی صفحه یکتا..." : singletonExisting ? <><strong>این صفحه یکتا قبلاً ساخته شده است.</strong> <Link href={adminPath(singletonExisting.trashed ? "/content/trash" : `/content/${singletonExisting.entry_id}`)} className="btn secondary small">{singletonExisting.trashed ? "بازیابی از سطل زباله" : `ویرایش ${singletonExisting.title || singletonExisting.path}`}</Link></> : "این نوع محتوا فقط یک صفحه دارد. آدرس آن را به‌صورت دستی تعیین کنید."}</div>}
       <form className="form" onSubmit={submit}>
         {loadingError && <div className="error" role="alert">{loadingError}</div>}
         {msg && <div className="error" role="alert">{msg}</div>}
