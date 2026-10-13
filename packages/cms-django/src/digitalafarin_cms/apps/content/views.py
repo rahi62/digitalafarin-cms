@@ -150,7 +150,26 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         entry = self.get_object()
         role = organization_role(request.user, entry.site.organization_id)
         can_publish = _publisher(request.user, entry)
+        live = PublishedEntry.objects.filter(entry=entry).first()
+        edited = False
+        if live:
+            from .publication import capture_publication
+            current, current_seo, current_schemas, _, _ = capture_publication(entry)
+            relevant = ("title", "slug", "path", "excerpt", "blocks", "custom_fields",
+                        "parent", "categories", "tags", "is_featured")
+            edited = any(current.get(key) != live.payload.get(key) for key in relevant)
+            if not edited:
+                ignored_seo = {"created_at", "updated_at", "analysis", "seo_score"}
+                clean = lambda value: {k: v for k, v in value.items() if k not in ignored_seo}
+                edited = clean(current_seo) != clean(live.seo)
+            if not edited:
+                reduced = lambda value: [(row.get("schema_type"), row.get("data"))
+                                         for row in value]
+                edited = reduced(current_schemas) != reduced(live.schemas)
         return Response({
+            "has_live_version": live is not None,
+            "has_unpublished_changes": edited,
+            "live_path": live.path if live else None,
             "role": role,
             "status": entry.status,
             "scheduled_at": entry.scheduled_at,
