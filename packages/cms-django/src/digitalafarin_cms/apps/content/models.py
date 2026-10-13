@@ -65,7 +65,6 @@ class ContentEntry(UUIDTimeStampedModel):
     def __str__(self): return self.title
     def save(self, *args, **kwargs):
         from .routing import validate_entry_route
-        from digitalafarin_cms.apps.seo.models import Redirect, SeoMeta
         with transaction.atomic():
             # Serializes route claims for one site, including legacy encoded aliases.
             Site.objects.select_for_update().get(pk=self.site_id)
@@ -74,20 +73,47 @@ class ContentEntry(UUIDTimeStampedModel):
             if kwargs.get("update_fields") is not None:
                 kwargs["update_fields"] = set(kwargs["update_fields"]) | {"path"}
             result = super().save(*args, **kwargs)
-            if previous and previous.path != self.path and (previous.published_at or previous.status == self.Status.PUBLISHED):
-                Redirect.objects.filter(site_id=self.site_id, destination_path=previous.path, is_active=True).update(destination_path=self.path)
-                Redirect.objects.update_or_create(site_id=self.site_id, source_path=previous.path,
-                    defaults={"destination_path": self.path, "redirect_type": "301", "is_active": True})
-                # Explicit external canonicals remain an SEO decision. Local self-canonicals follow moves.
-                from .views import frontend_base_for
-                base = frontend_base_for(self.site)
-                SeoMeta.objects.filter(entry=self, canonical_url=base + previous.path).update(canonical_url=base + self.path)
+            # Editing a published entry changes the working copy only. Route redirects and
+            # the public representation are changed exclusively by explicit publication.
+            if previous is None and self.status == self.Status.PUBLISHED:
+                from .publication import publish_snapshot
+                publish_snapshot(self)
             return result
+
     def publish(self):
-        self.status=self.Status.PUBLISHED
-        self.published_at=self.published_at or timezone.now()
-        self.scheduled_at=None
-        self.save(update_fields=["status","published_at","scheduled_at","updated_at"])
+        from .publication import publish_snapshot
+        with transaction.atomic():
+            self.status = self.Status.PUBLISHED
+            self.published_at = self.published_at or timezone.now()
+            self.scheduled_at = None
+            self.save(update_fields=["status", "published_at", "scheduled_at", "updated_at"])
+            publish_snapshot(self)
+
+
+class PublishedEntry(UUIDTimeStampedModel):
+    """Immutable-to-public working-copy projection, atomically replaced on publish."""
+    entry = models.OneToOneField(ContentEntry, on_delete=models.CASCADE, related_name="published_copy")
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name="published_entries")
+    content_type = models.ForeignKey(ContentTypeDefinition, on_delete=models.PROTECT, related_name="published_entries")
+    path = models.CharField(max_length=500)
+    title = models.CharField(max_length=255)
+    excerpt = models.TextField(blank=True)
+    published_at = models.DateTimeField()
+    payload = models.JSONField(default=dict)
+    seo = models.JSONField(default=dict, blank=True)
+    schemas = models.JSONField(default=list, blank=True)
+    category_slugs = models.JSONField(default=list, blank=True)
+    tag_slugs = models.JSONField(default=list, blank=True)
+    is_indexable = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["site", "path"], name="unique_published_site_path"),
+        ]
+        indexes = [
+            models.Index(fields=["site", "-published_at"], name="cms_published_site_time"),
+        ]
+
 
 class ContentRevision(UUIDTimeStampedModel):
     entry=models.ForeignKey(ContentEntry,on_delete=models.CASCADE,related_name="revisions")
