@@ -65,6 +65,9 @@ class ContentEntry(UUIDTimeStampedModel):
     published_at=models.DateTimeField(null=True,blank=True)
     scheduled_at=models.DateTimeField(null=True,blank=True)
     is_featured=models.BooleanField(default=False)
+    deleted_at=models.DateTimeField(null=True,blank=True,db_index=True)
+    deleted_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,
+                                 on_delete=models.SET_NULL,related_name="cms_trashed_entries")
     class Meta:
         constraints=[models.UniqueConstraint(fields=["site","path"],name="unique_entry_site_path")]
         ordering=["-published_at","-created_at"]
