@@ -15,6 +15,7 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   await page.addInitScript((token) => localStorage.setItem('cms_access_token', token), auth.access);
   await page.goto('/cms/route-explorer');
   await expect(page.getByRole('heading', { name: 'کاوشگر مسیرها' })).toBeVisible();
+  await expect(page.locator('#host-panel')).toHaveCSS('border-top-width', '0px'); // CMS .panel rules must not style host elements.
   await expect(page.locator('div.error[role="alert"]')).toContainText('No route report exported');
   // Explicit source snapshot export makes the same authenticated endpoint useful.
   const fixtureRoot = readFileSync('.tmp/host-integration/active-path.txt', 'utf8').trim();
