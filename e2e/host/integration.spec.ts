@@ -4,6 +4,15 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   const api = 'http://127.0.0.1:8197/api/cms/v1';
   const auth = await (await request.post(api + '/auth/token/', { data: { username: 'host-owner', password: 'fixture-password' } })).json();
   const headers = { Authorization: `Bearer ${auth.access}` };
+  // Route Explorer report is private and missing snapshots are reported truthfully.
+  expect((await request.get('/cms/route-explorer/report')).status()).toBe(401);
+  const routeReport = await request.get('/cms/route-explorer/report', { headers });
+  expect(routeReport.status()).toBe(404);
+  expect((await routeReport.json()).detail).toContain('No route report exported');
+  await page.addInitScript((token) => localStorage.setItem('cms_access_token', token), auth.access);
+  await page.goto('/cms/route-explorer');
+  await expect(page.getByRole('heading', { name: 'کاوشگر مسیرها' })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('No route report exported');
   const sites = await (await request.get(api + '/sites/', { headers })).json();
   const site = sites.results[0];
   const types = await (await request.get(api + '/content/types/', { headers })).json();
