@@ -175,6 +175,7 @@ function embed() {
     "sites.css",
     "reusable-blocks.css",
     "editor-navigation.css",
+    "team.css",
   ].map((name) => `import "${styleRoot}/${name}";`).join("\n");
 
   fs.writeFileSync(
