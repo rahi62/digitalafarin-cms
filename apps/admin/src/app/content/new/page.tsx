@@ -13,7 +13,7 @@ import { apiFetch, Paginated } from "@/lib/api";
 import { adminPath } from "@/lib/admin-path";
 
 type Site = { id: string; name: string };
-type ContentType = ContentRouting & { id: string; site: string; name: string; slug: string; schema: ContentTypeSchema };
+type ContentType = ContentRouting & { id: string; site: string; name: string; slug: string; kind?: "singleton" | "collection"; schema: ContentTypeSchema };
 
 export default function NewContent() {
   const [sites, setSites] = useState<Site[]>([]);
@@ -21,6 +21,8 @@ export default function NewContent() {
   const [msg, setMsg] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loadingError, setLoadingError] = useState("");
+  const [singletonCheck, setSingletonCheck] = useState(false);
+  const [singletonExisting, setSingletonExisting] = useState<{ entry_id: string; title: string; path: string } | null>(null);
   const [f, setF] = useState<any>({
     site: "", content_type: "", title: "", slug: "", path: "", excerpt: "",
     status: "draft", parent: null, is_featured: false, categories: [], tags: [], custom_fields: {},
@@ -46,6 +48,17 @@ export default function NewContent() {
     }
   }, [f.site, siteTypes, f.content_type]);
 
+  useEffect(() => {
+    if (!selectedType || selectedType.kind !== "singleton") { setSingletonExisting(null); setSingletonCheck(false); return; }
+    let active = true;
+    setSingletonExisting(null); setSingletonCheck(true);
+    apiFetch<{ exists: boolean; entry_id: string | null; title: string | null; path: string | null }>(`/content/types/${selectedType.id}/singleton-entry/`)
+      .then((result) => { if (active) setSingletonExisting(result.exists && result.entry_id ? { entry_id: result.entry_id, title: result.title || "", path: result.path || "" } : null); })
+      .catch((cause) => { if (active) setLoadingError(cause instanceof Error ? cause.message : "بررسی صفحه یکتا ناموفق بود"); })
+      .finally(() => { if (active) setSingletonCheck(false); });
+    return () => { active = false; };
+  }, [selectedType?.id, selectedType?.kind]);
+
   function selectType(typeId: string) {
     const type = types.find((item) => item.id === typeId);
     setF({ ...f, content_type: typeId, path_mode: type?.entry_path_pattern ? "auto" : "manual", custom_fields: customFieldDefaults(type?.schema) });
@@ -55,6 +68,7 @@ export default function NewContent() {
     e.preventDefault();
     setMsg("");
     if (!f.site || !f.content_type || !f.title.trim()) { setMsg("سایت، نوع محتوا و عنوان الزامی هستند."); return; }
+    if (selectedType?.kind === "singleton" && (singletonCheck || singletonExisting)) { setMsg("این صفحه یکتا قبلاً ساخته شده است. از صفحه ویرایش آن استفاده کنید."); return; }
     setSubmitting(true);
     try {
       const d: any = await apiFetch("/content/entries/", { method: "POST", body: JSON.stringify(f) });
@@ -69,6 +83,7 @@ export default function NewContent() {
       <PageHeader title="محتوای جدید" description="ساخت پیش‌نویس یا ارسال برای بررسی؛ انتشار از گردش کار انجام می‌شود."
         action={<Link href={adminPath("/content")} className="btn secondary">بازگشت به محتواها</Link>} />
       <div className="cmsNewContentHint">۱. سایت و نوع محتوا را انتخاب کنید. ۲. عنوان، مسیر و محتوا را تنظیم کنید. ۳. پیش‌نویس را ایجاد کنید و سپس از صفحه ویرایش، سئو، اسکیما و انتشار را مدیریت کنید.</div>
+      {selectedType?.kind === "singleton" && <div className="cmsSingletonHint" role="status">{singletonCheck ? "در حال بررسی صفحه یکتا..." : singletonExisting ? <><strong>این صفحه یکتا قبلاً ساخته شده است.</strong> <Link href={adminPath(`/content/${singletonExisting.entry_id}`)} className="btn secondary small">ویرایش {singletonExisting.title || singletonExisting.path}</Link></> : "این نوع محتوا فقط یک صفحه دارد. آدرس آن را به‌صورت دستی تعیین کنید."}</div>}
       <form className="form" onSubmit={submit}>
         {loadingError && <div className="error" role="alert">{loadingError}</div>}
         {msg && <div className="error" role="alert">{msg}</div>}
@@ -87,7 +102,7 @@ export default function NewContent() {
           <CustomFieldsEditor schema={selectedType?.schema} value={f.custom_fields || {}} siteId={f.site} onChange={(custom_fields) => setF({ ...f, custom_fields })} />
           <div className="field full contentEditorField"><label>محتوا</label><ProfessionalEditor siteId={f.site} value={f.blocks} onChange={(blocks) => setF({ ...f, blocks })} /></div>
         </div>
-        <div className="actions cmsNewContentActions"><button className="btn" disabled={submitting || !f.site || !f.content_type || !f.title.trim()}>{submitting ? "در حال ایجاد..." : "ایجاد محتوا"}</button>
+        <div className="actions cmsNewContentActions"><button className="btn" disabled={submitting || !f.site || !f.content_type || !f.title.trim() || (selectedType?.kind === "singleton" && (singletonCheck || Boolean(singletonExisting)))}>{submitting ? "در حال ایجاد..." : "ایجاد محتوا"}</button>
           <Link className="btn secondary" href={adminPath("/content")}>انصراف</Link></div>
       </form>
     </>
