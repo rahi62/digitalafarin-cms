@@ -146,7 +146,8 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
             raise PermissionDenied("Use the editorial workflow to change a published or scheduled state.")
 
         saved = serializer.save()
-        create_revision(saved, self.request.user, "Updated")
+        is_autosave = self.request.headers.get("X-CMS-Autosave") == "1"
+        create_revision(saved, self.request.user, "Updated", coalesce_autosave=is_autosave)
 
     @action(detail=True, methods=["get"])
     def workflow(self, request, pk=None):
