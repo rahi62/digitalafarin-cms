@@ -14,6 +14,7 @@ import "../styles/professional-editor.css";
 import "../styles/route-explorer.css";
 import "../styles/content-list.css";
 import "../styles/dashboard.css";
+import "../styles/sites.css";
 import Shell from "@/components/Shell";
 
 export const metadata: Metadata = {
