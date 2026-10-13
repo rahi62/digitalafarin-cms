@@ -31,6 +31,8 @@ class MembershipSerializer(serializers.ModelSerializer):
         model = Membership
         fields = "__all__"
         extra_kwargs = {"user": {"required": False}}
+        # Username resolves to user after field validation; the DB unique constraint remains authoritative.
+        validators = []
 
     def validate(self, attrs):
         request = self.context.get("request")
