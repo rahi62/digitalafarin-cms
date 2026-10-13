@@ -67,9 +67,10 @@ class RelationDeletionProtectionTests(TestCase):
         ).status_code, 200)
         self.source.custom_fields = {"days": []}
         self.source.save()
-        blocked = self.delete_target()
-        self.assertEqual(blocked.status_code, 400)
-        self.assertTrue(ContentEntry.objects.filter(pk=self.target.pk).exists())
+        # DELETE is now recoverable Trash; live publication is withdrawn atomically.
+        trashed = self.delete_target()
+        self.assertEqual(trashed.status_code, 204, trashed.data)
+        self.assertTrue(ContentEntry.objects.filter(pk=self.target.pk, deleted_at__isnull=False).exists())
 
     def test_target_type_slug_change_and_delete_blocked(self):
         res = self.client.patch(f"/api/cms/v1/content/types/{self.target_type.pk}/", {
