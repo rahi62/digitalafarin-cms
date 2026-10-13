@@ -114,7 +114,7 @@ def validate_field_values(fields, values, site, depth=0):
                 option if isinstance(option, str) else option["value"]
                 for option in field.get("options", [])
             }
-            if value not in allowed if isinstance(value, str) else True:
+            if not isinstance(value, str) or value not in allowed:
                 errors[key] = "Select a configured option."
         elif kind == "group":
             if not isinstance(value, dict):
@@ -172,11 +172,24 @@ def find_breaking_schema_changes(old_fields, next_fields, prefix=""):
             errors.append(f"{path}: changing a field type needs a migration")
         elif old.get("type") == "relation" and old.get("target_content_type") != new.get("target_content_type"):
             errors.append(f"{path}: changing relationship target needs a migration")
-        elif old.get("type") in {"group", "repeater"}:
+        elif old.get("type") == "select":
+            def choices(field):
+                return {item if isinstance(item, str) else item.get("value")
+                        for item in field.get("options", [])}
+            if not choices(old).issubset(choices(new)):
+                errors.append(f"{path}: removing select options needs a migration")
+        elif old.get("type") in {"repeater", "gallery"} and (
+            new.get("min_items", 0) > old.get("min_items", 0)
+            or new.get("max_items", MAX_ITEMS) < old.get("max_items", MAX_ITEMS)
+        ):
+            errors.append(f"{path}: tightening item count limits needs a migration")
+        if new is not None and new.get("required") and not old.get("required"):
+            errors.append(f"{path}: making an existing field required needs a migration")
+        if new is not None and old.get("type") in {"group", "repeater"} and new.get("type") == old.get("type"):
             errors.extend(find_breaking_schema_changes(
                 old.get("fields", []), new.get("fields", []), prefix=f"{path}.",
             ))
     for key, new in next_by_key.items():
-        if key not in old_by_key and new.get("required") and new.get("default") in (None, ""):
-            errors.append(f"{prefix}{key}: a new required field needs a default or migration")
+        if key not in old_by_key and new.get("required"):
+            errors.append(f"{prefix}{key}: a new required field needs a migration for existing entries")
     return errors
