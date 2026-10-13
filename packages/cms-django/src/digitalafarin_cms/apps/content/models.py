@@ -64,6 +64,8 @@ class ContentEntry(UUIDTimeStampedModel):
         ordering=["-published_at","-created_at"]
     def __str__(self): return self.title
     def save(self, *args, **kwargs):
+        if self._state.adding and self.status == self.Status.PUBLISHED and self.published_at is None:
+            self.published_at = timezone.now()
         from .routing import validate_entry_route
         with transaction.atomic():
             # Serializes route claims for one site, including legacy encoded aliases.
