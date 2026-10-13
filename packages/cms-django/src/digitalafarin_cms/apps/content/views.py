@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
@@ -202,11 +203,12 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         entry = self.get_object()
         if entry.status in PROTECTED_STATUSES:
             _require_publisher(request.user, entry)
-        entry.status = ContentEntry.Status.DRAFT
-        entry.scheduled_at = None
-        entry.save(update_fields=["status", "scheduled_at", "updated_at"])
-        PublishedEntry.objects.filter(entry=entry).delete()
-        create_revision(entry, request.user, "Returned to draft")
+        with transaction.atomic():
+            entry.status = ContentEntry.Status.DRAFT
+            entry.scheduled_at = None
+            entry.save(update_fields=["status", "scheduled_at", "updated_at"])
+            PublishedEntry.objects.filter(entry=entry).delete()
+            create_revision(entry, request.user, "Returned to draft")
         return Response(self.get_serializer(entry).data)
 
     @action(detail=True, methods=["post"])
