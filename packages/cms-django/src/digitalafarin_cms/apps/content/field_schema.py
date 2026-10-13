@@ -193,3 +193,12 @@ def find_breaking_schema_changes(old_fields, next_fields, prefix=""):
         if key not in old_by_key and new.get("required"):
             errors.append(f"{prefix}{key}: a new required field needs a migration for existing entries")
     return errors
+
+
+def relation_targets(fields):
+    """Yield declared target content type slugs at every nesting level."""
+    for field in fields:
+        if field.get("type") == "relation":
+            yield field["target_content_type"]
+        if field.get("type") in {"group", "repeater"}:
+            yield from relation_targets(field.get("fields", []))
