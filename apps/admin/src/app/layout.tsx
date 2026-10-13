@@ -17,6 +17,7 @@ import "../styles/dashboard.css";
 import "../styles/sites.css";
 import "../styles/reusable-blocks.css";
 import "../styles/editor-navigation.css";
+import "../styles/team.css";
 import Shell from "@/components/Shell";
 
 export const metadata: Metadata = {
