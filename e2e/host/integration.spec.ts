@@ -89,6 +89,12 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   await expect(page.getByRole('heading', { name: entry.title })).toHaveCount(0);
   const changed = await request.patch(`${api}/content/entries/${entry.id}/`, { headers, data: { slug: 'renamed', title: 'Changed immediately' } });
   expect(changed.ok()).toBeTruthy();
+  // The published page remains unchanged until explicit republishing.
+  await page.goto(entry.path);
+  await expect(page.getByRole('heading', { name: entry.title })).toBeVisible();
+  expect(decodeURI(new URL(page.url()).pathname)).toContain(entry.path.replace(/\/$/, ''));
+  expect((await request.get('/blog/renamed')).status()).toBe(404);
+  expect((await request.post(`${api}/content/entries/${entry.id}/publish/`, { headers })).ok()).toBeTruthy();
   await page.goto(entry.path);
   await expect(page).toHaveURL(/\/blog\/renamed\/?$/);
   await expect(page.getByRole('heading', { name: 'Changed immediately' })).toBeVisible();

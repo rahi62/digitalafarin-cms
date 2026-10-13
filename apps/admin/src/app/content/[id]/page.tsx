@@ -130,7 +130,7 @@ export default function EditContent() {
     cancelAutosaveTimer();
     autosaveTimer.current = setTimeout(() => {
       autosaveTimer.current = null;
-      void saveEntry(false, f).catch(() => undefined);
+      void saveEntry(false, f, true).catch(() => undefined);
     }, 2500);
 
     return cancelAutosaveTimer;
@@ -148,7 +148,7 @@ export default function EditContent() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [f, saveState]);
 
-  function saveEntry(showMessage = true, entrySnapshot = f) {
+  function saveEntry(showMessage = true, entrySnapshot = f, autosave = false) {
     if (!entrySnapshot) return Promise.resolve(null);
 
     const body = payloadFor(entrySnapshot);
@@ -159,6 +159,7 @@ export default function EditContent() {
       .catch(() => undefined)
       .then(() => apiFetch<any>(`/content/entries/${id}/`, {
         method: "PUT",
+        headers: autosave ? { "X-CMS-Autosave": "1" } : {},
         body: JSON.stringify(body),
       }))
       .then((saved) => {

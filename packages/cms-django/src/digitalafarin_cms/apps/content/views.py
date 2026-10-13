@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
@@ -22,11 +23,11 @@ from digitalafarin_cms.apps.common.tenancy import (
 from digitalafarin_cms.apps.seo.models import SchemaMarkup, SeoMeta
 from digitalafarin_cms.apps.seo.serializers import SchemaMarkupSerializer, SeoMetaSerializer
 from digitalafarin_cms.apps.sites.models import Membership, Site
-from .models import Category, ContentEntry, ContentRevision, ContentTypeDefinition, Menu, ReusableBlock, Tag
+from .models import Category, ContentEntry, ContentRevision, ContentTypeDefinition, Menu, PublishedEntry, ReusableBlock, Tag
 from .serializers import CategorySerializer, ContentEntrySerializer, ContentRevisionSerializer, ContentTypeSerializer, MenuSerializer, ReusableBlockSerializer, TagSerializer
 from .services import create_revision
 from .routing import normalize_path
-from .public import PublicEntrySerializer, public_entries
+from .public import PublicEntrySerializer, public_entries, published_content
 from digitalafarin_cms.media import normalize_media_data
 
 
@@ -139,18 +140,40 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 
         if entry.status in PROTECTED_STATUSES and not _publisher(self.request.user, entry):
             raise PermissionDenied("Only publishing roles can edit published or scheduled content.")
-        if requested_status in PROTECTED_STATUSES and requested_status != entry.status:
-            raise PermissionDenied("Use the publish or schedule workflow action for this transition.")
+        if requested_status != entry.status and (
+            requested_status in PROTECTED_STATUSES or entry.status in PROTECTED_STATUSES
+        ):
+            raise PermissionDenied("Use the editorial workflow to change a published or scheduled state.")
 
         saved = serializer.save()
-        create_revision(saved, self.request.user, "Updated")
+        is_autosave = self.request.headers.get("X-CMS-Autosave") == "1"
+        create_revision(saved, self.request.user, "Updated", coalesce_autosave=is_autosave)
 
     @action(detail=True, methods=["get"])
     def workflow(self, request, pk=None):
         entry = self.get_object()
         role = organization_role(request.user, entry.site.organization_id)
         can_publish = _publisher(request.user, entry)
+        live = PublishedEntry.objects.filter(entry=entry).first()
+        edited = False
+        if live:
+            from .publication import capture_publication
+            current, current_seo, current_schemas, _, _ = capture_publication(entry)
+            relevant = ("title", "slug", "path", "excerpt", "blocks", "custom_fields",
+                        "parent", "categories", "tags", "is_featured")
+            edited = any(current.get(key) != live.payload.get(key) for key in relevant)
+            if not edited:
+                ignored_seo = {"created_at", "updated_at", "analysis", "seo_score"}
+                clean = lambda value: {k: v for k, v in value.items() if k not in ignored_seo}
+                edited = clean(current_seo) != clean(live.seo)
+            if not edited:
+                reduced = lambda value: [(row.get("schema_type"), row.get("data"))
+                                         for row in value]
+                edited = reduced(current_schemas) != reduced(live.schemas)
         return Response({
+            "has_live_version": live is not None,
+            "has_unpublished_changes": edited,
+            "live_path": live.path if live else None,
             "role": role,
             "status": entry.status,
             "scheduled_at": entry.scheduled_at,
@@ -181,10 +204,12 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         entry = self.get_object()
         if entry.status in PROTECTED_STATUSES:
             _require_publisher(request.user, entry)
-        entry.status = ContentEntry.Status.DRAFT
-        entry.scheduled_at = None
-        entry.save(update_fields=["status", "scheduled_at", "updated_at"])
-        create_revision(entry, request.user, "Returned to draft")
+        with transaction.atomic():
+            entry.status = ContentEntry.Status.DRAFT
+            entry.scheduled_at = None
+            entry.save(update_fields=["status", "scheduled_at", "updated_at"])
+            PublishedEntry.objects.filter(entry=entry).delete()
+            create_revision(entry, request.user, "Returned to draft")
         return Response(self.get_serializer(entry).data)
 
     @action(detail=True, methods=["post"])
@@ -355,53 +380,77 @@ def _resolve_path(request):
             return Response({"detail": "Preview content not found"}, status=404)
     else:
         try:
-            entry = public_entries(site).select_related("site", "content_type", "author", "parent").prefetch_related("categories", "tags").filter(
+            published = public_entries(site).select_related("site", "content_type").filter(
                 Q(path=path) | Q(path=raw_path) | Q(path=path.rstrip("/") or "/")
             ).order_by("path").first()
-            if entry is None:
-                # Compatibility fallback for legacy encoded/NFD paths, without rewriting stored URLs.
-                for entry_id, stored_path in public_entries(site).values_list("pk", "path").iterator():
+            if published is None:
+                # Compatibility with NFD/encoded URLs, without mutating legacy published paths.
+                for item in public_entries(site).select_related("site", "content_type").iterator():
                     try:
-                        matches = normalize_path(stored_path) == path
+                        matches = normalize_path(item.path) == path
                     except ValidationError:
                         matches = False
                     if matches:
-                        entry = public_entries(site).select_related("site", "content_type", "author", "parent").prefetch_related("categories", "tags").get(pk=entry_id)
+                        published = item
                         break
-            if entry is None:
+            if published is None:
                 raise ContentEntry.DoesNotExist
         except ContentEntry.DoesNotExist:
             return Response({"detail": "Content not found"}, status=404)
 
-    seo = SeoMeta.objects.filter(entry=entry).first()
-    schemas = SchemaMarkup.objects.filter(entry=entry, is_active=True)
-    related = public_entries(site).filter(content_type=entry.content_type).exclude(pk=entry.pk)[:4]
-
+    related = public_entries(site).filter(
+        content_type_id=(entry.content_type_id if "preview" in request.query_params else published.content_type_id),
+    )
+    if "preview" in request.query_params:
+        related = related.exclude(entry_id=entry.pk)
+    else:
+        related = related.exclude(pk=published.pk)
+    related = related.order_by("-published_at")[:4]
     chain = []
-    current = entry
     seen = set()
-    while current and current.pk not in seen:
-        seen.add(current.pk)
-        if current.site_id != site.id:
-            break
-        if current.pk == entry.pk or (current.status == ContentEntry.Status.PUBLISHED and current.content_type.is_public):
+
+    if "preview" in request.query_params:
+        seo = SeoMeta.objects.filter(entry=entry).first()
+        schemas = SchemaMarkup.objects.filter(entry=entry, is_active=True)
+        current = entry
+        while current and current.pk not in seen:
+            seen.add(current.pk)
+            if current.site_id != site.id:
+                break
+            if current.pk == entry.pk or (current.status == ContentEntry.Status.PUBLISHED and current.content_type.is_public):
+                chain.append({"title": current.title, "path": current.path})
+            current = current.parent
+        content = ContentEntrySerializer(entry).data
+        blocks = normalize_media_data(entry.blocks)
+        seo_data = normalize_media_data(SeoMetaSerializer(seo).data) if seo else None
+        schema_data = SchemaMarkupSerializer(schemas, many=True).data
+    else:
+        current = published
+        while current and current.entry_id not in seen:
+            seen.add(current.entry_id)
             chain.append({"title": current.title, "path": current.path})
-        current = current.parent
+            parent_id = current.payload.get("parent")
+            current = public_entries(site).filter(entry_id=parent_id).first() if parent_id else None
+        content = published_content(published)
+        blocks = normalize_media_data(published.payload.get("blocks", []))
+        seo_data = normalize_media_data(published.seo) if published.seo else None
+        schema_data = normalize_media_data(published.schemas)
 
     return Response({
-        "preview": bool(preview_token),
+        "preview": "preview" in request.query_params,
         "site": {"name": site.name, "domain": site.domain, "language": site.default_language},
-        "content": ContentEntrySerializer(entry).data,
-        "blocks": normalize_media_data(entry.blocks),
-        "seo": normalize_media_data(SeoMetaSerializer(seo).data) if seo else None,
-        "schemas": SchemaMarkupSerializer(schemas, many=True).data,
+        "content": content,
+        "blocks": blocks,
+        "seo": seo_data,
+        "schemas": schema_data,
         "breadcrumbs": list(reversed(chain)),
         "related_content": [
-            {"id": str(item.id), "title": item.title, "path": item.path, "excerpt": item.excerpt}
-            for item in related
+            {
+                "id": str(item.entry_id), "title": item.title,
+                "path": item.path, "excerpt": item.excerpt,
+            } for item in related
         ],
     })
-
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
@@ -411,10 +460,10 @@ def sitemap(request):
         site = Site.objects.get(domain=domain, is_active=True)
     except Site.DoesNotExist:
         return HttpResponse("Site not found", status=404)
-    entries = public_entries(site).exclude(seo_meta__robots_index=False).order_by("path")
+    entries = public_entries(site).filter(is_indexable=True).order_by("path")
     base = frontend_base_for(site)
     rows = [
-        f"<url><loc>{xml_escape(base + entry.path)}</loc><lastmod>{entry.updated_at.date().isoformat()}</lastmod></url>"
+        f"<url><loc>{xml_escape(base + entry.path)}</loc><lastmod>{entry.published_at.date().isoformat()}</lastmod></url>"
         for entry in entries
     ]
     xml = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + "".join(rows) + "</urlset>"

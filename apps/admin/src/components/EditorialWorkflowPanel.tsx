@@ -5,6 +5,9 @@ import { apiFetch } from "@/lib/api";
 
 type Workflow = {
   role: string | null;
+  has_live_version: boolean;
+  has_unpublished_changes: boolean;
+  live_path: string | null;
   status: string;
   scheduled_at: string | null;
   published_at: string | null;
@@ -65,6 +68,7 @@ export default function EditorialWorkflowPanel({ entryId, onUpdated, beforeActio
   useEffect(() => { load(); }, [entryId]);
 
   async function run(action: string, body: Record<string, unknown> = {}, success = "وضعیت محتوا به‌روزرسانی شد") {
+    if (action === "return-draft" && workflow?.has_live_version && !window.confirm("این کار نسخه زنده سایت را از دسترس عموم خارج می‌کند. مطمئن هستید؟")) return;
     setBusy(action);
     setMessage("");
     try {
@@ -113,6 +117,13 @@ export default function EditorialWorkflowPanel({ entryId, onUpdated, beforeActio
 
       {message && <div className={message.includes("خطا") || message.includes("نامعتبر") || message.includes("انتخاب") ? "error" : "notice"}>{message}</div>}
 
+      {workflow.has_live_version && (
+        <div className="editorialLiveVersion" role="status">
+          <strong>نسخه عمومی سایت محفوظ است</strong>
+          <span>{workflow.has_unpublished_changes ? "تغییرات ذخیره‌شده در نسخه ویرایشی هنوز منتشر نشده‌اند. برای اعمال در سایت، «انتشار اکنون» را انتخاب کنید." : "این محتوا نسخه منتشرشده جداگانه دارد. ویرایش‌ها تا انتشار مجدد وارد سایت نمی‌شوند."}</span>
+          {workflow.live_path && <code dir="ltr">{workflow.live_path}</code>}
+        </div>
+      )}
       <div className="workflowFacts">
         <span><small>آخرین انتشار</small><strong>{dateLabel(workflow.published_at)}</strong></span>
         <span><small>زمان‌بندی</small><strong>{dateLabel(workflow.scheduled_at)}</strong></span>
@@ -126,8 +137,8 @@ export default function EditorialWorkflowPanel({ entryId, onUpdated, beforeActio
         {workflow.can_return_draft && workflow.status !== "draft" && (
           <button type="button" className="btn secondary" disabled={Boolean(busy)} onClick={() => run("return-draft", {}, "به Draft برگشت")}>بازگشت به Draft</button>
         )}
-        {workflow.can_publish && workflow.status !== "published" && (
-          <button type="button" className="btn" disabled={Boolean(busy)} onClick={() => run("publish", {}, "منتشر شد")}>انتشار اکنون</button>
+        {workflow.can_publish && (
+          <button type="button" className="btn" disabled={Boolean(busy)} onClick={() => run("publish", {}, workflow.has_live_version ? "نسخه عمومی به‌روزرسانی شد" : "منتشر شد")}>{workflow.has_live_version ? "انتشار تغییرات" : "انتشار اکنون"}</button>
         )}
         {workflow.can_unschedule && (
           <button type="button" className="btn dangerBtn" disabled={Boolean(busy)} onClick={() => run("unschedule", {}, "زمان‌بندی لغو شد")}>لغو زمان‌بندی</button>

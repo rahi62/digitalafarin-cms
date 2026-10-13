@@ -1,3 +1,4 @@
+"""Public content reads only published snapshots, never mutable editor fields."""
 from django.db.models import Q
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
@@ -6,37 +7,36 @@ from rest_framework import serializers
 
 from digitalafarin_cms.media import normalize_media_data
 from digitalafarin_cms.apps.sites.models import Site
-from .models import ContentEntry
+from .models import PublishedEntry
 
 
 def public_entries(site):
-    return ContentEntry.objects.filter(site=site, site__is_active=True, site__organization__is_active=True,
-        content_type__site=site, content_type__is_public=True, status=ContentEntry.Status.PUBLISHED)
+    return PublishedEntry.objects.filter(
+        site=site, site__is_active=True, site__organization__is_active=True,
+        content_type__site=site, content_type__is_public=True,
+    )
 
 
-class PublicEntrySerializer(serializers.ModelSerializer):
-    content_type_slug = serializers.CharField(source="content_type.slug", read_only=True)
-    url = serializers.SerializerMethodField()
-    categories = serializers.SerializerMethodField()
-    tags = serializers.SerializerMethodField()
+def published_content(item):
+    """Retain the resolver's established content shape and same-origin media resolution."""
+    from .views import frontend_base_for
+    content = dict(item.payload)
+    content["url"] = frontend_base_for(item.site) + item.path
+    return normalize_media_data(content)
 
-    class Meta:
-        model = ContentEntry
-        fields = ["id", "title", "slug", "path", "url", "excerpt", "status", "blocks", "custom_fields",
-                  "content_type_slug", "published_at", "updated_at", "is_featured", "categories", "tags"]
 
-    def get_url(self, obj):
-        from .views import frontend_base_for
-        return frontend_base_for(obj.site) + obj.path
-
-    def get_categories(self, obj):
-        return [{"id": str(x.pk), "name": x.name, "slug": x.slug} for x in obj.categories.all() if x.site_id == obj.site_id]
-
-    def get_tags(self, obj):
-        return [{"id": str(x.pk), "name": x.name, "slug": x.slug} for x in obj.tags.all() if x.site_id == obj.site_id]
-
-    def to_representation(self, instance):
-        return normalize_media_data(super().to_representation(instance))
+class PublicEntrySerializer(serializers.BaseSerializer):
+    def to_representation(self, item):
+        payload = item.payload
+        fields = (
+            "id", "title", "slug", "path", "excerpt", "status", "blocks", "custom_fields",
+            "content_type_slug", "published_at", "updated_at", "is_featured",
+        )
+        result = {key: payload.get(key) for key in fields}
+        result["url"] = published_content(item)["url"]
+        result["categories"] = payload.get("category_details", [])
+        result["tags"] = payload.get("tag_details", [])
+        return normalize_media_data(result)
 
 
 @api_view(["GET"])
@@ -49,6 +49,7 @@ def list_public_entries(request):
     site = Site.objects.filter(domain=domain, is_active=True).first()
     if not site:
         return Response({"detail": "Site not found"}, status=404)
+
     try:
         page = int(request.query_params.get("page", 1))
         size = int(request.query_params.get("page_size", 20))
@@ -56,22 +57,35 @@ def list_public_entries(request):
             raise ValueError
     except (ValueError, TypeError):
         return Response({"detail": "page must be positive and page_size must be between 1 and 100"}, status=400)
-    entries = public_entries(site).select_related("site", "content_type").prefetch_related("categories", "tags")
+
+    entries = public_entries(site).select_related("site", "content_type")
     if kind := request.query_params.get("content_type"):
-        entries = entries.filter(content_type__slug=kind)
+        entries = entries.filter(payload__content_type_slug=kind)
     if search := request.query_params.get("search"):
         entries = entries.filter(Q(title__icontains=search) | Q(excerpt__icontains=search))
-    if category := request.query_params.get("category"):
-        entries = entries.filter(categories__site=site, categories__slug=category)
-    if tag := request.query_params.get("tag"):
-        entries = entries.filter(tags__site=site, tags__slug=tag)
-    entries = entries.distinct().order_by("-published_at", "-created_at", "id")
+
+    category = request.query_params.get("category")
+    tag = request.query_params.get("tag")
+    if category or tag:
+        # JSON array containment is not supported by all installed Django DBs.
+        # Filter frozen category/tag slugs, never the mutable editorial relations.
+        valid_ids = [
+            pk for pk, categories, tags in entries.values_list(
+                "pk", "category_slugs", "tag_slugs"
+            ).iterator() if (not category or category in categories) and (not tag or tag in tags)
+        ]
+        entries = entries.filter(pk__in=valid_ids)
+
+    entries = entries.order_by("-published_at", "-created_at", "id")
     count = entries.count()
     offset = (page - 1) * size
     if page > 1 and offset >= count:
         return Response({"detail": "Page not found"}, status=404)
-    response = Response({"count": count, "page": page, "page_size": size,
-        "next": page + 1 if offset + size < count else None, "previous": page - 1 if page > 1 else None,
-        "results": PublicEntrySerializer(entries[offset:offset + size], many=True).data})
+    response = Response({
+        "count": count, "page": page, "page_size": size,
+        "next": page + 1 if offset + size < count else None,
+        "previous": page - 1 if page > 1 else None,
+        "results": PublicEntrySerializer(entries[offset:offset + size], many=True).data,
+    })
     response["Cache-Control"] = "no-store"
     return response

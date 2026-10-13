@@ -9,3 +9,8 @@
 .cmsNewContentHint{border:1px solid #fedf89;background:#fffaeb;color:#7a2e0e;border-radius:12px;padding:12px 16px;line-height:1.95;margin-bottom:16px;}
 .cmsNewContentActions{display:flex;align-items:center;flex-wrap:wrap;}
 @media(max-width:600px){.cmsNewContentActions .btn{flex:1;text-align:center;}}
+
+.editorialLiveVersion{display:grid;gap:7px;border:1px solid #b2ddff;background:#eff8ff;color:#175cd3;border-radius:12px;padding:14px 16px;line-height:1.8;margin:15px 0;}
+.editorialLiveVersion strong{font-size:13px;}
+.editorialLiveVersion span{font-size:12px;}
+.editorialLiveVersion code{direction:ltr;text-align:left;font-size:12px;color:#475467;overflow-wrap:anywhere;}
