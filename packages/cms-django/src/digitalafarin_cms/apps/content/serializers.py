@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from rest_framework import serializers
 from .models import ContentTypeDefinition, ContentEntry, ContentRevision, Category, Tag, ReusableBlock, Menu, MenuItem
+from .field_schema import validate_schema_fields, validate_field_values, find_breaking_schema_changes, relation_targets
 
 
 def would_create_parent_cycle(instance, parent):
@@ -26,11 +27,6 @@ def would_create_parent_cycle(instance, parent):
 
 
 class ContentTypeSerializer(serializers.ModelSerializer):
-    ALLOWED_FIELD_TYPES = {
-        "text", "textarea", "number", "boolean", "date", "datetime",
-        "url", "email", "select", "media", "json",
-    }
-
     class Meta:
         model = ContentTypeDefinition
         fields = "__all__"
@@ -47,6 +43,23 @@ class ContentTypeSerializer(serializers.ModelSerializer):
                 validate_collection_claim(site.pk, collection, self.instance)
         except DjangoValidationError as exc:
             raise serializers.ValidationError({"entry_path_pattern": exc.messages})
+        next_schema = attrs.get("schema")
+        if next_schema is not None and site is not None:
+            current_slug = attrs.get("slug", getattr(self.instance, "slug", None))
+            for target_slug in relation_targets(next_schema.get("fields", [])):
+                if target_slug == current_slug:
+                    continue  # Self-reference is allowed.
+                if not ContentTypeDefinition.objects.filter(site_id=site.pk, slug=target_slug).exists():
+                    raise serializers.ValidationError({"schema": f"Related content type '{target_slug}' does not exist on this site."})
+        if self.instance is not None and next_schema is not None:
+            # Replacing a live schema silently would strand historical custom_fields.
+            if self.instance.entries.exists():
+                issues = find_breaking_schema_changes(
+                    (self.instance.schema or {}).get("fields", []),
+                    (next_schema or {}).get("fields", []),
+                )
+                if issues:
+                    raise serializers.ValidationError({"schema": issues})
         attrs.update(collection_path=collection, entry_path_pattern=pattern)
         return attrs
 
@@ -60,29 +73,8 @@ class ContentTypeSerializer(serializers.ModelSerializer):
         if value in (None, ""):
             return {}
         if not isinstance(value, dict):
-            raise serializers.ValidationError("schema must be an object")
-        fields = value.get("fields", [])
-        if not isinstance(fields, list):
-            raise serializers.ValidationError("schema.fields must be a list")
-        seen = set()
-        for index, field in enumerate(fields):
-            if not isinstance(field, dict):
-                raise serializers.ValidationError(f"Field {index + 1} must be an object")
-            key = str(field.get("key", "")).strip()
-            field_type = str(field.get("type", "text")).strip() or "text"
-            if not key:
-                raise serializers.ValidationError(f"Field {index + 1} requires a key")
-            if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", key):
-                raise serializers.ValidationError(
-                    f"Field key '{key}' must start with a letter and contain only letters, numbers and underscores"
-                )
-            if key in seen:
-                raise serializers.ValidationError(f"Duplicate field key: {key}")
-            seen.add(key)
-            if field_type not in self.ALLOWED_FIELD_TYPES:
-                raise serializers.ValidationError(f"Unsupported field type: {field_type}")
-            if field_type == "select" and not isinstance(field.get("options", []), list):
-                raise serializers.ValidationError(f"Select field '{key}' options must be a list")
+            raise serializers.ValidationError("Schema must be an object")
+        validate_schema_fields(value.get("fields", []))
         return value
 
 
@@ -100,58 +92,6 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta: model=Tag; fields="__all__"
-
-
-def validate_custom_field_values(schema, custom):
-    """Validate custom field *values* while retaining old/unknown keys for schema migrations."""
-    if not isinstance(custom, dict):
-        raise serializers.ValidationError({"custom_fields": "Custom fields must be a JSON object."})
-    errors = {}
-    for field in schema.get("fields", []):
-        key = field.get("key")
-        if not key:
-            continue
-        value = custom.get(key)
-        required = bool(field.get("required"))
-        if value is None or value == "":
-            if required:
-                errors[key] = "Required field."
-            continue
-        kind = field.get("type", "text")
-        if kind in {"text", "textarea", "media"}:
-            if not isinstance(value, str):
-                errors[key] = "Expected text."
-        elif kind == "number":
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                errors[key] = "Expected a number."
-        elif kind == "boolean":
-            if not isinstance(value, bool):
-                errors[key] = "Expected true or false."
-        elif kind in {"date", "datetime"}:
-            if not isinstance(value, str):
-                errors[key] = "Expected an ISO date string."
-            else:
-                try:
-                    (date.fromisoformat if kind == "date" else datetime.fromisoformat)(value.replace("Z", "+00:00"))
-                except ValueError:
-                    errors[key] = "Invalid ISO date or datetime."
-        elif kind in {"email", "url"}:
-            if not isinstance(value, str):
-                errors[key] = "Expected a valid string."
-            else:
-                try:
-                    (validate_email if kind == "email" else URLValidator())(value)
-                except DjangoValidationError:
-                    errors[key] = "Invalid email or URL."
-        elif kind == "select":
-            allowed = [
-                option if isinstance(option, str) else option.get("value")
-                for option in field.get("options", []) if isinstance(option, (str, dict))
-            ]
-            if value not in allowed:
-                errors[key] = "Select a configured option."
-    if errors:
-        raise serializers.ValidationError({"custom_fields": errors})
 
 
 class ContentEntrySerializer(serializers.ModelSerializer):
@@ -215,7 +155,10 @@ class ContentEntrySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"tags":"All tags must belong to the same site."})
 
         if ctype:
-            validate_custom_field_values(ctype.schema or {}, custom)
+            try:
+                validate_field_values((ctype.schema or {}).get("fields", []), custom, site)
+            except serializers.ValidationError as exc:
+                raise serializers.ValidationError({"custom_fields": exc.detail})
 
         if status == ContentEntry.Status.SCHEDULED:
             if not scheduled_at:

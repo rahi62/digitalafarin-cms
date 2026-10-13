@@ -3,6 +3,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 type MockState = {
   createdPayload?: Record<string, unknown>;
   entry?: Record<string, unknown>;
+  createdType?: Record<string, unknown>;
 };
 
 const site = { id: "site-1", name: "Demo Site" };
@@ -78,7 +79,12 @@ async function installMocks(page: Page, state: MockState) {
     }
 
     if (method === "GET" && path === "/content/types/") {
-      return json(route, { count: 1, next: null, previous: null, results: [contentType] });
+      return json(route, { count: state.createdType ? 2 : 1, next: null, previous: null, results: [contentType, ...(state.createdType ? [state.createdType] : [])] });
+    }
+
+    if (method === "POST" && path === "/content/types/") {
+      state.createdType = { id: "type-new", ...(request.postDataJSON() as Record<string, unknown>) };
+      return json(route, state.createdType, 201);
     }
 
     if (method === "GET" && path === "/content/types/type-1/") {
@@ -261,4 +267,42 @@ test("standard edits preserve trailing advanced blocks through Standard ↔ Adva
 
   await page.getByRole("tab", { name: "بلوک‌های پیشرفته" }).click();
   await expect(page.getByPlaceholder("عنوان CTA")).toHaveValue("Contact us");
+});
+
+test("content type builder creates nested groups and bounded media fields without raw JSON editing", async ({ page }) => {
+  const state: MockState = {};
+  await installMocks(page, state);
+  await page.goto("/cms/content-types");
+  await expect(page.getByText("Content Type Builder")).toBeVisible();
+  const editor = page.locator(".contentTypeEditor");
+  await editor.locator(".formGrid input").nth(0).fill("Tour");
+  await editor.locator(".formGrid input").nth(1).fill("tour");
+  await page.getByRole("button", { name: "+ افزودن فیلد", exact: true }).click();
+  const first = editor.locator(".fieldBuilderRow").first();
+  await first.locator(".fieldBuilderInputs select").selectOption("group");
+  await first.getByRole("button", { name: "+ افزودن فیلد داخلی" }).click();
+  const nested = first.locator(".cmsDesignerNestedRow").first();
+  await nested.locator(".cmsDesignerNestedInputs input").nth(0).fill("Heading");
+  await nested.locator(".cmsDesignerNestedInputs input").nth(1).fill("heading");
+  await nested.locator(".cmsDesignerNestedInputs select").selectOption("text");
+  await nested.locator('input[type="checkbox"]').check();
+
+  await page.getByRole("button", { name: "+ افزودن فیلد", exact: true }).click();
+  const second = editor.locator(".fieldBuilderRow").nth(1);
+  await second.locator(".fieldBuilderInputs select").selectOption("gallery");
+  await second.locator(".cmsDesignerLimits input").nth(1).fill("6");
+  await page.getByRole("button", { name: "+ افزودن فیلد", exact: true }).click();
+  const third = editor.locator(".fieldBuilderRow").nth(2);
+  await third.locator(".fieldBuilderInputs select").selectOption("relation");
+  await third.locator(".cmsDesignerAdvanced input").fill("page");
+
+  await editor.getByRole("button", { name: "ذخیره Content Type" }).click();
+  await expect(page.getByText("Content Type ذخیره شد")).toBeVisible();
+  const payload = state.createdType as { schema?: { fields?: Array<Record<string, any>> } } | undefined;
+  expect(payload?.schema?.fields).toHaveLength(3);
+  expect(payload?.schema?.fields?.[0].type).toBe("group");
+  expect(payload?.schema?.fields?.[0].fields[0].key).toBe("heading");
+  expect(payload?.schema?.fields?.[0].fields[0].required).toBe(true);
+  expect(payload?.schema?.fields?.[1].max_items).toBe(6);
+  expect(payload?.schema?.fields?.[2].target_content_type).toBe("page");
 });

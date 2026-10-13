@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
+import AdvancedFieldDesigner from "@/components/AdvancedFieldDesigner";
 import { apiFetch, Paginated } from "@/lib/api";
 import type { CustomFieldDefinition, CustomFieldType, ContentTypeSchema } from "@/components/CustomFieldsEditor";
 
@@ -30,6 +31,10 @@ const fieldTypes: Array<{ value: CustomFieldType; label: string }> = [
   { value: "select", label: "Select" },
   { value: "media", label: "Media" },
   { value: "json", label: "JSON" },
+  { value: "relation", label: "رابطه با محتوا" },
+  { value: "group", label: "گروه فیلد" },
+  { value: "repeater", label: "فیلد تکرارشونده" },
+  { value: "gallery", label: "گالری رسانه" },
 ];
 
 const presets: Record<string, CustomFieldDefinition[]> = {
@@ -81,6 +86,10 @@ function normalizeField(field: CustomFieldDefinition): CustomFieldDefinition {
     placeholder: field.placeholder || "",
     default: field.default,
     options: field.options || [],
+    fields: (field.fields || []).map(normalizeField),
+    target_content_type: field.target_content_type || "",
+    min_items: field.min_items ?? 0,
+    max_items: field.max_items ?? 50,
   };
 }
 
@@ -91,6 +100,8 @@ export default function ContentTypesPage() {
   const [editing, setEditing] = useState<ContentType>(() => emptyType());
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [impact, setImpact] = useState<{ safe: boolean; affected_entries: number; warnings: string[]; sample_entries: Array<{ id: string; title: string }> } | null>(null);
 
   async function loadTypes(siteId = site) {
     if (!siteId) return;
@@ -124,6 +135,7 @@ export default function ContentTypesPage() {
   );
 
   function setFields(next: CustomFieldDefinition[]) {
+    setImpact(null);
     setEditing((current) => ({ ...current, schema: { ...current.schema, fields: next } }));
   }
 
@@ -137,6 +149,7 @@ export default function ContentTypesPage() {
   }
 
   function removeField(index: number) {
+    if (editing.id && !window.confirm("حذف این فیلد از ساختار ممکن است برای محتوای موجود نیازمند Migration باشد. ادامه می‌دهید؟")) return;
     setFields(fields.filter((_, i) => i !== index));
   }
 
@@ -152,6 +165,19 @@ export default function ContentTypesPage() {
     const preset = presets[name];
     if (!preset) return;
     setFields(preset.map(normalizeField));
+  }
+
+  async function checkImpact() {
+    if (!editing.id) return;
+    setChecking(true); setMessage(""); setImpact(null);
+    try {
+      const report = await apiFetch<{ safe: boolean; affected_entries: number; warnings: string[]; sample_entries: Array<{ id: string; title: string }> }>(
+        `/content/types/${editing.id}/schema-impact/`, {
+          method: "POST", body: JSON.stringify({ schema: { ...editing.schema, fields } }),
+        });
+      setImpact(report);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "گزارش اثر تغییر ساختار در دسترس نیست"); }
+    finally { setChecking(false); }
   }
 
   async function save() {
@@ -176,6 +202,7 @@ export default function ContentTypesPage() {
         ? await apiFetch<ContentType>(`/content/types/${editing.id}/`, { method: "PUT", body: JSON.stringify(payload) })
         : await apiFetch<ContentType>("/content/types/", { method: "POST", body: JSON.stringify(payload) });
       setEditing(saved);
+      setImpact(null);
       setMessage("Content Type ذخیره شد");
       await loadTypes(saved.site);
     } catch (error) {
@@ -222,7 +249,7 @@ export default function ContentTypesPage() {
           </div>
           <div className="contentTypeCards">
             {rows.map((item) => (
-              <button type="button" key={item.id} className={editing.id === item.id ? "active" : ""} onClick={() => setEditing({ ...item, schema: item.schema || { fields: [] } })}>
+              <button type="button" key={item.id} className={editing.id === item.id ? "active" : ""} onClick={() => { setImpact(null); setEditing({ ...item, schema: item.schema || { fields: [] } }); }}>
                 <span className="contentTypeIcon">{item.icon || "◇"}</span>
                 <span><strong>{item.name}</strong><small>/{item.slug} · {(item.schema?.fields || []).length} field</small></span>
                 <b>{item.is_public ? "Public" : "Private"}</b>
@@ -264,6 +291,7 @@ export default function ContentTypesPage() {
             </div>
           </div>
 
+          <p className="cmsDesignerNotice">فیلدهای گروهی، تکرارشونده، گالری و ارتباط با محتوای دیگر پشتیبانی می‌شوند. تغییر ناسازگار ساختار پس از ثبت محتوا به Migration جداگانه نیاز دارد و از ذخیره مخرب جلوگیری می‌شود.</p>
           <div className="fieldBuilderList">
             {fields.map((field, index) => (
               <div className="fieldBuilderRow" key={`${field.key}-${index}`}>
@@ -276,6 +304,7 @@ export default function ContentTypesPage() {
                   <div className="field"><label>Placeholder</label><input value={field.placeholder || ""} onChange={(e) => patchField(index, { placeholder: e.target.value })} /></div>
                   <div className="field"><label>Help text</label><input value={field.help_text || ""} onChange={(e) => patchField(index, { help_text: e.target.value })} /></div>
                   {field.type === "select" && <div className="field full"><label>Options — جداشده با کاما</label><input value={(field.options || []).map((option) => typeof option === "string" ? option : option.value).join(", ")} onChange={(e) => patchField(index, { options: e.target.value.split(",").map((item) => item.trim()).filter(Boolean) })} /></div>}
+                  <AdvancedFieldDesigner field={field} onChange={(next) => patchField(index, next)} />
                 </div>
                 <button type="button" className="fieldBuilderDelete" onClick={() => removeField(index)}>×</button>
               </div>
@@ -283,7 +312,13 @@ export default function ContentTypesPage() {
             {fields.length === 0 && <button type="button" className="fieldBuilderEmpty" onClick={addField}><strong>هنوز فیلدی تعریف نشده</strong><span>اولین Custom Field را اضافه کنید.</span></button>}
           </div>
 
+          {impact && <div className={impact.safe ? "cmsSchemaImpact isSafe" : "cmsSchemaImpact"} role="status">
+            <strong>{impact.safe ? "تغییر ساختار از نظر سازگاری مجاز است" : "تغییر ناسازگار؛ ذخیره تا مهاجرت داده مسدود است"}</strong>
+            <span>{impact.affected_entries.toLocaleString("fa-IR")} محتوای وابسته به این ساختار وجود دارد.</span>
+            {impact.warnings.length > 0 && <ul>{impact.warnings.map((item, index) => <li key={index} dir="ltr">{item}</li>)}</ul>}
+            </div>}
           <div className="contentTypeSaveBar">
+            {editing.id && <button type="button" className="btn secondary" disabled={saving || checking} onClick={checkImpact}>{checking ? "در حال بررسی..." : "بررسی اثر تغییرات"}</button>}
             <button className="btn" type="button" disabled={saving} onClick={save}>{saving ? "در حال ذخیره..." : "ذخیره Content Type"}</button>
             {editing.id && <button type="button" className="btn dangerBtn" onClick={remove}>حذف</button>}
           </div>
