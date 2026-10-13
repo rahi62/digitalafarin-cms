@@ -28,6 +28,7 @@ from .serializers import CategorySerializer, ContentEntrySerializer, ContentRevi
 from .services import create_revision
 from .field_schema import find_breaking_schema_changes, validate_schema_fields, relation_targets
 from .relations import find_relation_uses
+from .trash import move_to_trash, restore_from_trash
 from .routing import normalize_path
 from .public import PublicEntrySerializer, public_entries, published_content
 from digitalafarin_cms.media import normalize_media_data
@@ -177,18 +178,36 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     ordering_fields = ["created_at", "updated_at", "published_at", "scheduled_at", "title"]
     tenant_filter = "site__organization_id"
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if getattr(self, "action", None) in {"restore", "trashed"}:
+            return queryset.filter(deleted_at__isnull=False)
+        return queryset.filter(deleted_at__isnull=True)
+
     def perform_destroy(self, instance):
-        if PublishedEntry.objects.filter(entry_id=instance.pk).exists():
-            raise serializers.ValidationError({
-                "detail": "This content is publicly published. Unpublish it before removal."
-            })
-        uses = find_relation_uses(instance)
-        if uses:
-            raise serializers.ValidationError({
-                "detail": "This content is referenced by other entries. Remove their relations first.",
-                "referenced_by": uses,
-            })
-        instance.delete()
+        if instance.status in PROTECTED_STATUSES or PublishedEntry.objects.filter(entry_id=instance.pk).exists():
+            _require_publisher(self.request.user, instance)
+        move_to_trash(instance, self.request.user)
+
+    @action(detail=True, methods=["post"], url_path="trash")
+    def trash(self, request, pk=None):
+        entry = self.get_object()
+        self.perform_destroy(entry)
+        return Response({"id": str(entry.pk), "trashed": True, "restorable": True})
+
+    @action(detail=True, methods=["post"], url_path="restore")
+    def restore(self, request, pk=None):
+        entry = self.get_object()
+        restored = restore_from_trash(entry, request.user)
+        return Response(self.get_serializer(restored).data)
+
+    @action(detail=False, methods=["get"], url_path="trashed")
+    def trashed(self, request):
+        queryset = self.filter_queryset(self.get_queryset()).order_by("-deleted_at", "-created_at")
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            return self.get_paginated_response(self.get_serializer(page, many=True).data)
+        return Response(self.get_serializer(queryset, many=True).data)
 
     @action(detail=False, methods=["post"], url_path="path-preview")
     def path_preview(self, request):
