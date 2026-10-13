@@ -72,7 +72,7 @@ export function defineCmsComponentRegistry(input: readonly CmsHostComponentSlot[
     throw new CmsComponentRegistryError("Registry must have at most 100 components.");
   }
   const identifiers = new Set<string>();
-  const definitions = input.map((slot) => {
+  const definitions = input.map((slot: CmsHostComponentSlot) => {
     if (!slot || !SAFE_PROP.test(slot.id) || !SAFE_PROP.test(slot.component) ||
         PROTECTED_KEYS.has(slot.id) || PROTECTED_KEYS.has(slot.component)) {
       throw new CmsComponentRegistryError("Component IDs must be unique, safe host-local names.");
@@ -94,7 +94,7 @@ export function defineCmsComponentRegistry(input: readonly CmsHostComponentSlot[
       sourceSegments(source);
       props[prop] = source;
     }
-    const required = [...new Set(slot.required || [])];
+    const required: string[] = [...new Set<string>(slot.required || [])];
     if (required.some((name) => !Object.hasOwn(props, name))) {
       throw new CmsComponentRegistryError("Every required prop must be declared in the field mapping.");
     }
