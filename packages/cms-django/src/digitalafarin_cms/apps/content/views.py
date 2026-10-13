@@ -27,6 +27,7 @@ from .models import Category, ContentEntry, ContentRevision, ContentTypeDefiniti
 from .serializers import CategorySerializer, ContentEntrySerializer, ContentRevisionSerializer, ContentTypeSerializer, MenuSerializer, ReusableBlockSerializer, TagSerializer
 from .services import create_revision
 from .field_schema import find_breaking_schema_changes, validate_schema_fields, relation_targets
+from .relations import find_relation_uses
 from .routing import normalize_path
 from .public import PublicEntrySerializer, public_entries, published_content
 from digitalafarin_cms.media import normalize_media_data
@@ -87,6 +88,37 @@ class ContentTypeViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     search_fields = ["name", "slug"]
     tenant_filter = "site__organization_id"
 
+    @action(detail=True, methods=["get"], url_path="singleton-entry")
+    def singleton_entry(self, request, pk=None):
+        content_type = self.get_object()
+        if content_type.kind != ContentTypeDefinition.Kind.SINGLETON:
+            return Response({"detail": "This content type is a collection."}, status=400)
+        record = ContentEntry.objects.filter(content_type=content_type).first()
+        return Response({
+            "exists": record is not None,
+            "entry_id": str(record.pk) if record else None,
+            "title": record.title if record else None,
+            "path": record.path if record else None,
+        })
+
+    def perform_destroy(self, instance):
+        if instance.entries.exists():
+            raise serializers.ValidationError({
+                "content_type": "This content type contains entries; export or migrate them before removal."
+            })
+        dependencies = [
+            item.slug for item in ContentTypeDefinition.objects.filter(
+                site_id=instance.site_id
+            ).exclude(pk=instance.pk).only("slug", "schema")
+            if instance.slug in relation_targets((item.schema or {}).get("fields", []))
+        ]
+        if dependencies:
+            raise serializers.ValidationError({
+                "content_type": "Other content types reference this type.",
+                "referenced_by": dependencies[:10],
+            })
+        instance.delete()
+
     @action(detail=True, methods=["post"], url_path="schema-impact")
     def schema_impact(self, request, pk=None):
         """Dry-run a field schema edit; never mutate content or schema here."""
@@ -144,6 +176,19 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     search_fields = ["title", "slug", "path", "excerpt"]
     ordering_fields = ["created_at", "updated_at", "published_at", "scheduled_at", "title"]
     tenant_filter = "site__organization_id"
+
+    def perform_destroy(self, instance):
+        if PublishedEntry.objects.filter(entry_id=instance.pk).exists():
+            raise serializers.ValidationError({
+                "detail": "This content is publicly published. Unpublish it before removal."
+            })
+        uses = find_relation_uses(instance)
+        if uses:
+            raise serializers.ValidationError({
+                "detail": "This content is referenced by other entries. Remove their relations first.",
+                "referenced_by": uses,
+            })
+        instance.delete()
 
     @action(detail=False, methods=["post"], url_path="path-preview")
     def path_preview(self, request):
