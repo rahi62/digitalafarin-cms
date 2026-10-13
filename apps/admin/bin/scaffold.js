@@ -160,6 +160,7 @@ function embed() {
     "search-performance.css",
     "seo-opportunities.css",
     "professional-editor.css",
+    "route-explorer.css",
   ].map((name) => `import "${styleRoot}/${name}";`).join("\n");
 
   fs.writeFileSync(
