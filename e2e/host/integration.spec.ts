@@ -1,9 +1,34 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
 
 test('real host: draft preview, images, publish, list/detail, move, unpublish and legacy fallback', async ({ page, request }) => {
   const api = 'http://127.0.0.1:8197/api/cms/v1';
   const auth = await (await request.post(api + '/auth/token/', { data: { username: 'host-owner', password: 'fixture-password' } })).json();
   const headers = { Authorization: `Bearer ${auth.access}` };
+  // Route Explorer report is private and missing snapshots are reported truthfully.
+  expect((await request.get('/cms/route-explorer/report')).status()).toBe(401);
+  const routeReport = await request.get('/cms/route-explorer/report', { headers });
+  expect(routeReport.status()).toBe(404);
+  expect((await routeReport.json()).detail).toContain('No route report exported');
+  await page.addInitScript((token) => localStorage.setItem('cms_access_token', token), auth.access);
+  await page.goto('/cms/route-explorer');
+  await expect(page.getByRole('heading', { name: 'کاوشگر مسیرها' })).toBeVisible();
+  await expect(page.locator('#host-panel')).toHaveCSS('border-top-width', '0px'); // CMS .panel rules must not style host elements.
+  await expect(page.locator('div.error[role="alert"]')).toContainText('No route report exported');
+  // Explicit source snapshot export makes the same authenticated endpoint useful.
+  const fixtureRoot = readFileSync('.tmp/host-integration/active-path.txt', 'utf8').trim();
+  const cli = path.resolve('packages/cms-cli/bin/cli.js');
+  const exported = spawnSync(process.execPath, [cli, 'routes', '--frontend', fixtureRoot, '--export-report'], { encoding: 'utf8' });
+  expect(exported.status, exported.stdout + exported.stderr).toBe(0);
+  const availableReport = await request.get('/cms/route-explorer/report', { headers });
+  expect(availableReport.status()).toBe(200);
+  const routeData = await availableReport.json();
+  expect(routeData.routes).toEqual(expect.arrayContaining([expect.objectContaining({ url: '/blog' })]));
+  await page.reload();
+  await expect(page.getByRole('table').getByText('/blog', { exact: true })).toBeVisible();
+
   const sites = await (await request.get(api + '/sites/', { headers })).json();
   const site = sites.results[0];
   const types = await (await request.get(api + '/content/types/', { headers })).json();

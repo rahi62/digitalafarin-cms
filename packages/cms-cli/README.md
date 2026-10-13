@@ -102,6 +102,71 @@ npx @digitalafarin/cms-cli admin-standalone \
   --admin-port 3001
 ```
 
+
+## Route discovery, ownership mapping and validation (source branch)
+
+The route registry **inspects the host source tree**; it never queries Django models,
+guesses database ownership or overwrites host pages. This feature is present on the
+feature branch until it is released; use the local CLI during review.
+
+```bash
+node packages/cms-cli/bin/cli.js routes --frontend ./frontend
+node packages/cms-cli/bin/cli.js map-route --frontend ./frontend --route /blog --mode collection --content-type post
+node packages/cms-cli/bin/cli.js map-route --frontend ./frontend --route '/blog/[slug]' --mode detail --content-type post
+node packages/cms-cli/bin/cli.js map-route --frontend ./frontend --route /contact --mode page --source host
+node packages/cms-cli/bin/cli.js validate-routes --frontend ./frontend
+node packages/cms-cli/bin/cli.js doctor --frontend ./frontend --backend ./backend
+```
+
+- `routes` gives a read-only JSON inventory of App Router page/API files (including route groups,
+  dynamic segments, catch-all routes, parallel and interception routes), with **heuristic**
+  CMS loader indicators. A detected file does not imply that its data source is CMS-managed.
+- `map-route` writes explicit intent to `.digitalafarin/route-map.json` and refuses
+  missing/ambiguous paths, infrastructure endpoints, and inappropriate page/detail modes.
+  It does **not** connect or rewrite a loader. Review and commit the map with your host.
+- `validate-routes` catches duplicate URL ownership, dynamic parameter aliases such as
+  `/[id]` versus `/[slug]`, stale mappings, and likely missing CMS loaders. A warning
+  returns non-zero status because human review and real E2E are still needed.
+- `doctor` additionally checks existing host config and, when a route map exists, checks
+  route collisions and stale mappings. It is **not** a deployment certification.
+
+The mapping's `content_type` is an intended Django ContentTypeDefinition slug,
+**not** proof that the Content Type exists in the selected CMS site. Check site domain,
+backend content types, tenant scope, dynamic content data, preview, media, publish,
+redirects, and old routes in staging. Before applying CLI-generated proposals,
+review `.digitalafarin/integration.json` and keep legacy host loaders intact.
+
+## Route Explorer Admin UI (feature branch; not released yet)
+
+The Admin sidebar now includes **Route Explorer** under \`/cms/route-explorer\`.
+It is deliberately read-only: the browser neither inspects source files nor writes
+host code. Route ownership changes still require explicit CLI mapping and reviewed
+loader integration.
+
+After installing/updating the local feature-branch packages, from the host project:
+
+\`\`\`bash
+digitalafarin-cms routes --frontend . --export-report
+\`\`\`
+
+This writes \`.digitalafarin/routes-report.json\` containing source routes, mappings,
+static warnings and export timestamp. Keep this generated file available to the
+Next.js Admin server (e.g. in the host's working directory), or set the **server-only**
+\`DIGITALAFARIN_CMS_ROUTE_REPORT_PATH\` to an absolute file path in standalone deployments.
+The HTTP endpoint \`/cms/route-explorer/report\` checks the supplied Bearer token with
+Django before returning the snapshot. It returns 404 if no report exists, and does not
+trigger a scan. Never expose that file via public/static routes.
+
+Re-export the report after changing host routes or mapping configuration.
+The UI can search/filter ownership and copy a suggested \`map-route\` command. A
+saved map is an intention, not proof of correct CMS data flow. Verify with
+\`validate-routes\`, host loaders and staging E2E before deployment.
+
+Embedded CSS is wrapped in native \`@scope (.digitalafarinCmsAdmin)\`, so CMS
+component styles do not spill into similarly named host classes. Verify the host's
+target browser supports CSS Scope; rebuild explicitly to refresh previously copied
+embedded Admin sources, and review any local customizations before using \`--force\`.
+
 ## Doctor
 
 ```bash

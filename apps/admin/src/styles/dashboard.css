@@ -1,0 +1,25 @@
+.cmsDashboardTop{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
+.cmsDashboardSite{display:grid;gap:7px;min-width:min(340px,100%);}
+.cmsDashboardSite span{font-size:12px;font-weight:600;color:#475467;}
+.cmsDashboardSite select{width:100%;padding:10px 12px;border:1px solid #d0d5dd;border-radius:10px;background:#fff;}
+.cmsDashboardDomain{font-size:12px;color:#667085;margin-inline-start:auto;}
+.cmsDashboardStats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;}
+.cmsDashboardMetric{display:flex;flex-direction:column;min-width:0;border:1px solid #e4e7ec;border-radius:14px;background:#fff;padding:16px;gap:8px;transition:box-shadow .15s,border-color .15s;}
+.cmsDashboardMetric:hover,.cmsDashboardShortcut:hover{border-color:#ff5538;box-shadow:0 4px 14px rgba(16,24,40,.07);}
+.cmsDashboardMetric span{font-size:12px;line-height:1.8;color:#475467;}
+.cmsDashboardMetric strong{font-size:29px;color:#101828;font-variant-numeric:tabular-nums;}
+.cmsDashboardMetric small{font-size:11px;color:#667085;margin-top:auto;}
+.cmsDashboardSectionTitle{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+.cmsDashboardSectionTitle h2{margin:0;font-size:18px;}
+.cmsDashboardSectionTitle p{margin:4px 0 0;color:#667085;font-size:12px;}
+.cmsDashboardShortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+.cmsDashboardShortcut{border:1px solid #e4e7ec;border-radius:12px;padding:15px;display:grid;grid-template-columns:34px minmax(0,1fr);gap:2px 9px;align-items:center;}
+.cmsDashboardShortcut>span{grid-row:1/span 2;font-size:24px;color:#ff5538;text-align:center;}
+.cmsDashboardShortcut strong{font-size:13px;color:#101828;}
+.cmsDashboardShortcut small{color:#667085;font-size:11px;}
+.cmsDashboardEntry{font-weight:600;color:#175cd3;}
+.cmsDashboardEntry:hover{text-decoration:underline;}
+.cmsDashboardEmpty{padding:26px;text-align:center;color:#667085;}
+.cmsDashboardEmpty p{font-size:13px;}
+@media(max-width:1100px){.cmsDashboardStats{grid-template-columns:repeat(3,minmax(0,1fr));}.cmsDashboardShortcuts{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:700px){.cmsDashboardStats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}.cmsDashboardMetric{padding:12px;}.cmsDashboardMetric strong{font-size:23px;}.cmsDashboardShortcuts{grid-template-columns:1fr;}.cmsDashboardSite{flex:1;}.cmsDashboardDomain{display:none;}}

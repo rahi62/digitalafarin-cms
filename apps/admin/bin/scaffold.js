@@ -84,6 +84,15 @@ function embeddedTransformFor(embeddedRoot) {
       .replaceAll('from "@/styles/', `from "${styles}/`);
   };
 }
+/**
+ * The embedded Admin must not style host elements that happen to share class names.
+ * Native CSS @scope constrains every rule (including nested media queries) to /cms.
+ * Keep Admin root defaults outside the scope so the scope root itself is styled.
+ */
+function scopeEmbeddedCss(text) {
+  return "@scope (.digitalafarinCmsAdmin) {\n" + text + "\n}\n";
+}
+
 function scopeGlobalCss(text) {
   return text
     .replace(
@@ -126,11 +135,11 @@ function embed() {
   const transform = embeddedTransformFor(embeddedRoot);
   copyTree(path.join(packageRoot, "src", "components"), path.join(embeddedRoot, "components"), transform);
   copyTree(path.join(packageRoot, "src", "lib"), path.join(embeddedRoot, "lib"), transform);
-  copyTree(path.join(packageRoot, "src", "styles"), path.join(embeddedRoot, "styles"), transform);
+  copyTree(path.join(packageRoot, "src", "styles"), path.join(embeddedRoot, "styles"), (text) => scopeEmbeddedCss(text));
 
-  const globals = scopeGlobalCss(
+  const globals = ".digitalafarinCmsAdmin{min-height:100vh;background:#f5f7fb;color:#172033;font-family:Tahoma,Arial,sans-serif}\n" + scopeEmbeddedCss(scopeGlobalCss(
     fs.readFileSync(path.join(packageRoot, "src", "app", "globals.css"), "utf8"),
-  );
+  ));
   fs.writeFileSync(path.join(embeddedRoot, "styles", "globals.css"), globals);
 
   const adminApp = path.join(packageRoot, "src", "app");
@@ -160,6 +169,13 @@ function embed() {
     "search-performance.css",
     "seo-opportunities.css",
     "professional-editor.css",
+    "route-explorer.css",
+    "content-list.css",
+    "dashboard.css",
+    "sites.css",
+    "reusable-blocks.css",
+    "editor-navigation.css",
+    "team.css",
   ].map((name) => `import "${styleRoot}/${name}";`).join("\n");
 
   fs.writeFileSync(

@@ -226,7 +226,15 @@ export default function EditContent() {
           "ذخیره شد"
         }</span><button type="button" className="btn secondary" onClick={preview} disabled={previewing}>{previewing ? "در حال ساخت..." : "پیش‌نمایش"}</button></div>}
       />
-      <form className="form" onSubmit={submit}>
+      <nav className="cmsEditorJump" aria-label="بخش‌های ویرایش محتوا">
+        <a href="#cms-editor-fields">محتوا</a>
+        <a href="#cms-editor-workflow">انتشار</a>
+        <a href="#cms-editor-seo">سئو</a>
+        <a href="#cms-editor-schema">اسکیما</a>
+        <a href="#cms-editor-links">لینک‌های داخلی</a>
+        <a href="#cms-editor-revisions">نسخه‌ها</a>
+      </nav>
+      <form id="cms-editor-fields" className="form cmsEditorForm" onSubmit={submit}>
         {recoveryDraft && (
           <div className="recoveryNotice">
             <div>
@@ -261,14 +269,17 @@ export default function EditContent() {
 
           <div className="field full contentEditorField"><label>محتوا</label><ProfessionalEditor siteId={f.site} value={f.blocks || []} onChange={(blocks) => setF({ ...f, blocks })} /></div>
         </div>
-        <div className="actions"><button className="btn">ذخیره تغییرات</button></div>
+        <div className="actions cmsEditorSticky">
+          <button className="btn" disabled={saveState === "saving"}>{saveState === "saving" ? "در حال ذخیره..." : "ذخیره تغییرات"}</button>
+          <button type="button" className="btn secondary" onClick={preview} disabled={previewing || saveState === "saving"}>پیش‌نمایش</button>
+        </div>
       </form>
 
-      <EditorialWorkflowPanel entryId={id} beforeAction={async () => { cancelAutosaveTimer(); await saveEntry(false); }} onUpdated={(entry) => { const normalized = normalizeEntry(entry); lastSavedFingerprint.current = fingerprint(normalized); setF(normalized); }} />
-      <SeoPanel entryId={id} pageTitle={f.title} pagePath={f.path} />
-      <SchemaBuilder entryId={id} pageTitle={f.title} pagePath={f.path} blocks={f.blocks || []} />
-      <InternalLinksPanel entryId={id} />
-      <RevisionPanel entryId={id} current={f} onRestored={(entry) => setF(normalizeEntry(entry))} />
+      <section id="cms-editor-workflow" className="cmsEditorAnchor"><EditorialWorkflowPanel entryId={id} beforeAction={async () => { cancelAutosaveTimer(); await saveEntry(false); }} onUpdated={(entry) => { const normalized = normalizeEntry(entry); lastSavedFingerprint.current = fingerprint(normalized); setF(normalized); }} /></section>
+      <section id="cms-editor-seo" className="cmsEditorAnchor"><SeoPanel entryId={id} pageTitle={f.title} pagePath={f.path} /></section>
+      <section id="cms-editor-schema" className="cmsEditorAnchor"><SchemaBuilder entryId={id} pageTitle={f.title} pagePath={f.path} blocks={f.blocks || []} /></section>
+      <section id="cms-editor-links" className="cmsEditorAnchor"><InternalLinksPanel entryId={id} /></section>
+      <section id="cms-editor-revisions" className="cmsEditorAnchor"><RevisionPanel entryId={id} current={f} onRestored={(entry) => setF(normalizeEntry(entry))} /></section>
     </>
   );
 }

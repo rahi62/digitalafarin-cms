@@ -1,6 +1,8 @@
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
+from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -90,14 +92,34 @@ class MembershipViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         self._require_org_admin(serializer.validated_data["organization"])
         serializer.save()
 
+    def _guard_owner_change(self, instance, next_role):
+        if instance.role == Membership.Role.OWNER or next_role == Membership.Role.OWNER:
+            ensure_organization_roles(
+                self.request.user, instance.organization_id, (Membership.Role.OWNER,),
+                "Only an Owner can change another Owner's membership.",
+            )
+        if instance.role == Membership.Role.OWNER and next_role != Membership.Role.OWNER:
+            if not Membership.objects.filter(
+                organization_id=instance.organization_id,
+                role=Membership.Role.OWNER,
+            ).exclude(pk=instance.pk).exists():
+                raise ValidationError({"role": "The last Owner cannot be removed or demoted."})
+
     def perform_update(self, serializer):
-        self._require_org_admin(self.get_object().organization)
+        instance = self.get_object()
+        self._require_org_admin(instance.organization)
         self.validate_tenant_serializer(serializer)
-        serializer.save()
+        with transaction.atomic():
+            Organization.objects.select_for_update().get(pk=instance.organization_id)
+            self._guard_owner_change(instance, serializer.validated_data.get("role", instance.role))
+            serializer.save()
 
     def perform_destroy(self, instance):
         self._require_org_admin(instance.organization)
-        instance.delete()
+        with transaction.atomic():
+            Organization.objects.select_for_update().get(pk=instance.organization_id)
+            self._guard_owner_change(instance, None)
+            instance.delete()
 
 
 @api_view(["GET"])

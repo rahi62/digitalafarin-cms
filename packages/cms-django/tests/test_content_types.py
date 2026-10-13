@@ -159,3 +159,51 @@ class DynamicContentTypeTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 403)
+
+
+    def test_typed_custom_fields_reject_invalid_number_and_boolean(self):
+        content_type = self.create_type()
+        payload = {
+            "site": str(self.site.id),
+            "content_type": content_type["id"],
+            "title": "Invalid tour",
+            "slug": "invalid-tour",
+            "path": "/tours/invalid-tour/",
+            "custom_fields": {"destination": "Tehran", "price": "not-a-number", "hero_image": "https://example.test/hero.jpg"},
+            "blocks": [],
+        }
+        response = self.client.post("/api/cms/v1/content/entries/", payload, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("price", response.data["custom_fields"])
+        payload["custom_fields"]["price"] = True
+        response = self.client.post("/api/cms/v1/content/entries/", payload, format="json")
+        self.assertEqual(response.status_code, 400)
+
+    def test_select_date_email_and_url_are_validated(self):
+        create = self.client.post("/api/cms/v1/content/types/", {
+            "site": str(self.site.id), "name": "Profile", "slug": "profile",
+            "schema": {"fields": [
+                {"key": "kind", "type": "select", "options": ["basic", {"label": "Premium", "value": "premium"}]},
+                {"key": "start_date", "type": "date"},
+                {"key": "contact_email", "type": "email"},
+                {"key": "website", "type": "url"},
+                {"key": "enabled", "type": "boolean"},
+            ]},
+        }, format="json")
+        self.assertEqual(create.status_code, 201, create.data)
+        payload = {
+            "site": str(self.site.id), "content_type": create.data["id"],
+            "title": "Profile", "slug": "profile-test", "path": "/profiles/profile-test/",
+            "custom_fields": {"kind": "invalid", "start_date": "yesterday", "contact_email": "broken",
+                              "website": "javascript:alert(1)", "enabled": "true"},
+            "blocks": [],
+        }
+        response = self.client.post("/api/cms/v1/content/entries/", payload, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(set(response.data["custom_fields"]), {"kind", "start_date", "contact_email", "website", "enabled"})
+        payload["custom_fields"] = {
+            "kind": "premium", "start_date": "2026-10-13", "contact_email": "person@example.test",
+            "website": "https://example.test", "enabled": False,
+        }
+        response = self.client.post("/api/cms/v1/content/entries/", payload, format="json")
+        self.assertEqual(response.status_code, 201, response.data)

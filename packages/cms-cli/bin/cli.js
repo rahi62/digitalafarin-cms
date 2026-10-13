@@ -4,13 +4,14 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { scaffoldIntegration, applyIntegration, frontendDoctor } from "./integration.js";
+import { inventory, mapRoute, validateRoutes, routeMapFile, exportRouteReport } from "./routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(__filename), "..");
 const args = process.argv.slice(2);
 const command = args[0] || "init";
-if (!["init", "doctor", "admin", "admin-standalone", "apply-integration"].includes(command)) {
-  console.error("Usage: digitalafarin-cms [init|doctor|apply-integration|admin|admin-standalone] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--with-collection] [--collection-path /blog] [--content-type post] [--with-admin] [--admin-base-path /cms] [--admin-api-url URL]");
+if (!["init", "doctor", "admin", "admin-standalone", "apply-integration", "routes", "map-route", "validate-routes"].includes(command)) {
+  console.error("Usage: digitalafarin-cms [init|doctor|apply-integration|admin|admin-standalone|routes|map-route|validate-routes] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--with-collection] [--collection-path /blog] [--content-type post] [--with-admin] [--admin-base-path /cms] [--admin-api-url URL]");
   process.exit(2);
 }
 
@@ -174,8 +175,38 @@ const frontend = detectFrontend();
 console.log(`Django: ${backend || "not detected"}`);
 console.log(`Next.js: ${frontend || "not detected"}`);
 
+if (["routes", "map-route", "validate-routes"].includes(command)) {
+  if (!frontend) throw new Error("Pass --frontend pointing to a Next.js App Router project.");
+  const root = sourceRoot(frontend);
+  if (command === "routes") {
+    const report = validateRoutes(frontend, root);
+    if (has("--export-report")) console.log(`Route Explorer snapshot: ${exportRouteReport(frontend, root).filename}`);
+    console.log(JSON.stringify({ routes: report.routes, mappings: report.mappings, errors: report.errors, warnings: report.warnings }, null, 2));
+    process.exit(report.errors.length ? 1 : 0);
+  }
+  if (command === "map-route") {
+    const record = mapRoute(frontend, root, {
+      route: arg("--route"),
+      mode: arg("--mode"),
+      contentType: arg("--content-type"),
+      source: arg("--source", "cms"),
+    });
+    console.log(JSON.stringify({ mapping: record, map_file: routeMapFile(frontend), note: "Mapping records intent only; host loader integration and live tests remain required." }, null, 2));
+    process.exit(0);
+  }
+  const report = validateRoutes(frontend, root, { requireMap: true });
+  if (has("--export-report")) console.log(`Route Explorer snapshot: ${exportRouteReport(frontend, root).filename}`);
+  console.log(JSON.stringify({ errors: report.errors, warnings: report.warnings, mappings: report.mappings.length, routes: report.routes.length, note: "Static validation is not a runtime or Django content-type existence check." }, null, 2));
+  process.exit(report.errors.length || report.warnings.length ? 1 : 0);
+}
+
 if (command === "doctor") {
   let issues = frontend ? frontendDoctor(frontend, sourceRoot(frontend)) : 0;
+  if (frontend && exists(routeMapFile(frontend))) {
+    const report = validateRoutes(frontend, sourceRoot(frontend));
+    for (const error of report.errors) { console.log(`Route error: ${error}`); issues++; }
+    for (const warning of report.warnings) console.log(`Route review: ${warning}`);
+  }
   if (backend) {
     const result = spawnSync(arg("--python", process.env.PYTHON || "python"), ["manage.py", "cms_doctor"], { cwd: backend, stdio: "inherit", shell: process.platform === "win32" });
     if (result.status !== 0) issues++;

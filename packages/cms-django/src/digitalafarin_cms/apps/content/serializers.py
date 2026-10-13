@@ -1,4 +1,7 @@
 import re
+from datetime import date, datetime
+
+from django.core.validators import URLValidator, validate_email
 
 from django.utils import timezone
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -99,6 +102,58 @@ class TagSerializer(serializers.ModelSerializer):
     class Meta: model=Tag; fields="__all__"
 
 
+def validate_custom_field_values(schema, custom):
+    """Validate custom field *values* while retaining old/unknown keys for schema migrations."""
+    if not isinstance(custom, dict):
+        raise serializers.ValidationError({"custom_fields": "Custom fields must be a JSON object."})
+    errors = {}
+    for field in schema.get("fields", []):
+        key = field.get("key")
+        if not key:
+            continue
+        value = custom.get(key)
+        required = bool(field.get("required"))
+        if value is None or value == "":
+            if required:
+                errors[key] = "Required field."
+            continue
+        kind = field.get("type", "text")
+        if kind in {"text", "textarea", "media"}:
+            if not isinstance(value, str):
+                errors[key] = "Expected text."
+        elif kind == "number":
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                errors[key] = "Expected a number."
+        elif kind == "boolean":
+            if not isinstance(value, bool):
+                errors[key] = "Expected true or false."
+        elif kind in {"date", "datetime"}:
+            if not isinstance(value, str):
+                errors[key] = "Expected an ISO date string."
+            else:
+                try:
+                    (date.fromisoformat if kind == "date" else datetime.fromisoformat)(value.replace("Z", "+00:00"))
+                except ValueError:
+                    errors[key] = "Invalid ISO date or datetime."
+        elif kind in {"email", "url"}:
+            if not isinstance(value, str):
+                errors[key] = "Expected a valid string."
+            else:
+                try:
+                    (validate_email if kind == "email" else URLValidator())(value)
+                except DjangoValidationError:
+                    errors[key] = "Invalid email or URL."
+        elif kind == "select":
+            allowed = [
+                option if isinstance(option, str) else option.get("value")
+                for option in field.get("options", []) if isinstance(option, (str, dict))
+            ]
+            if value not in allowed:
+                errors[key] = "Select a configured option."
+    if errors:
+        raise serializers.ValidationError({"custom_fields": errors})
+
+
 class ContentEntrySerializer(serializers.ModelSerializer):
     url=serializers.SerializerMethodField()
     content_type_slug=serializers.CharField(source="content_type.slug",read_only=True)
@@ -154,9 +209,7 @@ class ContentEntrySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"tags":"All tags must belong to the same site."})
 
         if ctype:
-            required=[x.get("key") for x in ctype.schema.get("fields",[]) if x.get("required")]
-            missing=[key for key in required if key and custom.get(key) in (None,"")]
-            if missing: raise serializers.ValidationError({"custom_fields":f"Missing required fields: {', '.join(missing)}"})
+            validate_custom_field_values(ctype.schema or {}, custom)
 
         if status == ContentEntry.Status.SCHEDULED:
             if not scheduled_at:
