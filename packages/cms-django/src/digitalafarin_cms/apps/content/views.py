@@ -100,6 +100,7 @@ class ContentTypeViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
             "entry_id": str(record.pk) if record else None,
             "title": record.title if record else None,
             "path": record.path if record else None,
+            "trashed": record.deleted_at is not None if record else False,
         })
 
     def perform_destroy(self, instance):
