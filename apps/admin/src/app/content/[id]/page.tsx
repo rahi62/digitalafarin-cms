@@ -270,11 +270,6 @@ export default function EditContent() {
           <div className="field full contentEditorField"><label>محتوا</label><ProfessionalEditor siteId={f.site} value={f.blocks || []} onChange={(blocks) => setF({ ...f, blocks })} /></div>
         </div>
         <div className="actions cmsEditorSticky">
-          <span className={`autosaveStatus ${saveState}`}>{
-            saveState === "saving" ? "در حال ذخیره..." :
-            saveState === "dirty" ? "تغییرات ذخیره‌نشده" :
-            saveState === "error" ? "ذخیره ناموفق بود؛ دوباره امتحان کنید" : "همه تغییرات ذخیره شده‌اند"
-          }</span>
           <button className="btn" disabled={saveState === "saving"}>{saveState === "saving" ? "در حال ذخیره..." : "ذخیره تغییرات"}</button>
           <button type="button" className="btn secondary" onClick={preview} disabled={previewing || saveState === "saving"}>پیش‌نمایش</button>
         </div>
