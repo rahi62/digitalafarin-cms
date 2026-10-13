@@ -1,0 +1,16 @@
+.contentListFilters{display:grid;grid-template-columns:minmax(190px,1.4fr) repeat(3,minmax(140px,1fr));gap:12px;align-items:end;}
+.contentListFilters .field span{font-size:12px;font-weight:600;color:#344054;}
+.contentListFilters .field input,.contentListFilters .field select{min-width:0;}
+.contentListActions{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-start;flex-wrap:wrap;}
+.contentListSummary{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0 8px;color:#667085;}
+.contentListSummary strong{font-size:19px;color:#101828;}
+.contentListSummary span{font-size:12px;}
+.contentListTitle{font-weight:600;color:#175cd3;}
+.contentListTitle:hover{text-decoration:underline;}
+.contentListPath{display:inline-block;direction:ltr;text-align:left;max-width:280px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;white-space:nowrap;color:#475467;font-size:12px;}
+.contentListTable td{vertical-align:middle;}
+.contentListEmpty{text-align:center;padding:36px 12px;color:#667085;}
+.contentListPagination{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:20px;}
+.contentListPagination button:disabled{opacity:.45;cursor:not-allowed;}
+@media(max-width:1100px){.contentListFilters{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:600px){.contentListFilters{grid-template-columns:1fr;}.contentListActions{grid-column:1}.contentListActions button{flex:1}.contentListPagination{gap:8px;}.contentListPagination button{padding:9px 11px;}}
