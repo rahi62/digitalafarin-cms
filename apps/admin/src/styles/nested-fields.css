@@ -27,3 +27,9 @@
 .cmsNestedThumb img{height:100%;width:100%;object-fit:cover;}
 .cmsNestedThumb button{position:absolute;inset-inline-start:4px;top:4px;border:0;border-radius:5px;background:rgba(255,255,255,.9);padding:2px 7px;cursor:pointer;}
 @media(max-width:700px){.cmsDesignerNestedInputs,.cmsNestedGroup .customFieldsGrid,.cmsNestedItem .customFieldsGrid{grid-template-columns:1fr;}.cmsNestedSearch button{display:grid;}.cmsDesignerLimits{grid-template-columns:1fr;}}
+
+.cmsSchemaImpact{border:1px solid #fda29b;border-radius:11px;background:#fef3f2;color:#912018;padding:15px;display:grid;gap:8px;line-height:1.8;}
+.cmsSchemaImpact.isSafe{background:#ecfdf3;border-color:#abefc6;color:#027a48;}
+.cmsSchemaImpact strong{font-size:14px;}
+.cmsSchemaImpact span,.cmsSchemaImpact li{font-size:12px;}
+.cmsSchemaImpact ul{margin:0;padding-inline-start:20px;}
