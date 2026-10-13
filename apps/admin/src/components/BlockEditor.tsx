@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import MediaPicker, { MediaAsset } from "@/components/MediaPicker";
+import ReusableBlockPicker from "@/components/ReusableBlockPicker";
 
 export type BlockType =
   | "paragraph"
@@ -24,6 +25,7 @@ type Props = {
   value: ContentBlock[];
   onChange: (blocks: ContentBlock[]) => void;
   siteId?: string;
+  maxBlocks?: number;
 };
 
 type BlockDefinition = {
@@ -65,9 +67,11 @@ function bool(value: unknown) {
   return value === true;
 }
 
-export default function BlockEditor({ value, onChange, siteId }: Props) {
+export default function BlockEditor({ value, onChange, siteId, maxBlocks }: Props) {
   const [showLibrary, setShowLibrary] = useState(value.length === 0);
   const [showJson, setShowJson] = useState(false);
+  const [showReusable, setShowReusable] = useState(false);
+  const atLimit = maxBlocks !== undefined && value.length >= maxBlocks;
   const [jsonDraft, setJsonDraft] = useState("");
   const [jsonError, setJsonError] = useState("");
 
@@ -81,6 +85,7 @@ export default function BlockEditor({ value, onChange, siteId }: Props) {
   }, [value]);
 
   function addBlock(definition: BlockDefinition) {
+    if (atLimit) return;
     onChange([
       ...value,
       {
@@ -101,6 +106,7 @@ export default function BlockEditor({ value, onChange, siteId }: Props) {
   }
 
   function duplicateBlock(index: number) {
+    if (atLimit) return;
     const source = value[index];
     const copy = { ...source, id: uid(source.type), data: cloneData(source.data) };
     const next = [...value];
@@ -133,6 +139,7 @@ export default function BlockEditor({ value, onChange, siteId }: Props) {
     try {
       const parsed = JSON.parse(jsonDraft);
       if (!Array.isArray(parsed)) throw new Error("Root value must be an array");
+      if (maxBlocks !== undefined && parsed.length > maxBlocks) throw new Error(`حداکثر ${maxBlocks} بلوک مجاز است`);
       const richTextIndexes = parsed
         .map((block, index) => block && typeof block === "object" && block.type === "rich_text" ? index : -1)
         .filter((index) => index >= 0);
@@ -159,11 +166,12 @@ export default function BlockEditor({ value, onChange, siteId }: Props) {
         </div>
         <div className="blockEditorTopActions">
           <button type="button" className="btn secondary small" onClick={openJson}>JSON</button>
-          <button type="button" className="btn small" onClick={() => setShowLibrary((v) => !v)}>+ افزودن بلوک</button>
+          {!atLimit && <button type="button" className="btn small" onClick={() => setShowLibrary((v) => !v)}>+ افزودن بلوک</button>}
+          {!atLimit && siteId && <button type="button" className="btn secondary small" onClick={() => setShowReusable(true)}>از کتابخانه</button>}
         </div>
       </div>
 
-      {showLibrary && (
+      {showLibrary && !atLimit && (
         <div className="blockLibrary">
           {definitions.map((definition) => (
             <button type="button" key={definition.type} onClick={() => addBlock(definition)}>
@@ -193,7 +201,7 @@ export default function BlockEditor({ value, onChange, siteId }: Props) {
               <div className="editorBlockActions">
                 <button type="button" title="بالا" disabled={!canMoveBlock(index, -1)} onClick={() => moveBlock(index, -1)}>↑</button>
                 <button type="button" title="پایین" disabled={!canMoveBlock(index, 1)} onClick={() => moveBlock(index, 1)}>↓</button>
-                <button type="button" title="تکثیر" disabled={block.type === "rich_text"} onClick={() => duplicateBlock(index)}>⧉</button>
+                <button type="button" title="تکثیر" disabled={atLimit || block.type === "rich_text"} onClick={() => duplicateBlock(index)}>⧉</button>
                 <button type="button" className="danger" title="حذف" onClick={() => removeBlock(index)}>×</button>
               </div>
             </div>
@@ -202,10 +210,17 @@ export default function BlockEditor({ value, onChange, siteId }: Props) {
         ))}
       </div>
 
-      {value.length > 0 && (
+      {value.length > 0 && !atLimit && (
         <button type="button" className="addBlockInline" onClick={() => setShowLibrary(true)}>+ افزودن بلوک دیگر</button>
       )}
 
+      {siteId && <ReusableBlockPicker siteId={siteId} open={showReusable} onClose={() => setShowReusable(false)}
+        onSelect={(block) => {
+          if (atLimit) return;
+          const id = uid(block.type);
+          onChange([...value, { ...block, id, data: JSON.parse(JSON.stringify(block.data || {})) }]);
+          setShowReusable(false);
+        }} />}
       {showJson && (
         <div className="jsonModalBackdrop" role="dialog" aria-modal="true">
           <div className="jsonModal">
