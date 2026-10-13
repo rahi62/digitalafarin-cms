@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
+import AdvancedFieldDesigner from "@/components/AdvancedFieldDesigner";
 import { apiFetch, Paginated } from "@/lib/api";
 import type { CustomFieldDefinition, CustomFieldType, ContentTypeSchema } from "@/components/CustomFieldsEditor";
 
@@ -30,6 +31,10 @@ const fieldTypes: Array<{ value: CustomFieldType; label: string }> = [
   { value: "select", label: "Select" },
   { value: "media", label: "Media" },
   { value: "json", label: "JSON" },
+  { value: "relation", label: "رابطه با محتوا" },
+  { value: "group", label: "گروه فیلد" },
+  { value: "repeater", label: "فیلد تکرارشونده" },
+  { value: "gallery", label: "گالری رسانه" },
 ];
 
 const presets: Record<string, CustomFieldDefinition[]> = {
@@ -81,6 +86,10 @@ function normalizeField(field: CustomFieldDefinition): CustomFieldDefinition {
     placeholder: field.placeholder || "",
     default: field.default,
     options: field.options || [],
+    fields: (field.fields || []).map(normalizeField),
+    target_content_type: field.target_content_type || "",
+    min_items: field.min_items ?? 0,
+    max_items: field.max_items ?? 50,
   };
 }
 
@@ -137,6 +146,7 @@ export default function ContentTypesPage() {
   }
 
   function removeField(index: number) {
+    if (editing.id && !window.confirm("حذف این فیلد از ساختار ممکن است برای محتوای موجود نیازمند Migration باشد. ادامه می‌دهید؟")) return;
     setFields(fields.filter((_, i) => i !== index));
   }
 
@@ -264,6 +274,7 @@ export default function ContentTypesPage() {
             </div>
           </div>
 
+          <p className="cmsDesignerNotice">فیلدهای گروهی، تکرارشونده، گالری و ارتباط با محتوای دیگر پشتیبانی می‌شوند. تغییر ناسازگار ساختار پس از ثبت محتوا به Migration جداگانه نیاز دارد و از ذخیره مخرب جلوگیری می‌شود.</p>
           <div className="fieldBuilderList">
             {fields.map((field, index) => (
               <div className="fieldBuilderRow" key={`${field.key}-${index}`}>
@@ -276,6 +287,7 @@ export default function ContentTypesPage() {
                   <div className="field"><label>Placeholder</label><input value={field.placeholder || ""} onChange={(e) => patchField(index, { placeholder: e.target.value })} /></div>
                   <div className="field"><label>Help text</label><input value={field.help_text || ""} onChange={(e) => patchField(index, { help_text: e.target.value })} /></div>
                   {field.type === "select" && <div className="field full"><label>Options — جداشده با کاما</label><input value={(field.options || []).map((option) => typeof option === "string" ? option : option.value).join(", ")} onChange={(e) => patchField(index, { options: e.target.value.split(",").map((item) => item.trim()).filter(Boolean) })} /></div>}
+                  <AdvancedFieldDesigner field={field} onChange={(next) => patchField(index, next)} />
                 </div>
                 <button type="button" className="fieldBuilderDelete" onClick={() => removeField(index)}>×</button>
               </div>
