@@ -60,6 +60,25 @@ class ContentTypeSerializer(serializers.ModelSerializer):
                 )
                 if issues:
                     raise serializers.ValidationError({"schema": issues})
+        kind = attrs.get("kind", getattr(self.instance, "kind", "collection"))
+        if kind == ContentTypeDefinition.Kind.SINGLETON and (collection or pattern):
+            raise serializers.ValidationError({
+                "kind": "Singleton content types use one manually routed entry, not a collection URL or entry pattern."
+            })
+        if self.instance is not None:
+            if self.instance.entries.exists() and kind != self.instance.kind:
+                raise serializers.ValidationError({
+                    "kind": "Changing collection/singleton semantics with existing entries requires a data migration."
+                })
+            if self.instance.entries.exists() and site.pk != self.instance.site_id:
+                raise serializers.ValidationError({"site": "Move existing entries via an explicit tenant migration."})
+            old_slug = self.instance.slug
+            if attrs.get("slug", old_slug) != old_slug:
+                other_schemas = ContentTypeDefinition.objects.filter(site_id=self.instance.site_id).exclude(pk=self.instance.pk)
+                if any(old_slug in relation_targets((ct.schema or {}).get("fields", [])) for ct in other_schemas):
+                    raise serializers.ValidationError({
+                        "slug": "Other content schemas refer to this type. Update their relationships in a controlled migration first."
+                    })
         attrs.update(collection_path=collection, entry_path_pattern=pattern)
         return attrs
 
@@ -105,7 +124,7 @@ class ContentEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model=ContentEntry
         fields="__all__"
-        read_only_fields=["published_at"]
+        read_only_fields=["published_at", "singleton_slot"]
         extra_kwargs={"path": {"required": False, "allow_blank": True}}
         validators=[]  # The final computed route is validated below and under a site lock on save.
 
@@ -118,7 +137,7 @@ class ContentEntrySerializer(serializers.ModelSerializer):
         except DjangoValidationError as exc:
             raise serializers.ValidationError(getattr(exc, "message_dict", {"path": exc.messages}))
         except IntegrityError:
-            raise serializers.ValidationError({"path": "A conflicting content record already exists."})
+            raise serializers.ValidationError({"non_field_errors": "A conflicting route or singleton record already exists."})
 
     def validate_blocks(self,value):
         if not isinstance(value,list): raise serializers.ValidationError("blocks must be a list")
@@ -145,6 +164,10 @@ class ContentEntrySerializer(serializers.ModelSerializer):
 
         if site and ctype and ctype.site_id != site.id:
             raise serializers.ValidationError({"content_type":"Content type must belong to the same site."})
+        if ctype and ctype.kind == ContentTypeDefinition.Kind.SINGLETON:
+            requested_mode = attrs.get("path_mode", getattr(self.instance, "path_mode", "manual"))
+            if requested_mode != "manual":
+                raise serializers.ValidationError({"path_mode": "Singleton pages require a manual route."})
         if site and parent and parent.site_id != site.id:
             raise serializers.ValidationError({"parent":"Parent entry must belong to the same site."})
         if would_create_parent_cycle(self.instance, parent):

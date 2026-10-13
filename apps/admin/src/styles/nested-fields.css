@@ -33,3 +33,8 @@
 .cmsSchemaImpact strong{font-size:14px;}
 .cmsSchemaImpact span,.cmsSchemaImpact li{font-size:12px;}
 .cmsSchemaImpact ul{margin:0;padding-inline-start:20px;}
+
+.cmsSingletonHint{display:flex;align-items:center;flex-wrap:wrap;gap:10px;background:#eff8ff;border:1px solid #b2ddff;border-radius:12px;padding:12px 14px;color:#175cd3;font-size:13px;line-height:1.9;}
+.cmsSingletonHint strong{font-size:13px;}
+.contentTypeEditor .cmsSingletonHint{grid-column:1/-1;}
+@media(max-width:700px){.cmsSingletonHint .btn{width:100%;text-align:center;}}

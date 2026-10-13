@@ -14,6 +14,7 @@ type ContentType = {
   slug: string;
   icon: string;
   is_public: boolean;
+  kind: "collection" | "singleton";
   collection_path: string;
   entry_path_pattern: string;
   schema: ContentTypeSchema;
@@ -64,7 +65,7 @@ const presets: Record<string, CustomFieldDefinition[]> = {
 };
 
 function emptyType(site = ""): ContentType {
-  return { site, name: "", slug: "", icon: "", is_public: true, collection_path: "", entry_path_pattern: "", schema: { fields: [] } };
+  return { site, name: "", slug: "", icon: "", is_public: true, kind: "collection", collection_path: "", entry_path_pattern: "", schema: { fields: [] } };
 }
 
 function slugify(value: string) {
@@ -194,6 +195,7 @@ export default function ContentTypesPage() {
         slug: editing.slug.trim(),
         icon: editing.icon.trim(),
         is_public: editing.is_public,
+        kind: editing.kind || "collection",
         collection_path: editing.collection_path || "",
         entry_path_pattern: editing.entry_path_pattern || "",
         schema: { ...editing.schema, fields },
@@ -251,7 +253,7 @@ export default function ContentTypesPage() {
             {rows.map((item) => (
               <button type="button" key={item.id} className={editing.id === item.id ? "active" : ""} onClick={() => { setImpact(null); setEditing({ ...item, schema: item.schema || { fields: [] } }); }}>
                 <span className="contentTypeIcon">{item.icon || "◇"}</span>
-                <span><strong>{item.name}</strong><small>/{item.slug} · {(item.schema?.fields || []).length} field</small></span>
+                <span><strong>{item.name}</strong><small>/{item.slug} · {(item.schema?.fields || []).length} field · {item.kind === "singleton" ? "یکتا" : "مجموعه"}</small></span>
                 <b>{item.is_public ? "Public" : "Private"}</b>
               </button>
             ))}
@@ -271,9 +273,14 @@ export default function ContentTypesPage() {
               setEditing((current) => ({ ...current, name, slug: current.id || current.slug ? current.slug : slugify(name) }));
             }} placeholder="مثلاً Tour" /></div>
             <div className="field"><label>Slug</label><input dir="ltr" value={editing.slug} onChange={(e) => setEditing({ ...editing, slug: slugify(e.target.value) })} placeholder="tour" /></div>
+            <div className="field"><label>مدل محتوا</label><select value={editing.kind || "collection"} onChange={(e) => {
+              const kind = e.target.value as "collection" | "singleton";
+              setEditing({ ...editing, kind, collection_path: kind === "singleton" ? "" : editing.collection_path, entry_path_pattern: kind === "singleton" ? "" : editing.entry_path_pattern });
+            }}><option value="collection">مجموعه (Collection) — چندین محتوا</option><option value="singleton">صفحه یکتا (Singleton) — فقط یک محتوا</option></select><small>تغییر مدل ساختار دارای محتوا نیازمند مهاجرت داده است.</small></div>
             <div className="field"><label>Icon</label><input value={editing.icon} onChange={(e) => setEditing({ ...editing, icon: e.target.value })} placeholder="✈" /></div>
-            <div className="field"><label>مسیر فهرست</label><input dir="ltr" placeholder="/blog" value={editing.collection_path || ""} onChange={(e) => setEditing({ ...editing, collection_path: e.target.value })} /></div>
-            <div className="field"><label>الگوی آدرس محتوا</label><input dir="ltr" placeholder="/blog/{slug}/" value={editing.entry_path_pattern || ""} onChange={(e) => setEditing({ ...editing, entry_path_pattern: e.target.value })} /><small>برای Page و صفحهٔ اصلی هر دو فیلد مسیر را خالی بگذارید. تغییر الگو، آدرس محتوای موجود را جابه‌جا نمی‌کند.</small></div>
+            {editing.kind !== "singleton" && <div className="field"><label>مسیر فهرست</label><input dir="ltr" placeholder="/blog" value={editing.collection_path || ""} onChange={(e) => setEditing({ ...editing, collection_path: e.target.value })} /></div>}
+            {editing.kind !== "singleton" && <div className="field"><label>الگوی آدرس محتوا</label><input dir="ltr" placeholder="/blog/{slug}/" value={editing.entry_path_pattern || ""} onChange={(e) => setEditing({ ...editing, entry_path_pattern: e.target.value })} /><small>برای Page و صفحهٔ اصلی هر دو فیلد مسیر را خالی بگذارید. تغییر الگو، آدرس محتوای موجود را جابه‌جا نمی‌کند.</small></div>}
+            {editing.kind === "singleton" && <p className="cmsSingletonHint">این نوع محتوا فقط یک رکورد دارد؛ آدرس آن را هنگام ساخت همان صفحه تعیین می‌کنید. مسیرهای اختصاصی Next.js بدون اجازه تغییر نمی‌کنند.</p>}
             <label className="contentTypePublic"><input type="checkbox" checked={editing.is_public} onChange={(e) => setEditing({ ...editing, is_public: e.target.checked })} /><span><strong>Public</strong><small>قابل استفاده در خروجی عمومی سایت</small></span></label>
           </div>
 
