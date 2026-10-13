@@ -129,3 +129,38 @@ class NestedSchemaTests(TestCase):
                                     {"key": "optional_note", "type": "text"}]},
         }, format="json")
         self.assertEqual(safe.status_code, 200, safe.data)
+
+
+    def test_schema_impact_dry_run_reports_risks_without_writing(self):
+        created = self.client.post("/api/cms/v1/content/entries/",
+                                   self.entry_payload(self.valid_fields()), format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        endpoint = f"/api/cms/v1/content/types/{self.kind_id}/schema-impact/"
+        proposed = {"fields": [field for field in self.schema["fields"] if field["key"] != "location"]}
+        before = ContentTypeDefinition.objects.get(pk=self.kind_id).schema
+        result = self.client.post(endpoint, {"schema": proposed}, format="json")
+        self.assertEqual(result.status_code, 200, result.data)
+        self.assertFalse(result.data["safe"])
+        self.assertEqual(result.data["affected_entries"], 1)
+        self.assertTrue(result.data["warnings"])
+        self.assertEqual(ContentTypeDefinition.objects.get(pk=self.kind_id).schema, before)
+        compatible = self.client.post(endpoint, {
+            "schema": {"fields": [*self.schema["fields"], {"key": "notes", "type": "textarea"}]},
+        }, format="json")
+        self.assertEqual(compatible.status_code, 200, compatible.data)
+        self.assertTrue(compatible.data["safe"])
+
+    def test_schema_impact_requires_write_role_and_tenant_scope(self):
+        viewer = get_user_model().objects.create_user(username="nested-viewer")
+        Membership.objects.create(organization=self.org, user=viewer, role=Membership.Role.VIEWER)
+        client = APIClient()
+        client.force_authenticate(viewer)
+        endpoint = f"/api/cms/v1/content/types/{self.kind_id}/schema-impact/"
+        denied = client.post(endpoint, {"schema": self.schema}, format="json")
+        self.assertEqual(denied.status_code, 403)
+        foreign = ContentTypeDefinition.objects.create(site=self.other_site, name="Foreign", slug="foreign")
+        hidden = self.client.post(
+            f"/api/cms/v1/content/types/{foreign.pk}/schema-impact/",
+            {"schema": {"fields": []}}, format="json",
+        )
+        self.assertEqual(hidden.status_code, 404)
