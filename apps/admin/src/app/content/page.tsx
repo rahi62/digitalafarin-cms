@@ -37,6 +37,15 @@ export default function ContentPage() {
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const targetSite = params.get("site") || "";
+    const targetStatus = params.get("status") || "";
+    const allowedStatuses = ["draft", "review", "scheduled", "published", "archived"];
+    if (targetSite) setSite(targetSite);
+    if (allowedStatuses.includes(targetStatus)) setStatus(targetStatus as Status);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     Promise.all([apiFetch<Paginated<Site>>("/sites/"), apiFetch<Paginated<ContentType>>("/content/types/")])
       .then(([s, t]) => { if (active) { setSites(s.results); setTypes(t.results); } })
