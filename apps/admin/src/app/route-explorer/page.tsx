@@ -20,9 +20,10 @@ type Mapping = { route: string; file: string; source: "cms" | "host"; mode: "pag
 type Report = { version: number; generated_at: string; routes: RouteItem[]; mappings: Mapping[]; errors: string[]; warnings: string[]; mapped: boolean };
 type ViewMode = "all" | "unmapped" | "cms" | "host" | "protected";
 
-function commandFor(route: RouteItem, mode: string, contentType: string) {
+function commandFor(route: RouteItem, mode: string, contentType: string, source: "cms" | "host") {
   const safeRoute = route.url.replaceAll('"', '\\"');
-  return `npx @digitalafarin/cms-cli map-route --frontend . --route "${safeRoute}" --mode ${mode} --content-type ${contentType.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const cmsType = source === "cms" ? ` --content-type ${contentType.replace(/[^a-zA-Z0-9_-]/g, "")}` : "";
+  return `npx @digitalafarin/cms-cli map-route --frontend . --route "${safeRoute}" --mode ${mode} --source ${source}${cmsType}`;
 }
 function formatDate(value: string) {
   try { return new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
@@ -37,6 +38,8 @@ export default function RouteExplorerPage() {
   const [view, setView] = useState<ViewMode>("all");
   const [selected, setSelected] = useState<string | null>(null);
   const [contentType, setContentType] = useState("post");
+  const [source, setSource] = useState<"cms" | "host">("cms");
+  const [mode, setMode] = useState<"page" | "collection" | "detail">("page");
   const [copied, setCopied] = useState(false);
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -74,12 +77,12 @@ export default function RouteExplorerPage() {
   const unmappedCount = report?.routes.filter((route) => route.kind === "page" && !route.reserved && !mappedByRoute.has(route.url)).length || 0;
   const selectedRoute = report?.routes.find((route) => route.url === selected && route.kind === "page");
   const canMap = selectedRoute && !selectedRoute.reserved && !selectedRoute.parallel && !selectedRoute.intercepted;
-  const proposedMode = selectedRoute?.route_kind === "static" ? "page" : "detail";
+  const modeAllowed = selectedRoute && (mode === "detail" ? selectedRoute.route_kind !== "static" : mode === "collection" ? selectedRoute.route_kind === "static" : true);
 
   async function copyCommand() {
     if (!selectedRoute || !canMap) return;
     try {
-      await navigator.clipboard.writeText(commandFor(selectedRoute, proposedMode, contentType));
+      await navigator.clipboard.writeText(commandFor(selectedRoute, mode, contentType, source));
       setCopied(true);
     } catch { setCopied(false); setError("مرورگر اجازه کپی نداد. دستور را از بخش زیر به‌صورت دستی کپی کنید."); }
   }
@@ -133,7 +136,7 @@ export default function RouteExplorerPage() {
                 <td>{route.kind === "route" ? "API" : route.route_kind}</td>
                 <td>{protectedRoute ? "زیرساخت" : mapping?.source === "cms" ? `CMS · ${mapping.content_type}` : mapping?.source === "host" ? "میزبان" : "تعیین‌نشده"}</td>
                 <td><span className="routeExplorerFile" dir="ltr" title={route.file}>{route.file}</span></td>
-                <td><button type="button" className="btn secondary small" disabled={protectedRoute || route.parallel || route.intercepted} onClick={() => { setSelected(route.url); setCopied(false); }}>بررسی نگاشت</button></td>
+                <td><button type="button" className="btn secondary small" disabled={protectedRoute || route.parallel || route.intercepted} onClick={() => { const current = mappedByRoute.get(route.url); setSelected(route.url); setSource(current?.source || "cms"); setMode(current?.mode || (route.loader === "cms-collection" ? "collection" : route.route_kind === "static" ? "page" : "detail")); setContentType(current?.content_type || "post"); setCopied(false); }}>بررسی نگاشت</button></td>
               </tr>;
             })}</tbody>
           </table>
@@ -144,12 +147,14 @@ export default function RouteExplorerPage() {
         <div className="routeExplorerMappingHeader"><h2>بررسی نگاشت <code dir="ltr">{selectedRoute.url}</code></h2><button className="btn secondary small" onClick={() => setSelected(null)}>بستن</button></div>
         <p>منبع: <code dir="ltr">{selectedRoute.file}</code></p>
         <p>وضعیت Loader: <strong>{selectedRoute.loader}</strong> — با بررسی استاتیک تعیین شده است.</p>
-        <div className="field"><label htmlFor="route-content-type">نوع محتوا در Django</label>
+        <div className="routeExplorerMappingControls"><div className="field"><label htmlFor="route-owner">مالکیت</label><select id="route-owner" value={source} onChange={(event) => { setSource(event.target.value as "cms" | "host"); setCopied(false); }}><option value="cms">CMS</option><option value="host">سایت میزبان</option></select></div>
+        <div className="field"><label htmlFor="route-mode">نوع نگاشت</label><select id="route-mode" value={mode} onChange={(event) => { setMode(event.target.value as "page" | "collection" | "detail"); setCopied(false); }}><option value="page">صفحه</option>{selectedRoute.route_kind === "static" && <option value="collection">فهرست محتوا</option>}{selectedRoute.route_kind !== "static" && <option value="detail">جزئیات محتوا</option>}</select></div>
+        {source === "cms" && <div className="field"><label htmlFor="route-content-type">نوع محتوا در Django</label>
           <input id="route-content-type" value={contentType} onChange={(event) => { setContentType(event.target.value); setCopied(false); }} dir="ltr" />
-        </div>
-        <p>پیشنهاد ثبت نگاشت: <code dir="ltr">{selectedRoute.route_kind === "static" ? "page" : "detail"}</code></p>
-        <pre dir="ltr" className="routeExplorerCommand">{commandFor(selectedRoute, proposedMode, contentType)}</pre>
-        <button type="button" className="btn" disabled={!canMap || !/^[a-zA-Z0-9_-]+$/.test(contentType)} onClick={copyCommand}>{copied ? "دستور کپی شد" : "کپی دستور نگاشت"}</button>
+        </div>}</div>
+        <p>نوع نگاشت انتخاب‌شده: <code dir="ltr">{mode}</code></p>
+        <pre dir="ltr" className="routeExplorerCommand">{commandFor(selectedRoute, mode, contentType, source)}</pre>
+        <button type="button" className="btn" disabled={!canMap || !modeAllowed || (source === "cms" && !/^[a-zA-Z0-9_-]+$/.test(contentType))} onClick={copyCommand}>{copied ? "دستور کپی شد" : "کپی دستور نگاشت"}</button>
         <p className="muted">این دکمه فایلی را ویرایش نمی‌کند؛ اجرای دستور، بازبینی Loader و تأیید عملکرد در staging ضروری است.</p>
       </section>}
     </>}
