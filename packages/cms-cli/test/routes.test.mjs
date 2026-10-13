@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { inventory, mapRoute, readRouteMap, validateRoutes } from '../bin/routes.js';
+import { inventory, mapRoute, readRouteMap, validateRoutes, exportRouteReport } from '../bin/routes.js';
 
 function fixture(t, files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'route-map-'));
@@ -97,4 +97,23 @@ test('CLI commands expose read-only inventory and enforce explicit mapping', (t)
   const verified = run('validate-routes');
   assert.equal(verified.status, 0, verified.stdout + verified.stderr);
   assert.match(verified.stdout, /"errors": \[\]/);
+});
+
+test('route explorer export is opt-in and writes a validated snapshot', (t) => {
+  const root = fixture(t, {
+    'app/page.tsx': 'export default function Home() {}',
+    'app/blog/[slug]/page.tsx': 'cms.resolveForRoute()',
+  });
+  const target = path.join(root, '.digitalafarin', 'routes-report.json');
+  assert.ok(!fs.existsSync(target));
+  mapRoute(root, root, { route: '/blog/[slug]', mode: 'detail', contentType: 'post' });
+  assert.ok(!fs.existsSync(target));
+  const exported = exportRouteReport(root, root);
+  assert.equal(exported.filename, target);
+  const parsed = JSON.parse(fs.readFileSync(target, 'utf8'));
+  assert.equal(parsed.version, 1);
+  assert.equal(parsed.mappings[0].content_type, 'post');
+  assert.ok(parsed.generated_at);
+  assert.equal(parsed.errors.length, 0);
+  assert.equal(parsed.warnings.length, 0);
 });
