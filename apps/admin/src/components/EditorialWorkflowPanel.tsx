@@ -138,7 +138,7 @@ export default function EditorialWorkflowPanel({ entryId, onUpdated, beforeActio
           <button type="button" className="btn secondary" disabled={Boolean(busy)} onClick={() => run("return-draft", {}, "به Draft برگشت")}>بازگشت به Draft</button>
         )}
         {workflow.can_publish && (
-          <button type="button" className="btn" disabled={Boolean(busy)} onClick={() => run("publish", {}, workflow.has_live_version ? "نسخه عمومی به‌روزرسانی شد" : "منتشر شد")}>{workflow.has_live_version ? "انتشار تغییرات" : "انتشار اکنون"</button>
+          <button type="button" className="btn" disabled={Boolean(busy)} onClick={() => run("publish", {}, workflow.has_live_version ? "نسخه عمومی به‌روزرسانی شد" : "منتشر شد")}>{workflow.has_live_version ? "انتشار تغییرات" : "انتشار اکنون"}</button>
         )}
         {workflow.can_unschedule && (
           <button type="button" className="btn dangerBtn" disabled={Boolean(busy)} onClick={() => run("unschedule", {}, "زمان‌بندی لغو شد")}>لغو زمان‌بندی</button>
