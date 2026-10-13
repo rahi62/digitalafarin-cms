@@ -136,6 +136,37 @@ backend content types, tenant scope, dynamic content data, preview, media, publi
 redirects, and old routes in staging. Before applying CLI-generated proposals,
 review `.digitalafarin/integration.json` and keep legacy host loaders intact.
 
+## Route Explorer Admin UI (feature branch; not released yet)
+
+The Admin sidebar now includes **Route Explorer** under \`/cms/route-explorer\`.
+It is deliberately read-only: the browser neither inspects source files nor writes
+host code. Route ownership changes still require explicit CLI mapping and reviewed
+loader integration.
+
+After installing/updating the local feature-branch packages, from the host project:
+
+\`\`\`bash
+digitalafarin-cms routes --frontend . --export-report
+\`\`\`
+
+This writes \`.digitalafarin/routes-report.json\` containing source routes, mappings,
+static warnings and export timestamp. Keep this generated file available to the
+Next.js Admin server (e.g. in the host's working directory), or set the **server-only**
+\`DIGITALAFARIN_CMS_ROUTE_REPORT_PATH\` to an absolute file path in standalone deployments.
+The HTTP endpoint \`/cms/route-explorer/report\` checks the supplied Bearer token with
+Django before returning the snapshot. It returns 404 if no report exists, and does not
+trigger a scan. Never expose that file via public/static routes.
+
+Re-export the report after changing host routes or mapping configuration.
+The UI can search/filter ownership and copy a suggested \`map-route\` command. A
+saved map is an intention, not proof of correct CMS data flow. Verify with
+\`validate-routes\`, host loaders and staging E2E before deployment.
+
+Embedded CSS is wrapped in native \`@scope (.digitalafarinCmsAdmin)\`, so CMS
+component styles do not spill into similarly named host classes. Verify the host's
+target browser supports CSS Scope; rebuild explicitly to refresh previously copied
+embedded Admin sources, and review any local customizations before using \`--force\`.
+
 ## Doctor
 
 ```bash
