@@ -1,6 +1,9 @@
 """Explicit publication boundary between a mutable editorial entry and public content."""
 
 from copy import deepcopy
+import json
+
+from django.core.serializers.json import DjangoJSONEncoder
 
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
@@ -38,12 +41,12 @@ def capture_publication(entry):
         "scheduled_at": None,
     }
     seo_obj = SeoMeta.objects.filter(entry=entry).first()
-    seo = dict(SeoMetaSerializer(seo_obj).data) if seo_obj else {}
+    seo = json.loads(json.dumps(dict(SeoMetaSerializer(seo_obj).data), cls=DjangoJSONEncoder)) if seo_obj else {}
     if seo_obj:
         seo["og_image"] = seo_obj.og_image
-    schemas = list(SchemaMarkupSerializer(
+    schemas = json.loads(json.dumps(list(SchemaMarkupSerializer(
         SchemaMarkup.objects.filter(entry=entry, is_active=True), many=True,
-    ).data)
+    ).data), cls=DjangoJSONEncoder))
     return payload, seo, schemas, categories, tags
 
 
