@@ -139,8 +139,10 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 
         if entry.status in PROTECTED_STATUSES and not _publisher(self.request.user, entry):
             raise PermissionDenied("Only publishing roles can edit published or scheduled content.")
-        if requested_status in PROTECTED_STATUSES and requested_status != entry.status:
-            raise PermissionDenied("Use the publish or schedule workflow action for this transition.")
+        if requested_status != entry.status and (
+            requested_status in PROTECTED_STATUSES or entry.status in PROTECTED_STATUSES
+        ):
+            raise PermissionDenied("Use the editorial workflow to change a published or scheduled state.")
 
         saved = serializer.save()
         create_revision(saved, self.request.user, "Updated")
