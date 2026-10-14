@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import Link from "next/link";
 import { adminPath } from "@/lib/admin-path";
-import { getAccessToken } from "@/lib/api";
+import { sessionRequest } from "@/lib/api";
 
 type RouteItem = {
   url: string;
@@ -46,12 +46,9 @@ export default function RouteExplorerPage() {
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError("");
-    const token = getAccessToken();
-    if (!token) { setLoading(false); setError("برای مشاهده گزارش ابتدا وارد پنل شوید."); return; }
+    // Session is validated server-side; browser JavaScript never accesses JWTs.
     try {
-      const res = await fetch(adminPath("/route-explorer/report"), {
-        headers: { Authorization: `Bearer ${token}` }, signal, cache: "no-store",
-      });
+      const res = await sessionRequest(adminPath("/route-explorer/report"), { signal });
       const body = await res.json();
       if (!res.ok) throw new Error(body.detail || `HTTP ${res.status}`);
       setReport(body as Report);
