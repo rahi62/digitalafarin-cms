@@ -92,7 +92,7 @@ export default function ComponentRegistryPage() {
       try {
         const [response, siteResponse] = await Promise.all([
           fetch(adminPath("/route-explorer/report"), {
-            headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: abort.signal,
+            headers: BFF_ENABLED ? {} : { Authorization: `Bearer ${token}` }, credentials: "same-origin", cache: "no-store", signal: abort.signal,
           }),
           apiFetch<Paginated<Site>>("/sites/?page_size=100", { signal: abort.signal }),
         ]);
