@@ -87,7 +87,7 @@ export default function ComponentRegistryPage() {
     const abort = new AbortController();
     async function load() {
       const token = getAccessToken();
-      if (!token) { setError("ابتدا به پنل CMS وارد شوید."); setLoading(false); return; }
+      if (!BFF_ENABLED && !token) { setError("ابتدا به پنل CMS وارد شوید."); setLoading(false); return; }
       setLoading(true);
       try {
         const [response, siteResponse] = await Promise.all([
