@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
                     choices=[("approve", "Approve"), ("rollback", "Rollback"), ("revoke", "Revoke")])),
                 ("from_version", models.PositiveIntegerField(null=True, blank=True)),
                 ("to_version", models.PositiveIntegerField(null=True, blank=True)),
-                ("checksum", models.CharField(max_length=64)),
+                ("checksum", models.CharField(max_length=64, blank=True)),
                 ("reason", models.CharField(max_length=500, blank=True)),
                 ("draft", models.ForeignKey(
                     to="digitalafarin_cms_content.componentbindingdraft",
