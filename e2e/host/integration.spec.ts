@@ -9,11 +9,19 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   const headers = { Authorization: `Bearer ${auth.access}` };
   // Route Explorer report is private and missing snapshots are reported truthfully.
   expect((await request.get('/cms/route-explorer/report')).status()).toBe(401);
-  const routeReport = await request.get('/cms/route-explorer/report', { headers });
+  const session = await page.request.post('/cms/session/login', {
+    headers: { 'x-cms-request': '1' },
+    data: { username: 'host-owner', password: 'fixture-password' },
+  });
+  expect(session.status()).toBe(200);
+  const sessionBody = await session.json();
+  expect(sessionBody).toEqual({ authenticated: true });
+  const routeReport = await page.request.get('/cms/route-explorer/report');
   expect(routeReport.status()).toBe(404);
   expect((await routeReport.json()).detail).toContain('No route report exported');
-  await page.addInitScript((token) => localStorage.setItem('cms_access_token', token), auth.access);
   await page.goto('/cms/route-explorer');
+  expect(await page.evaluate(() => localStorage.getItem('cms_access_token'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('cms_refresh_token'))).toBeNull();
   await expect(page.getByRole('heading', { name: 'کاوشگر مسیرها' })).toBeVisible();
   await expect(page.locator('#host-panel')).toHaveCSS('border-top-width', '0px'); // CMS .panel rules must not style host elements.
   await expect(page.locator('div.error[role="alert"]')).toContainText('No route report exported');
@@ -22,7 +30,7 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   const cli = path.resolve('packages/cms-cli/bin/cli.js');
   const exported = spawnSync(process.execPath, [cli, 'routes', '--frontend', fixtureRoot, '--export-report'], { encoding: 'utf8' });
   expect(exported.status, exported.stdout + exported.stderr).toBe(0);
-  const availableReport = await request.get('/cms/route-explorer/report', { headers });
+  const availableReport = await page.request.get('/cms/route-explorer/report');
   expect(availableReport.status()).toBe(200);
   const routeData = await availableReport.json();
   expect(routeData.routes).toEqual(expect.arrayContaining([expect.objectContaining({ url: '/blog' })]));
@@ -71,7 +79,6 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   await page.goto(homePreview.frontend_url);
   await expect(page.getByRole('heading', { name: 'Draft homepage' })).toBeVisible();
 
-  await page.addInitScript((token) => localStorage.setItem('cms_access_token', token), auth.access);
   await page.goto(`/cms/content/${entry.id}`);
   await expect.poll(() => page.locator('.tiptap img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   await expect(page.locator('output')).toContainText(entry.path);
