@@ -1,5 +1,6 @@
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from digitalafarin_cms.session_auth import CmsTokenObtainPairSerializer, CmsTokenRefreshSerializer
 from digitalafarin_cms.logout import CmsLogoutView
 
 urlpatterns = [
