@@ -18,10 +18,11 @@ To opt in for standalone or embedded Admin:
 NEXT_PUBLIC_DIGITALAFARIN_CMS_AUTH_MODE=bff
 DIGITALAFARIN_CMS_BFF_SECRET=<generate-a-random-secret-of-at-least-32-characters>
 DIGITALAFARIN_CMS_API_URL=http://127.0.0.1:8000/api/cms/v1
+DIGITALAFARIN_CMS_PUBLIC_ORIGIN=https://your-site.example
 NEXT_PUBLIC_DIGITALAFARIN_CMS_ADMIN_BASE_PATH=/cms
 ```
 
-Create a unique cryptographically strong `DIGITALAFARIN_CMS_BFF_SECRET` and store it in protected server environment settings; **never** use `NEXT_PUBLIC_` for this secret. Production requires HTTPS/TLS; secure cookies are enabled when `NODE_ENV=production`. All server instances must share the same BFF CSRF secret.
+Create a unique cryptographically strong `DIGITALAFARIN_CMS_BFF_SECRET` and store it in protected server environment settings; **never** use `NEXT_PUBLIC_` for this secret. Production requires HTTPS/TLS; secure cookies are enabled when `NODE_ENV=production`. All server instances must share the same BFF CSRF secret. Set `DIGITALAFARIN_CMS_PUBLIC_ORIGIN` to the exact public HTTPS origin to make strict Origin validation deterministic behind proxies.
 
 This feature is not enabled unless `NEXT_PUBLIC_DIGITALAFARIN_CMS_AUTH_MODE=bff`. Existing bearer-token users retain the previous compatibility path until host migration. Do not run both modes for the same Admin deployment without a coordinated upgrade.
 
