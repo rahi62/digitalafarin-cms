@@ -25,6 +25,7 @@ const links=[
   ["/audit","SEO Audit","✓"],
   ["/audit-trends","Audit Trends","↗"],
   ["/search-performance","Search Performance","⌁"],
+  ["/security/sessions","نشست‌های من","♙"],
   ["/settings","تنظیمات سایت","⚙"]
 ] as const;
 
