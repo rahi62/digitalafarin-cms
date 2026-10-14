@@ -88,12 +88,13 @@ function sessionExpired() {
 
 export async function logout(): Promise<void> {
   const refresh = getRefreshToken();
+  const access = getAccessToken();
   // Clear browser credentials first, independently of network availability.
   clearTokens();
   if (refresh) {
     try {
       await fetch(`${API_URL}/auth/logout/`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", ...(access ? { Authorization: `Bearer ${access}` } : {}) },
         body: JSON.stringify({ refresh }), cache: "no-store",
       });
     } catch { /* local logout remains in effect on network failure */ }
