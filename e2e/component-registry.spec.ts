@@ -24,7 +24,7 @@ const contentType = {
 };
 
 type ApprovalEvent = {
-  id: string; action: string; from_version: number | null; to_version: number;
+  id: string; action: string; from_version: number | null; to_version: number | null;
   reason: string; created_at: string;
 };
 type DraftState = {
@@ -76,7 +76,8 @@ async function mockDashboard(page: import("@playwright/test").Page, state: Draft
         body: JSON.stringify({ format_version: 1, approved_version: state.approvedVersion, slots: state.draft?.slots, runtime_status: "unverified" }) });
     }
     if ((path === "/content/component-bindings/binding-1/approve/" ||
-         path === "/content/component-bindings/binding-1/rollback-approval/") && method === "POST") {
+         path === "/content/component-bindings/binding-1/rollback-approval/" ||
+         path === "/content/component-bindings/binding-1/revoke-approval/") && method === "POST") {
       const data = route.request().postDataJSON() as {
         target_version: number; expected_approved_version: number | null;
         expected_draft_version: number; reason: string; confirm: boolean;
@@ -85,11 +86,11 @@ async function mockDashboard(page: import("@playwright/test").Page, state: Draft
       if (!data.confirm || data.expected_approved_version !== previous || data.expected_draft_version !== state.draft?.version) {
         return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ detail: "Version conflict" }) });
       }
-      state.approvedVersion = data.target_version;
+      state.approvedVersion = path.endsWith("revoke-approval/") ? null : data.target_version;
       state.events = [{
         id: "event-" + ((state.events?.length || 0) + 1),
-        action: path.endsWith("rollback-approval/") ? "rollback" : "approve",
-        from_version: previous, to_version: data.target_version, reason: data.reason,
+        action: path.endsWith("revoke-approval/") ? "revoke" : path.endsWith("rollback-approval/") ? "rollback" : "approve",
+        from_version: previous, to_version: state.approvedVersion, reason: data.reason,
         created_at: "2026-10-14T10:00:00Z",
       }, ...(state.events || [])];
       return route.fulfill({ status: 200, contentType: "application/json",
@@ -189,5 +190,10 @@ test("admin approval and rollback remain manual and preserve editable versions",
   await page.getByRole("button", { name: "ثبت Rollback تأیید" }).click();
   expect(state.approvedVersion).toBe(1);
   await expect(page.getByText("بازگردانی نسخه ۱")).toBeVisible();
+  await expect(page.getByText("اجرا روی میزبان:")).toContainText("تأییدنشده");
+  await page.getByRole("textbox", { name: "دلیل بازگردانی" }).fill("توقف انتشار تا تأیید میزبان");
+  await page.getByRole("button", { name: "لغو تأیید فعلی" }).click();
+  expect(state.approvedVersion).toBeNull();
+  await expect(page.getByText("لغو تأیید", { exact: true })).toBeVisible();
   await expect(page.getByText("اجرا روی میزبان:")).toContainText("تأییدنشده");
 });
