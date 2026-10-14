@@ -29,6 +29,11 @@ type SavedDraft = {
   slots: SavedBindingSlot[]; updated_at: string;
 };
 type SavedHistory = { current_version: number; results: Array<{ version: number; created_at: string; created_by: string | null }> };
+type Approval = {
+  draft_version: number; approved_version: number | null; approved_checksum: string | null;
+  approved_at: string | null; runtime_status: "unverified"; has_unapproved_changes: boolean;
+  events: Array<{ id: string; action: string; from_version: number | null; to_version: number | null; reason: string; created_at: string }>;
+};
 
 function toSavedSlots(drafts: ComponentSlotDraft[]): SavedBindingSlot[] {
   return drafts.map((slot) => ({
@@ -72,6 +77,11 @@ export default function ComponentRegistryPage() {
   const [history, setHistory] = useState<SavedHistory | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [approval, setApproval] = useState<Approval | null>(null);
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const [rollbackVersion, setRollbackVersion] = useState("");
+  const [rollbackReason, setRollbackReason] = useState("");
 
   useEffect(() => {
     const abort = new AbortController();
@@ -148,15 +158,69 @@ export default function ComponentRegistryPage() {
   const issues = useMemo(() => validateComponentSlots(slots, report?.routes || []), [slots, report]);
   const generated = useMemo(() => issues.length === 0 && slots.length > 0 ? generateRegistryCode(slots) : "", [slots, issues]);
   const mapped = report?.mappings.find((item) => active && normalizeRegistryRoute(item.route) === normalizeRegistryRoute(active.route));
+  const rollbackVersions = Array.from(new Set((approval?.events || []).map((event) => event.to_version)))
+    .filter((entryVersion): entryVersion is number => entryVersion !== null && entryVersion !== approval?.approved_version)
+    .sort((a, b) => b - a);
+
+  async function loadApproval(id: string) {
+    try {
+      const status = await apiFetch<Approval>(`/content/component-bindings/${id}/approval/`);
+      setApproval(status);
+    } catch (cause) {
+      setApproval(null);
+      setError(cause instanceof Error ? cause.message : "وضعیت تأیید Registry بارگذاری نشد.");
+    }
+  }
+  async function changeApproval(action: "approve" | "rollback" | "revoke") {
+    if (!draftId || version === null || approvalBusy || unsavedChanges || !approval) return;
+    const destination = action === "revoke" ? null : action === "approve" ? version : Number(rollbackVersion);
+    if (action !== "revoke" && (!Number.isInteger(destination) || destination === null || destination < 1)) return;
+    if ((action === "rollback" || action === "revoke") && !rollbackReason.trim()) {
+      setError("برای بازگردانی، دلیل تغییر را وارد کنید."); return;
+    }
+    const message = action === "approve"
+      ? `نسخه ${destination} برای استقرار احتمالی تأیید شود؟ این عملیات کد Next.js یا سایت زنده را تغییر نمی‌دهد.`
+      : action === "revoke" ? "تأیید فعلی کاملاً لغو شود؟ تاریخچه محفوظ است و این عمل هیچ دیپلوی خودکاری ایجاد نمی‌کند."
+      : `تأیید نسخه ${approval.approved_version} به نسخه ${destination} برگردد؟ هیچ دیپلوی خودکاری انجام نمی‌شود.`;
+    if (!window.confirm(message)) return;
+    setApprovalBusy(true); setError(""); setNotice("");
+    try {
+      const updated = await apiFetch<Approval>(
+        `/content/component-bindings/${draftId}/${action === "approve" ? "approve" : action === "revoke" ? "revoke-approval" : "rollback-approval"}/`,
+        { method: "POST", body: JSON.stringify({
+          confirm: true, target_version: destination,
+          expected_draft_version: version,
+          expected_approved_version: approval.approved_version,
+          reason: action === "approve" ? "" : rollbackReason.trim(),
+        }) },
+      );
+      setApproval(updated); setRollbackVersion(""); setRollbackReason("");
+      setNotice(`وضعیت تأیید ${destination === null ? "لغو شد" : `نسخه ${destination.toLocaleString("fa-IR")} ثبت شد`}؛ وضعیت اجرای میزبان همچنان تأیید نشده است.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "تغییر تأیید ناموفق بود. نسخه‌ها را دوباره بررسی کنید.");
+      await loadApproval(draftId);
+    } finally { setApprovalBusy(false); }
+  }
+  async function copyApprovedManifest() {
+    if (!draftId || !approval?.approved_version) return;
+    try {
+      const manifest = await apiFetch<Record<string, unknown>>(`/content/component-bindings/${draftId}/approved-manifest/`);
+      await navigator.clipboard.writeText(JSON.stringify(manifest, null, 2));
+      setNotice("نسخه تأییدشده برای بررسی و استفاده در میزبان کپی شد؛ هیچ تغییری روی سرور اعمال نشد.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "دریافت نسخه تأییدشده ناموفق بود"); }
+  }
 
   function clearSavedSelection() {
     setDraftId(""); setVersion(null); setHistory(null); setHostKey("main");
+    setApproval(null); setUnsavedChanges(false); setRollbackVersion(""); setRollbackReason("");
     setNotice("");
   }
   async function openSaved(draft: SavedDraft) {
     setDraftId(draft.id); setHostKey(draft.host_key); setVersion(draft.version);
     setSlots(fromSavedSlots(draft.slots)); setSelected(0);
-    setCopied(false); setNotice("");
+    setCopied(false); setNotice(""); setUnsavedChanges(false);
+    setApproval(null); setRollbackVersion(""); setRollbackReason("");
+    await loadApproval(draft.id);
     try {
       const result = await apiFetch<SavedHistory>(`/content/component-bindings/${draft.id}/history/`);
       setHistory(result);
@@ -176,6 +240,8 @@ export default function ComponentRegistryPage() {
         { method: draftId ? "PATCH" : "POST", body: JSON.stringify(payload) },
       );
       setDraftId(result.id); setVersion(result.version);
+      setUnsavedChanges(false);
+      void loadApproval(result.id);
       setNotice(`پیش‌نویس اتصال‌ها، نسخه ${result.version.toLocaleString("fa-IR")} ذخیره شد. این کار سایت میزبان را تغییر نمی‌دهد.`);
       const fresh = await apiFetch<Paginated<SavedDraft>>(`/content/component-bindings/?site=${encodeURIComponent(siteId)}&page_size=100`);
       setStored(fresh.results);
@@ -188,7 +254,7 @@ export default function ComponentRegistryPage() {
 
   function updateActive(patch: Partial<ComponentSlotDraft>) {
     setSlots((prev) => prev.map((item, index) => index === selected ? { ...item, ...patch } : item));
-    setCopied(false);
+    setCopied(false); setUnsavedChanges(true);
   }
   function changeProp(index: number, patch: Partial<ComponentSlotDraft["props"][number]>) {
     if (!active) return;
@@ -199,12 +265,12 @@ export default function ComponentRegistryPage() {
     if (!base) return;
     setSlots((prev) => [...prev, { ...newSlot(normalizeRegistryRoute(base.url) || base.url), id: `Slot${prev.length + 1}` }]);
     setSelected(slots.length);
-    setCopied(false);
+    setCopied(false); setUnsavedChanges(true);
   }
   function removeSlot() {
     setSlots((prev) => prev.filter((_, i) => i !== selected));
     setSelected(Math.max(0, selected - 1));
-    setCopied(false);
+    setCopied(false); setUnsavedChanges(true);
   }
   async function copyCode() {
     if (!generated) return;
@@ -265,6 +331,56 @@ export default function ComponentRegistryPage() {
           <span>{history.results.map((item) => item.version.toLocaleString("fa-IR")).join(" ← ")}</span>
         </div>}
       </section>
+      {draftId && <section className="panel registryApproval" aria-label="تأیید نسخه و بازگردانی">
+        <div className="registryApprovalHead"><h2>تأیید کنترل‌شده نسخه Registry</h2>
+          <span>اجرا روی میزبان: <strong>تأییدنشده</strong></span>
+        </div>
+        <p>تأیید یا Rollback فقط نسخه منتخب در CMS را تغییر می‌دهد. استقرار و اتصال واقعی Next.js باید جداگانه بررسی و اعمال شود.</p>
+        {approval ? <>
+          <div className="registryApprovalStats">
+            <span>نسخه پیش‌نویس: <strong>{version?.toLocaleString("fa-IR")}</strong></span>
+            <span>آخرین نسخه تأییدشده: <strong>{approval.approved_version?.toLocaleString("fa-IR") || "ندارد"}</strong></span>
+            {unsavedChanges && <strong className="registryApprovalWarning">تغییرات ذخیره‌نشده دارید؛ ابتدا ذخیره کنید.</strong>}
+          </div>
+          <div className="registryApprovalActions">
+            <button className="btn" type="button" disabled={approvalBusy || unsavedChanges || !generated || approval.approved_version === version}
+              onClick={() => void changeApproval("approve")}>{approvalBusy ? "در حال ثبت..." : "تأیید نسخه ذخیره‌شده"}</button>
+            <button className="btn secondary" type="button" disabled={approvalBusy || !approval.approved_version}
+              onClick={() => void copyApprovedManifest()}>کپی Manifest تأییدشده</button>
+          </div>
+          {approval.approved_version !== null && <div className="registryRevoke">
+            <strong>لغو کامل تأیید</strong>
+            <p>برای بازگشت به وضعیت بدون نسخه تأییدشده (حتی اولین تأیید)، دلیل را در فیلد پایین وارد کنید. هیچ رکوردی حذف نمی‌شود.</p>
+            <button type="button" className="btn secondary"
+              disabled={approvalBusy || unsavedChanges || !rollbackReason.trim()}
+              onClick={() => void changeApproval("revoke")}>لغو تأیید فعلی</button>
+          </div>}
+          {approval.approved_version !== null && rollbackVersions.length > 0 && <div className="registryRollback">
+            <h3>بازگرداندن تأیید به نسخه قبلی</h3>
+            <div className="registryRollbackFields">
+              <label className="field"><span>نسخه قبلاً تأییدشده</span>
+                <select value={rollbackVersion} onChange={(event) => setRollbackVersion(event.target.value)}>
+                  <option value="">انتخاب نسخه</option>
+                  {rollbackVersions.map((item) => <option key={item} value={item}>{item.toLocaleString("fa-IR")}</option>)}
+                </select></label>
+              <label className="field"><span>دلیل بازگردانی</span>
+                <input value={rollbackReason} maxLength={500} onChange={(event) => setRollbackReason(event.target.value)} />
+              </label>
+              <button type="button" className="btn secondary"
+                disabled={approvalBusy || unsavedChanges || !rollbackVersion || !rollbackReason.trim()}
+                onClick={() => void changeApproval("rollback")}>ثبت Rollback تأیید</button>
+            </div>
+          </div>}
+          {approval.events.length > 0 && <div className="registryApprovalLog">
+            <strong>تاریخچه تأییدها</strong>
+            {approval.events.slice(0, 8).map((event) => <div key={event.id}>
+              <span>{event.action === "revoke" ? "لغو تأیید" : `${event.action === "rollback" ? "بازگردانی" : "تأیید"} نسخه ${event.to_version?.toLocaleString("fa-IR") || "نامشخص"}`}</span>
+              <small>{new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(event.created_at))}</small>
+              {event.reason && <small>{event.reason}</small>}
+            </div>)}
+          </div>}
+        </> : <p>وضعیت تأیید هنوز دریافت نشده است.</p>}
+      </section>}
       <div className="registryContext panel">
         <label className="field"><span>سایت محتوایی</span>
           <select value={siteId} onChange={(event) => { setSiteId(event.target.value); clearSavedSelection(); }}>

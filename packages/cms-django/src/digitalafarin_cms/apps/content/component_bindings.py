@@ -9,7 +9,7 @@ from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from digitalafarin_cms.apps.common.tenancy import TenantScopedViewSetMixin
+from digitalafarin_cms.apps.common.tenancy import TenantScopedViewSetMixin, ensure_organization_roles
 from digitalafarin_cms.apps.sites.models import Membership
 from .models import ComponentBindingDraft, ComponentBindingRevision
 
@@ -166,3 +166,44 @@ class ComponentBindingViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
                 "created_by": str(row.created_by_id) if row.created_by_id else None,
             } for row in rows],
         })
+
+
+    def _require_approver(self, instance):
+        ensure_organization_roles(
+            self.request.user, instance.site.organization_id,
+            (Membership.Role.OWNER, Membership.Role.ADMIN),
+            "Only Owner or Admin can approve and roll back host registry configurations.",
+        )
+
+    @action(detail=True, methods=["get"], url_path="approval")
+    def approval(self, request, pk=None):
+        from .component_approvals import approval_state
+        instance = self.get_object()
+        return Response(approval_state(instance, include_history=True))
+
+    @action(detail=True, methods=["get"], url_path="approved-manifest")
+    def approved_manifest(self, request, pk=None):
+        from .component_approvals import get_approved_manifest
+        instance = self.get_object()
+        return Response(get_approved_manifest(instance))
+
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, pk=None):
+        from .component_approvals import change_approval
+        instance = self.get_object()
+        self._require_approver(instance)
+        return Response(change_approval(instance, request.user, action="approve", data=request.data))
+
+    @action(detail=True, methods=["post"], url_path="rollback-approval")
+    def rollback_approval(self, request, pk=None):
+        from .component_approvals import change_approval
+        instance = self.get_object()
+        self._require_approver(instance)
+        return Response(change_approval(instance, request.user, action="rollback", data=request.data))
+
+    @action(detail=True, methods=["post"], url_path="revoke-approval")
+    def revoke_approval(self, request, pk=None):
+        from .component_approvals import change_approval
+        instance = self.get_object()
+        self._require_approver(instance)
+        return Response(change_approval(instance, request.user, action="revoke", data=request.data))

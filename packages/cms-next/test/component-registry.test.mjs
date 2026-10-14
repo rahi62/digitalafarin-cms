@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   defineCmsComponentRegistry, resolveCmsComponentSlot, CmsComponentRegistryError,
+  assertCmsApprovedHostManifest,
 } from "../dist/index.js";
 
 const page = {
@@ -52,6 +53,7 @@ test("registry rejects unsafe binding roots, prototype keys, duplicates and rese
     { id: "BadId", route: "/", component: "Safe", props: { x: "content.custom_fields.__proto__.x" } },
     { id: "BadBinding", route: "/", component: "Safe", props: { x: "secret.password" } },
     { id: "BadUrl", route: "https://bad.test/", component: "Safe", props: { x: "content.title" } },
+    { id: "DynamicUrl", route: "/blog/[slug]/", component: "Safe", props: { x: "content.title" } },
     { id: "BadProp", route: "/", component: "Safe", props: { __proto__: "content.title", safe: "content.__proto__" } },
   ]) {
     assert.throws(() => defineCmsComponentRegistry([invalid]), CmsComponentRegistryError);
@@ -78,4 +80,34 @@ test("registry does not permit prototype traversal through nested content", () =
     id: "Hack", component: "Hack", route: "/",
     props: { key: "content.custom_fields.constructor" },
   }]), CmsComponentRegistryError);
+});
+
+test("pinned host manifest must exactly match CMS-approved revision and local components", () => {
+  const local = defineCmsComponentRegistry([{
+    id: "Hero", route: "/", component: "HeroSection",
+    props: { heading: "content.title", subtitle: "content.excerpt" },
+    required: ["heading"],
+  }]);
+  const slots = [{
+    id: "Hero", route: "/", component: "HeroSection",
+    props: { subtitle: "content.excerpt", heading: "content.title" },
+    required: ["heading"],
+  }];
+  const pinned = { site: "site-1", hostKey: "primary", version: 2, checksum: "a".repeat(64) };
+  const manifest = {
+    format_version: 1, site: "site-1", host_key: "primary",
+    approved_version: 2, sha256: pinned.checksum, slots, runtime_status: "unverified",
+  };
+  assert.doesNotThrow(() => assertCmsApprovedHostManifest(manifest, local, pinned));
+  for (const changed of [
+    { ...manifest, site: "another-tenant" },
+    { ...manifest, host_key: "other" },
+    { ...manifest, approved_version: 1 },
+    { ...manifest, sha256: "b".repeat(64) },
+    { ...manifest, slots: [{ ...slots[0], props: { heading: "content.custom_fields.other" } }] },
+    { ...manifest, slots: [{ ...slots[0], component: "RemoteRenderer" }] },
+    { ...manifest, slots: [{ ...slots[0], route: "/api/" }] },
+  ]) {
+    assert.throws(() => assertCmsApprovedHostManifest(changed, local, pinned), CmsComponentRegistryError);
+  }
 });

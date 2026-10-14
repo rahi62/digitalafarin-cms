@@ -30,7 +30,7 @@ const RESERVED_ROUTES = new Set(["api", "admin", "cms", "media", "_next", "stati
 
 function canonicalPath(input: string): string {
   if (typeof input !== "string" || !input.startsWith("/") || input.startsWith("//") ||
-      /[?#%\\:{}]/.test(input) || /[\x00-\x20]/.test(input)) {
+      /[?#%\\:{}]/.test(input) || ["[", "]", "*", "(", ")"].some((char) => input.includes(char)) || /[\x00-\x20]/.test(input)) {
     throw new CmsComponentRegistryError("A component route must be a safe absolute local path.");
   }
   const parts = input.split("/").filter(Boolean);
@@ -145,4 +145,56 @@ export function resolveCmsComponentSlot(
     }
   }
   return { id: slot.id, route: slot.route, component: slot.component, props };
+}
+
+
+/** Metadata retrieved by an authenticated server, never from arbitrary client input. */
+export type CmsApprovedManifest = {
+  format_version: number;
+  site: string;
+  host_key: string;
+  approved_version: number;
+  sha256: string;
+  slots: CmsHostComponentSlot[];
+  runtime_status?: "unverified";
+};
+
+/**
+ * Fail closed unless a CMS-approved revision exactly matches the host's
+ * explicitly compiled component allowlist and pinned deployment identity.
+ *
+ * Caller MUST use an authenticated, trusted HTTPS API response on the server.
+ * This does not fetch, deploy, import, or execute remote components.
+ */
+export function assertCmsApprovedHostManifest(
+  remote: unknown,
+  local: CmsComponentRegistry,
+  pinned: { site: string; hostKey: string; version: number; checksum: string },
+): asserts remote is CmsApprovedManifest {
+  if (!remote || typeof remote !== "object" || Array.isArray(remote)) {
+    throw new CmsComponentRegistryError("Approved host manifest is missing or invalid.");
+  }
+  const manifest = remote as Record<string, unknown>;
+  if (manifest.format_version !== 1 ||
+      manifest.site !== pinned.site || manifest.host_key !== pinned.hostKey ||
+      manifest.approved_version !== pinned.version ||
+      !/^[a-f0-9]{64}$/.test(String(manifest.sha256)) ||
+      manifest.sha256 !== pinned.checksum) {
+    throw new CmsComponentRegistryError("CMS approval differs from this host build's pinned deployment identity.");
+  }
+  const remoteSlots = defineCmsComponentRegistry(manifest.slots as CmsHostComponentSlot[]);
+  if (remoteSlots.length !== local.length) {
+    throw new CmsComponentRegistryError("CMS approved component count differs from host build.");
+  }
+  const toIdentity = (slot: CmsHostComponentSlot) => JSON.stringify({
+    id: slot.id, route: slot.route, component: slot.component,
+    props: Object.keys(slot.props).sort().map((name) => [name, slot.props[name]]),
+    required: [...(slot.required || [])].sort(),
+  });
+  const expected = new Map(local.map((item) => [item.id, toIdentity(item)]));
+  for (const slot of remoteSlots) {
+    if (!expected.has(slot.id) || expected.get(slot.id) !== toIdentity(slot)) {
+      throw new CmsComponentRegistryError("CMS approved component bindings differ from host allowlist.");
+    }
+  }
 }
