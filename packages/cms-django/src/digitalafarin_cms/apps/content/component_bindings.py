@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from digitalafarin_cms.apps.common.tenancy import TenantScopedViewSetMixin
+from digitalafarin_cms.apps.sites.models import Membership
 from .models import ComponentBindingDraft, ComponentBindingRevision
 
 
@@ -123,6 +124,7 @@ class ComponentBindingViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = ComponentBindingDraft.objects.select_related("site", "site__organization").all()
     serializer_class = ComponentBindingSerializer
     tenant_filter = "site__organization_id"
+    write_roles = (Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.EDITOR)
     filterset_fields = ["site", "host_key"]
     http_method_names = ["get", "post", "put", "patch", "head", "options"]
 
