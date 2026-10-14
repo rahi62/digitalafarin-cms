@@ -50,7 +50,7 @@ export default function RouteExplorerPage() {
     if (!BFF_ENABLED && !token) { setLoading(false); setError("برای مشاهده گزارش ابتدا وارد پنل شوید."); return; }
     try {
       const res = await fetch(adminPath("/route-explorer/report"), {
-        headers: { Authorization: `Bearer ${token}` }, signal, cache: "no-store",
+        headers: BFF_ENABLED ? {} : { Authorization: `Bearer ${token}` }, credentials: "same-origin", signal, cache: "no-store",
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.detail || `HTTP ${res.status}`);
