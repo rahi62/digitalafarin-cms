@@ -11,8 +11,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const path = stripAdminBasePath(pathname || "/");
 
   useEffect(() => {
-    if (path !== "/login" && !getAccessToken()) {
+    if (path === "/login") return;
+    if (!BFF_ENABLED && !getAccessToken()) {
       window.location.href = adminPath("/login");
+    } else if (BFF_ENABLED) {
+      fetch(adminPath("/auth/session/status"), { credentials: "same-origin", cache: "no-store" })
+        .then((response) => response.json())
+        .then((status) => { if (!status.hasSession) window.location.replace(adminPath("/login")); })
+        .catch(() => { /* API requests will fail closed if session is unavailable. */ });
     }
   }, [path]);
 
