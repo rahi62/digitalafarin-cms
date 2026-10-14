@@ -3,6 +3,14 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from digitalafarin_cms.session_auth import CmsTokenObtainPairSerializer, CmsTokenRefreshSerializer
 from digitalafarin_cms.logout import CmsLogoutView
 
+class CmsObtainPairView(TokenObtainPairView):
+    serializer_class = CmsTokenObtainPairSerializer
+
+
+class CmsRefreshView(TokenRefreshView):
+    serializer_class = CmsTokenRefreshSerializer
+
+
 urlpatterns = [
     path("auth/token/", TokenObtainPairView.as_view(), name="digitalafarin_cms_token_obtain_pair"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="digitalafarin_cms_token_refresh"),
