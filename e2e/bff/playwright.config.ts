@@ -23,6 +23,7 @@ export default defineConfig({
         NEXT_PUBLIC_DIGITALAFARIN_CMS_ADMIN_BASE_PATH: "/cms",
         NEXT_PUBLIC_DIGITALAFARIN_CMS_AUTH_MODE: "bff",
         DIGITALAFARIN_CMS_API_URL: "http://127.0.0.1:9779/api/cms/v1",
+        DIGITALAFARIN_CMS_PUBLIC_ORIGIN: "http://127.0.0.1:3104",
         DIGITALAFARIN_CMS_BFF_SECRET: "a-long-random-test-secret-that-is-over-32-bytes",
       },
     },
