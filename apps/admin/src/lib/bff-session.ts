@@ -72,7 +72,12 @@ export function clearSessionCookies(response: NextResponse) {
 }
 export function bffError(request: NextRequest, csrf = true): NextResponse | null {
   if (!ready()) return failure(503, "Secure BFF session is not configured.");
-  if (!sameOrigin(request)) return failure(403, "Cross-origin session request denied.");
+  const unsafe = !["GET", "HEAD", "OPTIONS"].includes(request.method.toUpperCase());
+  // Browsers generally omit Origin on same-origin GET, but must send it on writes.
+  if (unsafe && !sameOrigin(request)) return failure(403, "Cross-origin session request denied.");
+  if (!unsafe && ["cross-site", "same-site"].includes(request.headers.get("sec-fetch-site") || "")) {
+    return failure(403, "Cross-site session read denied.");
+  }
   if (csrf && !verifyCsrf(request)) return failure(403, "CSRF validation failed.");
   return null;
 }
