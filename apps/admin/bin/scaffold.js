@@ -179,6 +179,7 @@ function embed() {
     "nested-fields.css",
     "team.css",
     "trash.css",
+    "session-security.css",
   ].map((name) => `import "${styleRoot}/${name}";`).join("\n");
 
   fs.writeFileSync(
