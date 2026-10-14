@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
+import { BFF_MODE, names, ready } from "@/lib/bff-session";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,7 +13,10 @@ function result(body: unknown, status: number) {
 }
 
 export async function GET(request: NextRequest) {
-  const authorization = request.headers.get("authorization") || "";
+  if (BFF_MODE && !ready()) return result({ detail: "BFF authentication is not configured" }, 503);
+  const authorization = BFF_MODE
+    ? "Bearer " + (request.cookies.get(names.access)?.value || "")
+    : request.headers.get("authorization") || "";
   if (!/^Bearer [A-Za-z0-9._-]+$/.test(authorization)) return result({ detail: "Authentication required" }, 401);
 
   // Validate CMS identity with Django. Possession of an arbitrary token does not authorize route inspection.
