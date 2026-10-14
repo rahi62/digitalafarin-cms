@@ -13,7 +13,7 @@ class CmsRefreshView(TokenRefreshView):
 
 urlpatterns = [
     path("auth/token/", CmsObtainPairView.as_view(), name="digitalafarin_cms_token_obtain_pair"),
-    path("auth/token/refresh/", TokenRefreshView.as_view(), name="digitalafarin_cms_token_refresh"),
+    path("auth/token/refresh/", CmsRefreshView.as_view(), name="digitalafarin_cms_token_refresh"),
     path("auth/logout/", CmsLogoutView.as_view(), name="digitalafarin_cms_logout"),
     path("", include("digitalafarin_cms.apps.sites.urls")),
     path("content/", include("digitalafarin_cms.apps.content.urls")),
