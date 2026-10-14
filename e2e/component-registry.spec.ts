@@ -23,7 +23,8 @@ const contentType = {
   ]},
 };
 
-async function mockDashboard(page: import("@playwright/test").Page) {
+type DraftState = { draft?: { id: string; site: string; host_key: string; version: number; slots: Array<Record<string, unknown>>; updated_at: string }; };
+async function mockDashboard(page: import("@playwright/test").Page, state: DraftState = {}) {
   await page.addInitScript(() => localStorage.setItem("cms_access_token", "e2e-access-token"));
   await page.route("**" + "/cms/route-explorer/report", async (route: Route) => {
     expect(route.request().headers().authorization).toBe("Bearer e2e-access-token");
@@ -31,6 +32,27 @@ async function mockDashboard(page: import("@playwright/test").Page) {
   });
   await page.route("**" + "/cms/api-proxy/**", async (route: Route) => {
     const path = new URL(route.request().url()).pathname.replace("/cms/api-proxy", "");
+    const method = route.request().method();
+    const write = method === "POST" || method === "PATCH";
+    if (path === "/content/component-bindings/" && write) {
+      const data = route.request().postDataJSON() as Record<string, unknown>;
+      const version = state.draft ? state.draft.version + 1 : 1;
+      state.draft = { id: "binding-1", site: String(data.site),
+        host_key: String(data.host_key), version,
+        slots: data.slots as Array<Record<string, unknown>>, updated_at: "2026-10-14T10:00:00Z" };
+      return route.fulfill({ status: state.draft.version === 1 ? 201 : 200,
+        contentType: "application/json", body: JSON.stringify(state.draft) });
+    }
+    if (path === "/content/component-bindings/" && method === "GET") {
+      return route.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify({ count: state.draft ? 1 : 0, next: null, previous: null,
+          results: state.draft ? [state.draft] : [] }) });
+    }
+    if (path === "/content/component-bindings/binding-1/history/" && method === "GET") {
+      return route.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify({ current_version: state.draft?.version || 1,
+          results: state.draft ? [{ version: state.draft.version, created_at: state.draft.updated_at, created_by: null }] : [] }) });
+    }
     const payload = path === "/sites/" ? { count: 1, results: [{ id: "site-1", name: "Demo", domain: "demo.test" }], next: null, previous: null }
       : path === "/content/types/" ? { count: 1, results: [contentType], next: null, previous: null }
       : { count: 0, results: [], next: null, previous: null };
@@ -74,4 +96,24 @@ test("dynamic and infrastructure routes cannot be selected for host component ow
   await expect(available.locator('option[value="/blog/[slug]/"]')).toHaveCount(0);
   await available.selectOption("/about/");
   await expect(page.locator(".registryCode")).toContainText('"route": "/about/"');
+});
+
+test("saved component draft can be loaded and updated without changing host source", async ({ page }) => {
+  const state: DraftState = {};
+  await mockDashboard(page, state);
+  await page.goto("/cms/component-registry?route=%2F");
+  const button = page.getByRole("button", { name: "ثبت پیش‌نویس" });
+  await expect(button).toBeEnabled();
+  await button.click();
+  await expect(page.getByText("پیش‌نویس اتصال‌ها، نسخه ۱ ذخیره شد.")).toBeVisible();
+  expect(state.draft?.slots[0]?.id).toBe("HomeHero");
+  await page.getByRole("textbox", { name: "شناسه اتصال" }).fill("UpdatedHero");
+  await page.getByRole("button", { name: "ذخیره نسخه جدید" }).click();
+  await expect(page.getByText("پیش‌نویس اتصال‌ها، نسخه ۲ ذخیره شد.")).toBeVisible();
+  expect(state.draft?.version).toBe(2);
+  expect(state.draft?.slots[0]?.id).toBe("UpdatedHero");
+  await page.getByRole("button", { name: "پیکربندی جدید" }).click();
+  await page.getByRole("combobox", { name: "نسخه ذخیره‌شده" }).selectOption("binding-1");
+  await expect(page.getByRole("textbox", { name: "شناسه اتصال" })).toHaveValue("UpdatedHero");
+  await expect(page.locator(".registryCode")).toContainText('"id": "UpdatedHero"');
 });
