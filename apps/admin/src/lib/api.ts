@@ -69,24 +69,25 @@ function loginRedirect() {
     window.location.assign(adminPath("/login"));
   }
 }
-export async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
+export async function sessionRequest(url: string, options: RequestInit = {}): Promise<Response> {
   const headers = new Headers(options.headers || {});
   headers.delete("Authorization");
   headers.set("x-cms-request", "1");
   if (options.body != null && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const execute = () => fetch(API_URL + path, {
-    ...options, headers, credentials: "same-origin", cache: "no-store",
-  });
+  const execute = () => fetch(url, { ...options, headers, credentials: "same-origin", cache: "no-store" });
   let response = await execute();
   if (response.status === 401) {
     if (await refreshSession()) response = await execute();
     else { loginRedirect(); throw new CmsSessionExpiredError(); }
   }
-  if (response.status === 401) {
-    loginRedirect(); throw new CmsSessionExpiredError();
-  }
+  if (response.status === 401) { loginRedirect(); throw new CmsSessionExpiredError(); }
+  return response;
+}
+
+export async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await sessionRequest(API_URL + path, options);
   if (!response.ok) {
     let message = "API error " + response.status;
     try {
