@@ -26,3 +26,18 @@ class Membership(UUIDTimeStampedModel):
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.VIEWER)
     class Meta:
         constraints=[models.UniqueConstraint(fields=["organization","user"], name="unique_org_member")]
+
+
+class CmsUserSession(UUIDTimeStampedModel):
+    """User-wide CMS login session; shared across tenants and all CMS API servers."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="cms_login_sessions")
+    refresh_expires_at = models.DateTimeField()
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "revoked_at", "refresh_expires_at"],
+                         name="cms_user_session_lookup"),
+        ]

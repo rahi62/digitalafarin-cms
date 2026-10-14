@@ -15,7 +15,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path?: s
   const suffixWithTrailingSlash = suffix ? `${suffix}/` : "";
   const target = `${upstreamBaseUrl()}/${suffixWithTrailingSlash}${incomingUrl.search}`;
 
-  if (BFF_MODE && path[0] === "auth") {
+  if (BFF_MODE && path[0] === "auth" && path[1] !== "sessions") {
     // Do not permit a BFF-enabled browser to retrieve raw Django tokens.
     return failure(404, "Authentication endpoint not exposed through BFF proxy.");
   }

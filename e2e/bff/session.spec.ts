@@ -66,3 +66,38 @@ test("HttpOnly BFF session protects API requests against CSRF and client token e
   expect(after.find((cookie) => cookie.name === "cms_bff_csrf")).toBeUndefined();
   expect((await page.request.get("/cms/api-proxy/sites/")).status()).toBe(401);
 });
+
+test("session inventory can revoke other devices and all devices through protected BFF API", async ({ page, browser }) => {
+  const other = await browser.newContext();
+  const otherPage = await other.newPage();
+  try {
+    const login = async (tab: typeof page) => {
+      await tab.goto("/cms/login");
+      const code = await tab.evaluate(async () => (await fetch("/cms/auth/session/login", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: "testuser", password: "testpass" }),
+      })).status);
+      expect(code).toBe(200);
+    };
+    await login(page);
+    await login(otherPage);
+    await page.goto("/cms/security/sessions");
+    await expect(page.getByRole("heading", { name: "نشست‌ها و دستگاه‌های من" })).toBeVisible();
+    await expect(page.locator(".cmsSessionItem").first()).toBeVisible();
+    page.on("dialog", async (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "خروج از دستگاه‌های دیگر" }).click();
+    await expect(page.getByText("نشست‌های انتخاب‌شده در سرور باطل شدند.")).toBeVisible();
+    const revokedResponse = await otherPage.evaluate(async () =>
+      (await fetch("/cms/api-proxy/sites/", { credentials: "same-origin" })).status);
+    expect(revokedResponse).toBe(401);
+    const currentResponse = await page.evaluate(async () =>
+      (await fetch("/cms/api-proxy/sites/", { credentials: "same-origin" })).status);
+    expect(currentResponse).toBe(200);
+    await page.getByRole("button", { name: "خروج از همه دستگاه‌ها" }).click();
+    await expect(page).toHaveURL(/\/cms\/login/);
+    expect((await page.context().cookies()).find(cookie => cookie.name === "cms_bff_access")).toBeUndefined();
+  } finally {
+    await other.close();
+  }
+});

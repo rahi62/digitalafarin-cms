@@ -120,6 +120,14 @@ function sessionExpired() {
   }
 }
 
+export const CMS_AUTH_EVENTS = "digitalafarin-cms-session-events";
+function notifyLogout() {
+  if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+  const channel = new BroadcastChannel(CMS_AUTH_EVENTS);
+  channel.postMessage({ type: "signed-out" });
+  channel.close();
+}
+
 export async function logout(): Promise<void> {
   if (BFF_ENABLED) {
     clearTokens();
@@ -129,6 +137,7 @@ export async function logout(): Promise<void> {
         headers: { "X-CMS-CSRF": bffCsrf() },
       });
     } catch { /* Do not restore legacy browser credentials on failure. */ }
+    notifyLogout();
     return;
   }
   const refresh = getRefreshToken();
@@ -143,6 +152,7 @@ export async function logout(): Promise<void> {
       });
     } catch { /* local logout remains in effect on network failure */ }
   }
+  notifyLogout();
 }
 export async function apiFetch<T = any>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});

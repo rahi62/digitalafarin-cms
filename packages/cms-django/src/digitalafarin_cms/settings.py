@@ -23,7 +23,7 @@ def apply_defaults(namespace: dict) -> None:
     rest = dict(namespace.get("REST_FRAMEWORK", {}))
     rest.setdefault(
         "DEFAULT_AUTHENTICATION_CLASSES",
-        ("rest_framework_simplejwt.authentication.JWTAuthentication",),
+        ("digitalafarin_cms.session_auth.CmsSessionJWTAuthentication",),
     )
     rest.setdefault(
         "DEFAULT_FILTER_BACKENDS",

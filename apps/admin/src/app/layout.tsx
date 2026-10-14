@@ -21,6 +21,7 @@ import "../styles/editor-navigation.css";
 import "../styles/nested-fields.css";
 import "../styles/team.css";
 import "../styles/trash.css";
+import "../styles/session-security.css";
 import Shell from "@/components/Shell";
 
 export const metadata: Metadata = {
