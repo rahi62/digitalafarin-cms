@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: ".",
-  testMatch: ["professional-editor.spec.ts", "component-registry.spec.ts"],
+  testMatch: ["professional-editor.spec.ts", "component-registry.spec.ts", "session-security.spec.ts"],
   timeout: 45_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
