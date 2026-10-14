@@ -16,6 +16,13 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   expect(session.status()).toBe(200);
   const sessionBody = await session.json();
   expect(sessionBody).toEqual({ authenticated: true });
+  const cookies = await page.context().cookies();
+  const accessCookie = cookies.find((cookie) => cookie.name === '__da_cms_access');
+  const refreshCookie = cookies.find((cookie) => cookie.name === '__da_cms_refresh');
+  expect(accessCookie?.httpOnly).toBe(true);
+  expect(refreshCookie?.httpOnly).toBe(true);
+  expect(accessCookie?.path).toBe('/cms');
+  expect(refreshCookie?.sameSite).toBe('Strict');
   const routeReport = await page.request.get('/cms/route-explorer/report');
   expect(routeReport.status()).toBe(404);
   expect((await routeReport.json()).detail).toContain('No route report exported');
