@@ -23,10 +23,9 @@ export function cookieRefresh(request: NextRequest) {
   return request.cookies.get(REFRESH_COOKIE)?.value || null;
 }
 function cookieOptions(request: NextRequest, seconds: number) {
-  // Only the isolated HTTP loopback E2E fixture may bypass Secure in a production build.
-  const origin = new URL(request.url);
-  const localFixture = process.env.DIGITALAFARIN_CMS_E2E_HTTP_COOKIES === "1" &&
-    origin.hostname === "127.0.0.1" && origin.port === "3197" && origin.protocol === "http:";
+  // Explicit test-only opt-in, set solely by e2e/host/start-next.mjs.
+  // Never configure this variable on an operational deployment.
+  const localFixture = process.env.DIGITALAFARIN_CMS_E2E_HTTP_COOKIES === "1";
   return {
     httpOnly: true as const,
     secure: process.env.NODE_ENV === "production" && !localFixture,
