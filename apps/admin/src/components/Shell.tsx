@@ -14,6 +14,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    // Erase readable JWTs left by versions before HttpOnly sessions.
+    try { localStorage.removeItem("cms_access_token"); localStorage.removeItem("cms_refresh_token"); } catch { /* storage may be disabled */ }
     if (path === "/login") return;
     let alive = true;
     setState("checking");
