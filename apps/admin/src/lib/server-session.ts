@@ -32,7 +32,7 @@ function cookieOptions(request: NextRequest, seconds: number) {
   };
 }
 export function saveSession(response: NextResponse, request: NextRequest, access: string, refresh: string) {
-  response.cookies.set(ACCESS_COOKIE, access, cookieOptions(request, 30 * 60));
+  response.cookies.set(ACCESS_COOKIE, access, cookieOptions(request, 10 * 60));
   response.cookies.set(REFRESH_COOKIE, refresh, cookieOptions(request, 7 * 24 * 60 * 60));
 }
 export function eraseSession(response: NextResponse, request: NextRequest) {
