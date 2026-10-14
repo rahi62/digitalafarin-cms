@@ -32,7 +32,7 @@ type SavedHistory = { current_version: number; results: Array<{ version: number;
 type Approval = {
   draft_version: number; approved_version: number | null; approved_checksum: string | null;
   approved_at: string | null; runtime_status: "unverified"; has_unapproved_changes: boolean;
-  events: Array<{ id: string; action: string; from_version: number | null; to_version: number; reason: string; created_at: string }>;
+  events: Array<{ id: string; action: string; from_version: number | null; to_version: number | null; reason: string; created_at: string }>;
 };
 
 function toSavedSlots(drafts: ComponentSlotDraft[]): SavedBindingSlot[] {
@@ -159,7 +159,8 @@ export default function ComponentRegistryPage() {
   const generated = useMemo(() => issues.length === 0 && slots.length > 0 ? generateRegistryCode(slots) : "", [slots, issues]);
   const mapped = report?.mappings.find((item) => active && normalizeRegistryRoute(item.route) === normalizeRegistryRoute(active.route));
   const rollbackVersions = Array.from(new Set((approval?.events || []).map((event) => event.to_version)))
-    .filter((entryVersion) => entryVersion !== approval?.approved_version).sort((a, b) => b - a);
+    .filter((entryVersion): entryVersion is number => entryVersion !== null && entryVersion !== approval?.approved_version)
+    .sort((a, b) => b - a);
 
   async function loadApproval(id: string) {
     try {
@@ -170,30 +171,31 @@ export default function ComponentRegistryPage() {
       setError(cause instanceof Error ? cause.message : "وضعیت تأیید Registry بارگذاری نشد.");
     }
   }
-  async function changeApproval(action: "approve" | "rollback") {
+  async function changeApproval(action: "approve" | "rollback" | "revoke") {
     if (!draftId || version === null || approvalBusy || unsavedChanges || !approval) return;
-    const destination = action === "approve" ? version : Number(rollbackVersion);
-    if (!Number.isInteger(destination) || destination < 1) return;
-    if (action === "rollback" && !rollbackReason.trim()) {
+    const destination = action === "revoke" ? null : action === "approve" ? version : Number(rollbackVersion);
+    if (action !== "revoke" && (!Number.isInteger(destination) || destination === null || destination < 1)) return;
+    if ((action === "rollback" || action === "revoke") && !rollbackReason.trim()) {
       setError("برای بازگردانی، دلیل تغییر را وارد کنید."); return;
     }
     const message = action === "approve"
       ? `نسخه ${destination} برای استقرار احتمالی تأیید شود؟ این عملیات کد Next.js یا سایت زنده را تغییر نمی‌دهد.`
+      : action === "revoke" ? "تأیید فعلی کاملاً لغو شود؟ تاریخچه محفوظ است و این عمل هیچ دیپلوی خودکاری ایجاد نمی‌کند."
       : `تأیید نسخه ${approval.approved_version} به نسخه ${destination} برگردد؟ هیچ دیپلوی خودکاری انجام نمی‌شود.`;
     if (!window.confirm(message)) return;
     setApprovalBusy(true); setError(""); setNotice("");
     try {
       const updated = await apiFetch<Approval>(
-        `/content/component-bindings/${draftId}/${action === "approve" ? "approve" : "rollback-approval"}/`,
+        `/content/component-bindings/${draftId}/${action === "approve" ? "approve" : action === "revoke" ? "revoke-approval" : "rollback-approval"}/`,
         { method: "POST", body: JSON.stringify({
           confirm: true, target_version: destination,
           expected_draft_version: version,
           expected_approved_version: approval.approved_version,
-          reason: action === "rollback" ? rollbackReason.trim() : "",
+          reason: action === "approve" ? "" : rollbackReason.trim(),
         }) },
       );
       setApproval(updated); setRollbackVersion(""); setRollbackReason("");
-      setNotice(`وضعیت تأیید نسخه ${destination.toLocaleString("fa-IR")} در CMS ثبت شد؛ وضعیت اجرای میزبان همچنان تأیید نشده است.`);
+      setNotice(`وضعیت تأیید ${destination === null ? "لغو شد" : `نسخه ${destination.toLocaleString("fa-IR")} ثبت شد`}؛ وضعیت اجرای میزبان همچنان تأیید نشده است.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تغییر تأیید ناموفق بود. نسخه‌ها را دوباره بررسی کنید.");
       await loadApproval(draftId);
@@ -346,6 +348,13 @@ export default function ComponentRegistryPage() {
             <button className="btn secondary" type="button" disabled={approvalBusy || !approval.approved_version}
               onClick={() => void copyApprovedManifest()}>کپی Manifest تأییدشده</button>
           </div>
+          {approval.approved_version !== null && <div className="registryRevoke">
+            <strong>لغو کامل تأیید</strong>
+            <p>برای بازگشت به وضعیت بدون نسخه تأییدشده (حتی اولین تأیید)، دلیل را در فیلد پایین وارد کنید. هیچ رکوردی حذف نمی‌شود.</p>
+            <button type="button" className="btn secondary"
+              disabled={approvalBusy || unsavedChanges || !rollbackReason.trim()}
+              onClick={() => void changeApproval("revoke")}>لغو تأیید فعلی</button>
+          </div>}
           {rollbackVersions.length > 0 && <div className="registryRollback">
             <h3>بازگرداندن تأیید به نسخه قبلی</h3>
             <div className="registryRollbackFields">
@@ -365,7 +374,7 @@ export default function ComponentRegistryPage() {
           {approval.events.length > 0 && <div className="registryApprovalLog">
             <strong>تاریخچه تأییدها</strong>
             {approval.events.slice(0, 8).map((event) => <div key={event.id}>
-              <span>{event.action === "rollback" ? "بازگردانی" : "تأیید"} نسخه {event.to_version.toLocaleString("fa-IR")}</span>
+              <span>{event.action === "revoke" ? "لغو تأیید" : `${event.action === "rollback" ? "بازگردانی" : "تأیید"} نسخه ${event.to_version?.toLocaleString("fa-IR") || "نامشخص"}`}</span>
               <small>{new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(event.created_at))}</small>
               {event.reason && <small>{event.reason}</small>}
             </div>)}
