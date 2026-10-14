@@ -14,6 +14,7 @@ const links=[
   ["/content-types","ساختار محتوا","◇"],
   ["/reusable-blocks","بلوک‌های آماده","▦"],
   ["/route-explorer","کاوشگر مسیرها","◎"],
+  ["/component-registry","اتصال کامپوننت‌ها","▤"],
   ["/taxonomies","دسته‌ها و تگ‌ها","#"],
   ["/menus","منوها","☰"],
   ["/media","رسانه","▧"],
