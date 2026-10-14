@@ -47,7 +47,7 @@ export default function RouteExplorerPage() {
     setLoading(true);
     setError("");
     const token = getAccessToken();
-    if (!token) { setLoading(false); setError("برای مشاهده گزارش ابتدا وارد پنل شوید."); return; }
+    if (!BFF_ENABLED && !token) { setLoading(false); setError("برای مشاهده گزارش ابتدا وارد پنل شوید."); return; }
     try {
       const res = await fetch(adminPath("/route-explorer/report"), {
         headers: { Authorization: `Bearer ${token}` }, signal, cache: "no-store",
