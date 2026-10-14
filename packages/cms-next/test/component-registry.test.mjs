@@ -53,6 +53,7 @@ test("registry rejects unsafe binding roots, prototype keys, duplicates and rese
     { id: "BadId", route: "/", component: "Safe", props: { x: "content.custom_fields.__proto__.x" } },
     { id: "BadBinding", route: "/", component: "Safe", props: { x: "secret.password" } },
     { id: "BadUrl", route: "https://bad.test/", component: "Safe", props: { x: "content.title" } },
+    { id: "DynamicUrl", route: "/blog/[slug]/", component: "Safe", props: { x: "content.title" } },
     { id: "BadProp", route: "/", component: "Safe", props: { __proto__: "content.title", safe: "content.__proto__" } },
   ]) {
     assert.throws(() => defineCmsComponentRegistry([invalid]), CmsComponentRegistryError);
