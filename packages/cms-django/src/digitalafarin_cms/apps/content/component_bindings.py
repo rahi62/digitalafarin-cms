@@ -200,3 +200,10 @@ class ComponentBindingViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         instance = self.get_object()
         self._require_approver(instance)
         return Response(change_approval(instance, request.user, action="rollback", data=request.data))
+
+    @action(detail=True, methods=["post"], url_path="revoke-approval")
+    def revoke_approval(self, request, pk=None):
+        from .component_approvals import change_approval
+        instance = self.get_object()
+        self._require_approver(instance)
+        return Response(change_approval(instance, request.user, action="revoke", data=request.data))
