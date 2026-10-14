@@ -355,7 +355,7 @@ export default function ComponentRegistryPage() {
               disabled={approvalBusy || unsavedChanges || !rollbackReason.trim()}
               onClick={() => void changeApproval("revoke")}>لغو تأیید فعلی</button>
           </div>}
-          {rollbackVersions.length > 0 && <div className="registryRollback">
+          {approval.approved_version !== null && rollbackVersions.length > 0 && <div className="registryRollback">
             <h3>بازگرداندن تأیید به نسخه قبلی</h3>
             <div className="registryRollbackFields">
               <label className="field"><span>نسخه قبلاً تأییدشده</span>
