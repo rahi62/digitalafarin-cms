@@ -15,6 +15,7 @@ DJANGO_APPS = (
 REQUIRED_DJANGO_APPS = (
     "rest_framework",
     "django_filters",
+    "rest_framework_simplejwt.token_blacklist",
 )
 
 ALL_DJANGO_APPS = REQUIRED_DJANGO_APPS + DJANGO_APPS
