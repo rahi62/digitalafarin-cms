@@ -8,11 +8,13 @@ export default defineConfig({
   use: { baseURL: "http://127.0.0.1:3104", ...devices["Desktop Chrome"] },
   webServer: [
     {
+      cwd: process.cwd(),
       command: "node e2e/bff/mock-upstream.mjs",
       url: "http://127.0.0.1:9779/health",
       reuseExistingServer: !process.env.CI, timeout: 30000,
     },
     {
+      cwd: process.cwd(),
       command: "npm --workspace apps/admin run dev -- --hostname 127.0.0.1 --port 3104",
       url: "http://127.0.0.1:3104/cms/login",
       reuseExistingServer: !process.env.CI, timeout: 120000,
