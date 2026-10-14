@@ -55,9 +55,13 @@ function json(route: Route, body: unknown, status = 200) {
 }
 
 async function installMocks(page: Page, state: MockState) {
-  await page.addInitScript(() => {
-    localStorage.setItem("cms_access_token", "e2e-access-token");
-    localStorage.setItem("cms_refresh_token", "e2e-refresh-token");
+  await page.context().addCookies([{
+    name: "__da_cms_access", value: "e2e-access-token", url: "http://127.0.0.1:3101/cms/",
+    httpOnly: true, sameSite: "Strict",
+  }]);
+  await page.route("**/cms/session/status", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json",
+      body: JSON.stringify({ authenticated: true }) });
   });
 
   await page.route("https://cdn.example.test/**", async (route) => {

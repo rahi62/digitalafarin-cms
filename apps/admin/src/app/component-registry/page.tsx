@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { adminPath } from "@/lib/admin-path";
-import { apiFetch, getAccessToken, Paginated } from "@/lib/api";
+import { apiFetch, sessionRequest, Paginated } from "@/lib/api";
 import {
   ComponentSlotDraft, RouteReportItem, SiteContentType,
   customFieldSources, defaultPropSources, eligibleRoute,
@@ -86,14 +86,11 @@ export default function ComponentRegistryPage() {
   useEffect(() => {
     const abort = new AbortController();
     async function load() {
-      const token = getAccessToken();
-      if (!token) { setError("ابتدا به پنل CMS وارد شوید."); setLoading(false); return; }
+      // Authorization is carried only by the scoped server-side session cookie.
       setLoading(true);
       try {
         const [response, siteResponse] = await Promise.all([
-          fetch(adminPath("/route-explorer/report"), {
-            headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: abort.signal,
-          }),
+          sessionRequest(adminPath("/route-explorer/report"), { signal: abort.signal }),
           apiFetch<Paginated<Site>>("/sites/?page_size=100", { signal: abort.signal }),
         ]);
         const body = await response.json();

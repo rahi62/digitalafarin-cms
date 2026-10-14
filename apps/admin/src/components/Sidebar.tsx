@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { clearTokens } from "@/lib/api";
+import { logout } from "@/lib/api";
 import { adminPath, stripAdminBasePath } from "@/lib/admin-path";
 
 const links=[
@@ -33,6 +33,14 @@ function isActive(path:string,href:string){return href==="/"?path==="/":path===h
 export default function Sidebar(){
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
+  async function endSession() {
+    if (signingOut) return;
+    setSigningOut(true); setSignOutError("");
+    try { await logout(); window.location.replace(adminPath("/login")); }
+    catch (cause) { setSignOutError(cause instanceof Error ? cause.message : "خروج ناموفق بود"); setSigningOut(false); }
+  }
   const current = stripAdminBasePath(pathname || "/");
 
   useEffect(() => { setOpen(false); }, [pathname]);
@@ -49,6 +57,7 @@ export default function Sidebar(){
       aria-label="ناوبری مدیریت محتوا">{links.map(([href,label,icon])=>
         <Link key={href} href={adminPath(href)} className={isActive(current,href)?"active":""}><b>{icon}</b>{label}</Link>
       )}</nav>
-    <button className="logout" onClick={()=>{clearTokens();window.location.href=adminPath("/login")}}>خروج</button>
+    {signOutError && <div role="alert" className="error">{signOutError}</div>}
+    <button className="logout" type="button" disabled={signingOut} onClick={() => void endSession()}>{signingOut ? "در حال خروج..." : "خروج امن"}</button>
   </aside>;
 }
