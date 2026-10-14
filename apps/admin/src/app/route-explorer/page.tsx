@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import Link from "next/link";
 import { adminPath } from "@/lib/admin-path";
-import { getAccessToken } from "@/lib/api";
+import { BFF_ENABLED, getAccessToken } from "@/lib/api";
 
 type RouteItem = {
   url: string;
@@ -47,10 +47,10 @@ export default function RouteExplorerPage() {
     setLoading(true);
     setError("");
     const token = getAccessToken();
-    if (!token) { setLoading(false); setError("برای مشاهده گزارش ابتدا وارد پنل شوید."); return; }
+    if (!BFF_ENABLED && !token) { setLoading(false); setError("برای مشاهده گزارش ابتدا وارد پنل شوید."); return; }
     try {
       const res = await fetch(adminPath("/route-explorer/report"), {
-        headers: { Authorization: `Bearer ${token}` }, signal, cache: "no-store",
+        headers: BFF_ENABLED ? {} : { Authorization: `Bearer ${token}` }, credentials: "same-origin", signal, cache: "no-store",
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.detail || `HTTP ${res.status}`);

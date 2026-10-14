@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { adminPath } from "@/lib/admin-path";
-import { apiFetch, getAccessToken, Paginated } from "@/lib/api";
+import { apiFetch, BFF_ENABLED, getAccessToken, Paginated } from "@/lib/api";
 import {
   ComponentSlotDraft, RouteReportItem, SiteContentType,
   customFieldSources, defaultPropSources, eligibleRoute,
@@ -87,12 +87,12 @@ export default function ComponentRegistryPage() {
     const abort = new AbortController();
     async function load() {
       const token = getAccessToken();
-      if (!token) { setError("ابتدا به پنل CMS وارد شوید."); setLoading(false); return; }
+      if (!BFF_ENABLED && !token) { setError("ابتدا به پنل CMS وارد شوید."); setLoading(false); return; }
       setLoading(true);
       try {
         const [response, siteResponse] = await Promise.all([
           fetch(adminPath("/route-explorer/report"), {
-            headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: abort.signal,
+            headers: BFF_ENABLED ? {} : { Authorization: `Bearer ${token}` }, credentials: "same-origin", cache: "no-store", signal: abort.signal,
           }),
           apiFetch<Paginated<Site>>("/sites/?page_size=100", { signal: abort.signal }),
         ]);
