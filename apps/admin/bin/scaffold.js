@@ -170,6 +170,7 @@ function embed() {
     "seo-opportunities.css",
     "professional-editor.css",
     "route-explorer.css",
+    "component-registry.css",
     "content-list.css",
     "dashboard.css",
     "sites.css",
