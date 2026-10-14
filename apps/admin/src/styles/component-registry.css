@@ -29,3 +29,13 @@
 .registryEmpty code{word-break:break-word;}
 @media(max-width:920px){.registryLayout{grid-template-columns:1fr;}.registrySlots{display:flex;align-items:stretch;flex-wrap:wrap;gap:9px;}.registrySlotsHeader{width:100%;}.registrySlot{flex:1 1 150px;margin:0;}}
 @media(max-width:640px){.registryContext{display:grid;}.registryEditorGrid,.registryProp{grid-template-columns:1fr;}.registryEditorGrid label:last-child{grid-column:auto;}.registryProp>button{width:100%;}.registryPropsHeader .btn{width:100%;}.registryCode{font-size:11px;}}
+
+.registryDrafts{margin-bottom:16px;}
+.registryDraftsHeader{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+.registryDraftsHeader h2{font-size:16px;margin:0;}
+.registryDraftsHeader p{font-size:12px;color:#667085;line-height:1.9;margin:6px 0 12px;}
+.registryDraftsControls{display:grid;grid-template-columns:minmax(210px,1.3fr) minmax(170px,1fr) auto;align-items:end;gap:12px;}
+.registryDraftsControls .field select,.registryDraftsControls .field input{width:100%;min-width:0;}
+.registryHistory{border:1px solid #d0d5dd;background:#f8fafc;border-radius:9px;padding:12px;margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;}
+.registryDraftNotice{border:1px solid #abefc6;color:#027a48;background:#ecfdf3;padding:10px 12px;border-radius:9px;font-size:12px;line-height:1.9;}
+@media(max-width:700px){.registryDraftsControls{grid-template-columns:1fr;}.registryDraftsControls>button{width:100%;}.registryDraftsHeader>button{width:100%;}}
