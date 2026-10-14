@@ -81,7 +81,7 @@ def validate_component_slots(slots):
         props, required = item.get("props"), item.get("required", [])
         if not isinstance(props, dict) or len(props) > 50:
             raise serializers.ValidationError(f"Slot {index}: invalid props mapping.")
-        if not isinstance(required, list) or any(not isinstance(v, str) for v in required):
+        if not isinstance(required, list) or len(required) > 50 or any(not isinstance(v, str) for v in required):
             raise serializers.ValidationError(f"Slot {index}: required props must be a list of names.")
         if len(required) != len(set(required)) or not set(required).issubset(props):
             raise serializers.ValidationError(f"Slot {index}: required props must reference defined props.")
@@ -109,6 +109,8 @@ class ComponentBindingSerializer(serializers.ModelSerializer):
         return validate_component_slots(value)
 
     def validate(self, attrs):
+        if self.instance is None and attrs.get("expected_version") is not None:
+            raise serializers.ValidationError({"expected_version": "Version is assigned by the server on creation."})
         if self.instance is not None:
             if attrs.get("site") and attrs["site"].pk != self.instance.site_id:
                 raise serializers.ValidationError({"site": "Moving a host binding between sites is not supported."})
