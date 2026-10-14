@@ -183,6 +183,11 @@ class ComponentBindingDraft(UUIDTimeStampedModel):
     host_key = models.SlugField(max_length=80)
     slots = models.JSONField(default=list)
     version = models.PositiveIntegerField(default=1)
+    approved_version = models.PositiveIntegerField(null=True, blank=True)
+    approved_checksum = models.CharField(max_length=64, blank=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                    on_delete=models.SET_NULL, related_name="approved_cms_component_bindings")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
                                   on_delete=models.SET_NULL, related_name="created_cms_component_drafts")
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
@@ -201,3 +206,18 @@ class ComponentBindingRevision(UUIDTimeStampedModel):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["draft", "version"], name="unique_cms_component_revision")]
+
+
+class ComponentBindingApprovalEvent(UUIDTimeStampedModel):
+    """Append-only record: approval changes are not runtime deployments."""
+    draft = models.ForeignKey(ComponentBindingDraft, on_delete=models.PROTECT, related_name="approval_events")
+    action = models.CharField(max_length=16, choices=[("approve", "Approve"), ("rollback", "Rollback")])
+    from_version = models.PositiveIntegerField(null=True, blank=True)
+    to_version = models.PositiveIntegerField()
+    checksum = models.CharField(max_length=64)
+    reason = models.CharField(max_length=500, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                    on_delete=models.SET_NULL, related_name="cms_component_approval_events")
+
+    class Meta:
+        ordering = ["-created_at"]
