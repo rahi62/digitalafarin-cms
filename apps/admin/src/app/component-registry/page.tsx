@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { adminPath } from "@/lib/admin-path";
-import { apiFetch, getAccessToken, Paginated } from "@/lib/api";
+import { apiFetch, BFF_ENABLED, getAccessToken, Paginated } from "@/lib/api";
 import {
   ComponentSlotDraft, RouteReportItem, SiteContentType,
   customFieldSources, defaultPropSources, eligibleRoute,
