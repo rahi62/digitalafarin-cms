@@ -1,0 +1,31 @@
+.registryNotice{margin:14px 0 18px;border:1px solid #fedf89;border-radius:12px;padding:14px 17px;background:#fffaeb;color:#7a2e0e;font-size:13px;line-height:1.95;}
+.registryContext{display:flex;align-items:end;gap:14px;flex-wrap:wrap;margin:0 0 18px;}
+.registryContext .field{min-width:min(260px,100%);flex:1;}
+.registryContextNote{font-size:12px;color:#667085;flex:1 0 180px;line-height:1.9;}
+.registryLayout{display:grid;grid-template-columns:minmax(230px,290px) minmax(0,1fr);gap:15px;align-items:start;}
+.registrySlots,.registryEditor{min-width:0;}
+.registrySlotsHeader,.registryEditorHeader,.registryPropsHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:13px;}
+.registryEditor h2,.registryPropsHeader h3{font-size:16px;margin:0;}
+.registrySlot{display:grid;gap:5px;padding:11px 12px;border:1px solid #e4e7ec;border-radius:10px;background:#fff;text-align:start;width:100%;margin-top:9px;cursor:pointer;}
+.registrySlot:hover,.registrySlot.isActive{border-color:#ff5538;background:#fff7f5;}
+.registrySlot code{font-size:11px;color:#667085;overflow-wrap:anywhere;}
+.registrySlot small{font-size:11px;color:#667085;}
+.registryEditorGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.registryEditorGrid label:last-child{grid-column:1/-1;}
+.registryEditor .field input,.registryEditor .field select,.registryContext .field select{width:100%;min-width:0;}
+.registryRouteContext{display:flex;gap:7px;align-items:center;flex-wrap:wrap;border:1px solid #e4e7ec;border-radius:9px;padding:12px;margin:15px 0;font-size:12px;}
+.registryRouteContext span{color:#667085;}
+.registryPropsHeader{margin-top:20px;}
+.registryProps{display:grid;gap:12px;}
+.registryProp{border:1px solid #e4e7ec;border-radius:12px;padding:13px;display:grid;grid-template-columns:minmax(110px,1fr) minmax(210px,2fr);gap:12px;align-items:end;}
+.registryRequired{display:flex;align-items:center;gap:8px;font-size:13px;}
+.registryProp>button{justify-self:start;}
+.registryOutput{margin-top:18px;}
+.registryOutput h2{font-size:17px;}
+.registryOutput p{font-size:13px;line-height:1.9;}
+.registryCode{direction:ltr;text-align:left;white-space:pre;overflow-x:auto;background:#101828;color:#e4e7ec;padding:15px;border-radius:10px;font-size:12px;max-height:500px;}
+.registryErrors{background:#fef3f2;border:1px solid #fda29b;color:#912018;border-radius:10px;padding:13px;font-size:12px;line-height:1.85;}
+.registryEmpty{display:grid;gap:12px;margin-top:15px;}
+.registryEmpty code{word-break:break-word;}
+@media(max-width:920px){.registryLayout{grid-template-columns:1fr;}.registrySlots{display:flex;align-items:stretch;flex-wrap:wrap;gap:9px;}.registrySlotsHeader{width:100%;}.registrySlot{flex:1 1 150px;margin:0;}}
+@media(max-width:640px){.registryContext{display:grid;}.registryEditorGrid,.registryProp{grid-template-columns:1fr;}.registryEditorGrid label:last-child{grid-column:auto;}.registryProp>button{width:100%;}.registryPropsHeader .btn{width:100%;}.registryCode{font-size:11px;}}
