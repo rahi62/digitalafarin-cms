@@ -25,7 +25,7 @@ export function cookieRefresh(request: NextRequest) {
 function cookieOptions(request: NextRequest, seconds: number) {
   // Explicit test-only opt-in, set solely by e2e/host/start-next.mjs.
   // Never configure this variable on an operational deployment.
-  const localFixture = process.env.DIGITALAFARIN_CMS_E2E_HTTP_COOKIES === "1";
+  const localFixture = process.env["DIGITALAFARIN_CMS_E2E_HTTP_COOKIES"] === "1";
   return {
     httpOnly: true as const,
     secure: process.env.NODE_ENV === "production" && !localFixture,
