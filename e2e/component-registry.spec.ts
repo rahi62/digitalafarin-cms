@@ -34,7 +34,7 @@ async function mockDashboard(page: import("@playwright/test").Page, state: Draft
     const path = new URL(route.request().url()).pathname.replace("/cms/api-proxy", "");
     const method = route.request().method();
     const write = method === "POST" || method === "PATCH";
-    if (path === "/content/component-bindings/" && write) {
+    if ((path === "/content/component-bindings/" || path === "/content/component-bindings/binding-1/") && write) {
       const data = route.request().postDataJSON() as Record<string, unknown>;
       const version = state.draft ? state.draft.version + 1 : 1;
       state.draft = { id: "binding-1", site: String(data.site),
