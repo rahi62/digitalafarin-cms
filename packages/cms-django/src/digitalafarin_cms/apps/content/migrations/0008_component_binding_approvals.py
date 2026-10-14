@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 ("action", models.CharField(max_length=16,
-                    choices=[("approve", "Approve"), ("rollback", "Rollback")])),
+                    choices=[("approve", "Approve"), ("rollback", "Rollback"), ("revoke", "Revoke")])),
                 ("from_version", models.PositiveIntegerField(null=True, blank=True)),
                 ("to_version", models.PositiveIntegerField()),
                 ("checksum", models.CharField(max_length=64)),
