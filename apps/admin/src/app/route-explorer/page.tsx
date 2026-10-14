@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import Link from "next/link";
 import { adminPath } from "@/lib/admin-path";
-import { getAccessToken } from "@/lib/api";
+import { BFF_ENABLED, getAccessToken } from "@/lib/api";
 
 type RouteItem = {
   url: string;
