@@ -44,9 +44,17 @@ function approvalSnapshot(state: DraftState) {
   };
 }
 async function mockDashboard(page: import("@playwright/test").Page, state: DraftState = {}) {
-  await page.addInitScript(() => localStorage.setItem("cms_access_token", "e2e-access-token"));
+  await page.context().addCookies([{
+    name: "__da_cms_access", value: "e2e-access-token", url: "http://127.0.0.1:3101/cms/",
+    httpOnly: true, sameSite: "Strict",
+  }]);
+  await page.route("**/cms/session/status", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json",
+      body: JSON.stringify({ authenticated: true }) });
+  });
   await page.route("**" + "/cms/route-explorer/report", async (route: Route) => {
-    expect(route.request().headers().authorization).toBe("Bearer e2e-access-token");
+    expect(route.request().headers().cookie).toContain("__da_cms_access=e2e-access-token");
+    expect(route.request().headers().authorization).toBeUndefined();
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(report) });
   });
   await page.route("**" + "/cms/api-proxy/**", async (route: Route) => {
