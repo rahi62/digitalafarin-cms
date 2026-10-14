@@ -49,6 +49,6 @@ export default function Sidebar(){
       aria-label="ناوبری مدیریت محتوا">{links.map(([href,label,icon])=>
         <Link key={href} href={adminPath(href)} className={isActive(current,href)?"active":""}><b>{icon}</b>{label}</Link>
       )}</nav>
-    <button className="logout" onClick={()=>{void logout();window.location.href=adminPath("/login")}}>خروج</button>
+    <button className="logout" onClick={()=>{void logout().finally(()=>{window.location.href=adminPath("/login")});}}>خروج</button>
   </aside>;
 }
