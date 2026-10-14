@@ -1,5 +1,6 @@
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from digitalafarin_cms.logout import CmsLogoutView
 
 urlpatterns = [
     path("auth/token/", TokenObtainPairView.as_view(), name="digitalafarin_cms_token_obtain_pair"),
