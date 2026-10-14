@@ -30,7 +30,7 @@ const RESERVED_ROUTES = new Set(["api", "admin", "cms", "media", "_next", "stati
 
 function canonicalPath(input: string): string {
   if (typeof input !== "string" || !input.startsWith("/") || input.startsWith("//") ||
-      /[?#%\\:{}]/.test(input) || /[\x00-\x20]/.test(input)) {
+      /[?#%\\:{}]/.test(input) || ["[", "]", "*", "(", ")"].some((char) => input.includes(char)) || /[\x00-\x20]/.test(input)) {
     throw new CmsComponentRegistryError("A component route must be a safe absolute local path.");
   }
   const parts = input.split("/").filter(Boolean);
