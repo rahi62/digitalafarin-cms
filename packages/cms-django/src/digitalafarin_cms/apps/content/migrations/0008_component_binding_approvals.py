@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
                 ("action", models.CharField(max_length=16,
                     choices=[("approve", "Approve"), ("rollback", "Rollback"), ("revoke", "Revoke")])),
                 ("from_version", models.PositiveIntegerField(null=True, blank=True)),
-                ("to_version", models.PositiveIntegerField()),
+                ("to_version", models.PositiveIntegerField(null=True, blank=True)),
                 ("checksum", models.CharField(max_length=64)),
                 ("reason", models.CharField(max_length=500, blank=True)),
                 ("draft", models.ForeignKey(
