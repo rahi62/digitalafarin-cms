@@ -33,8 +33,18 @@ export function sameOrigin(request: NextRequest): boolean {
   const origin = request.headers.get("origin");
   const fetchSite = request.headers.get("sec-fetch-site");
   if (fetchSite && !["same-origin", "none"].includes(fetchSite)) return false;
-  // Explicit origin on unsafe requests avoids Referer or proxy-host ambiguity.
-  return origin === request.nextUrl.origin;
+  if (!origin) return false;
+  try {
+    const requested = new URL(origin);
+    const configured = process.env.DIGITALAFARIN_CMS_PUBLIC_ORIGIN;
+    if (configured) return requested.origin === new URL(configured).origin;
+    // Next.js may reconstruct nextUrl using a private reverse-proxy origin.
+    // Compare against the actual HTTP Host while still requiring a matching scheme.
+    const host = request.headers.get("host");
+    const scheme = request.headers.get("x-forwarded-proto") ||
+      new URL(request.url).protocol.slice(0, -1);
+    return requested.host === host && requested.protocol === scheme + ":";
+  } catch { return false; }
 }
 export function newCsrf(): string {
   const nonce = randomBytes(24).toString("hex");
