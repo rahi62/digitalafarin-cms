@@ -175,3 +175,29 @@ class MenuItem(UUIDTimeStampedModel):
     sort_order=models.PositiveIntegerField(default=0)
     is_external=models.BooleanField(default=False)
     class Meta: ordering=["sort_order","created_at"]
+
+
+class ComponentBindingDraft(UUIDTimeStampedModel):
+    """Site-scoped authoring artifact; never executed directly by a Next.js host."""
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name="cms_component_drafts")
+    host_key = models.SlugField(max_length=80)
+    slots = models.JSONField(default=list)
+    version = models.PositiveIntegerField(default=1)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                  on_delete=models.SET_NULL, related_name="created_cms_component_drafts")
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                  on_delete=models.SET_NULL, related_name="updated_cms_component_drafts")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["site", "host_key"], name="unique_cms_component_site_host")]
+
+
+class ComponentBindingRevision(UUIDTimeStampedModel):
+    draft = models.ForeignKey(ComponentBindingDraft, on_delete=models.CASCADE, related_name="revisions")
+    version = models.PositiveIntegerField()
+    slots = models.JSONField(default=list)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name="cms_component_revisions")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["draft", "version"], name="unique_cms_component_revision")]

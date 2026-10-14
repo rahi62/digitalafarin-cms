@@ -20,6 +20,31 @@ type Report = {
   warnings: string[];
 };
 type Site = { id: string; name: string; domain: string };
+type SavedBindingSlot = {
+  id: string; component: string; route: string;
+  props: Record<string, string>; required?: string[];
+};
+type SavedDraft = {
+  id: string; site: string; host_key: string; version: number;
+  slots: SavedBindingSlot[]; updated_at: string;
+};
+type SavedHistory = { current_version: number; results: Array<{ version: number; created_at: string; created_by: string | null }> };
+
+function toSavedSlots(drafts: ComponentSlotDraft[]): SavedBindingSlot[] {
+  return drafts.map((slot) => ({
+    id: slot.id, component: slot.component, route: normalizeRegistryRoute(slot.route) || slot.route,
+    props: Object.fromEntries(slot.props.map((prop) => [prop.name, prop.source])),
+    required: slot.props.filter((prop) => prop.required).map((prop) => prop.name),
+  }));
+}
+function fromSavedSlots(saved: SavedBindingSlot[]): ComponentSlotDraft[] {
+  return saved.map((slot) => ({
+    id: slot.id, component: slot.component, route: slot.route,
+    props: Object.entries(slot.props).map(([name, source]) => ({
+      name, source, required: Boolean(slot.required?.includes(name)),
+    })),
+  }));
+}
 
 function newSlot(route: string): ComponentSlotDraft {
   return {
@@ -40,6 +65,13 @@ export default function ComponentRegistryPage() {
   const [typesLoading, setTypesLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [stored, setStored] = useState<SavedDraft[]>([]);
+  const [draftId, setDraftId] = useState("");
+  const [hostKey, setHostKey] = useState("main");
+  const [version, setVersion] = useState<number | null>(null);
+  const [history, setHistory] = useState<SavedHistory | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     const abort = new AbortController();
@@ -94,6 +126,16 @@ export default function ComponentRegistryPage() {
     return () => abort.abort();
   }, [siteId]);
 
+  useEffect(() => {
+    if (!siteId) { setStored([]); return; }
+    const controller = new AbortController();
+    apiFetch<Paginated<SavedDraft>>(`/content/component-bindings/?site=${encodeURIComponent(siteId)}&page_size=100`,
+      { signal: controller.signal })
+      .then((result) => { if (!controller.signal.aborted) setStored(result.results); })
+      .catch((cause) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "بارگذاری پیش‌نویس اتصال‌ها ناموفق بود"); });
+    return () => controller.abort();
+  }, [siteId]);
+
   const available = useMemo(() => (report?.routes || []).filter(eligibleRoute), [report]);
   const active = slots[selected] || null;
   const selectedType = types.find((item) => item.id === contentType);
@@ -106,6 +148,43 @@ export default function ComponentRegistryPage() {
   const issues = useMemo(() => validateComponentSlots(slots, report?.routes || []), [slots, report]);
   const generated = useMemo(() => issues.length === 0 && slots.length > 0 ? generateRegistryCode(slots) : "", [slots, issues]);
   const mapped = report?.mappings.find((item) => active && normalizeRegistryRoute(item.route) === normalizeRegistryRoute(active.route));
+
+  function clearSavedSelection() {
+    setDraftId(""); setVersion(null); setHistory(null); setHostKey("main");
+    setNotice("");
+  }
+  async function openSaved(draft: SavedDraft) {
+    setDraftId(draft.id); setHostKey(draft.host_key); setVersion(draft.version);
+    setSlots(fromSavedSlots(draft.slots)); setSelected(0);
+    setCopied(false); setNotice("");
+    try {
+      const result = await apiFetch<SavedHistory>(`/content/component-bindings/${draft.id}/history/`);
+      setHistory(result);
+    } catch { setHistory(null); }
+  }
+  async function saveDraft() {
+    if (!siteId || issues.length || slots.length === 0 || saving) return;
+    if (!/^[a-z0-9][a-z0-9_-]{0,79}$/.test(hostKey)) {
+      setError("شناسه میزبان باید کوچک و شامل حروف لاتین، اعداد، خط‌تیره یا زیرخط باشد."); return;
+    }
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const values = { site: siteId, host_key: hostKey, slots: toSavedSlots(slots) };
+      const payload = draftId ? { ...values, expected_version: version } : values;
+      const result = await apiFetch<SavedDraft>(
+        draftId ? `/content/component-bindings/${draftId}/` : "/content/component-bindings/",
+        { method: draftId ? "PATCH" : "POST", body: JSON.stringify(payload) },
+      );
+      setDraftId(result.id); setVersion(result.version);
+      setNotice(`پیش‌نویس اتصال‌ها، نسخه ${result.version.toLocaleString("fa-IR")} ذخیره شد. این کار سایت میزبان را تغییر نمی‌دهد.`);
+      const fresh = await apiFetch<Paginated<SavedDraft>>(`/content/component-bindings/?site=${encodeURIComponent(siteId)}&page_size=100`);
+      setStored(fresh.results);
+      const record = await apiFetch<SavedHistory>(`/content/component-bindings/${result.id}/history/`);
+      setHistory(record);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "ذخیره پیش‌نویس موفق نبود؛ ممکن است مدیر دیگری نسخه را تغییر داده باشد.");
+    } finally { setSaving(false); }
+  }
 
   function updateActive(patch: Partial<ComponentSlotDraft>) {
     setSlots((prev) => prev.map((item, index) => index === selected ? { ...item, ...patch } : item));
@@ -151,9 +230,44 @@ export default function ComponentRegistryPage() {
       <code dir="ltr">npx @digitalafarin/cms-cli routes --frontend . --export-report</code>
     </div>}
     {report && <>
+      <section className="panel registryDrafts" aria-label="پیش‌نویس‌های نسخه‌دار">
+        <div className="registryDraftsHeader"><div><h2>پیش‌نویس‌های اتصال</h2>
+          <p>نسخه‌ها در CMS ذخیره می‌شوند، اما فقط کد تأییدشده و اعمال‌شده در پروژه Next.js اجرا می‌شود.</p></div>
+          <button type="button" className="btn secondary small" onClick={() => {
+            clearSavedSelection();
+            const first = available[0];
+            setSlots(first ? [newSlot(normalizeRegistryRoute(first.url) || first.url)] : []);
+            setSelected(0);
+          }}>پیکربندی جدید</button></div>
+        <div className="registryDraftsControls">
+          <label className="field"><span>نسخه ذخیره‌شده</span>
+            <select value={draftId} onChange={(event) => {
+              const selectedDraft = stored.find((item) => item.id === event.target.value);
+              if (selectedDraft) void openSaved(selectedDraft);
+              else clearSavedSelection();
+            }}>
+              <option value="">پیکربندی جدید و ذخیره‌نشده</option>
+              {stored.map((draft) => <option key={draft.id} value={draft.id}>
+                {draft.host_key} — نسخه {draft.version.toLocaleString("fa-IR")}
+              </option>)}
+            </select>
+          </label>
+          <label className="field"><span>شناسه پروژه میزبان</span>
+            <input dir="ltr" value={hostKey} disabled={Boolean(draftId)} placeholder="main"
+              onChange={(event) => setHostKey(event.target.value)} />
+          </label>
+          <button type="button" className="btn" disabled={!generated || !siteId || saving}
+            onClick={() => void saveDraft()}>{saving ? "در حال ذخیره..." : draftId ? "ذخیره نسخه جدید" : "ثبت پیش‌نویس"}</button>
+        </div>
+        {notice && <p className="registryDraftNotice" role="status">{notice}</p>}
+        {history && <div className="registryHistory">
+          <strong>تاریخچه: {history.results.length.toLocaleString("fa-IR")} نسخه اخیر</strong>
+          <span>{history.results.map((item) => item.version.toLocaleString("fa-IR")).join(" ← ")}</span>
+        </div>}
+      </section>
       <div className="registryContext panel">
         <label className="field"><span>سایت محتوایی</span>
-          <select value={siteId} onChange={(event) => setSiteId(event.target.value)}>
+          <select value={siteId} onChange={(event) => { setSiteId(event.target.value); clearSavedSelection(); }}>
             {sites.map((site) => <option key={site.id} value={site.id}>{site.name} — {site.domain}</option>)}
           </select>
         </label>

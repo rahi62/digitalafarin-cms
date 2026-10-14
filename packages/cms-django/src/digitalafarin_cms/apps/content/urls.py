@@ -3,8 +3,10 @@ from rest_framework.routers import DefaultRouter
 from .views import ContentTypeViewSet, ContentEntryViewSet, ContentRevisionViewSet, CategoryViewSet, TagViewSet, ReusableBlockViewSet, MenuViewSet, resolve_path, sitemap, robots_txt
 from .menu_views import MenuItemViewSet, resolve_menu
 from .public import list_public_entries
+from .component_bindings import ComponentBindingViewSet
 
 router=DefaultRouter()
+router.register("component-bindings",ComponentBindingViewSet,basename="component-bindings")
 router.register("types",ContentTypeViewSet)
 router.register("entries",ContentEntryViewSet)
 router.register("revisions",ContentRevisionViewSet)
