@@ -211,7 +211,7 @@ class ComponentBindingRevision(UUIDTimeStampedModel):
 class ComponentBindingApprovalEvent(UUIDTimeStampedModel):
     """Append-only record: approval changes are not runtime deployments."""
     draft = models.ForeignKey(ComponentBindingDraft, on_delete=models.PROTECT, related_name="approval_events")
-    action = models.CharField(max_length=16, choices=[("approve", "Approve"), ("rollback", "Rollback")])
+    action = models.CharField(max_length=16, choices=[("approve", "Approve"), ("rollback", "Rollback"), ("revoke", "Revoke")])
     from_version = models.PositiveIntegerField(null=True, blank=True)
     to_version = models.PositiveIntegerField()
     checksum = models.CharField(max_length=64)
