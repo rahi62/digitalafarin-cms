@@ -23,7 +23,7 @@ class ManagedCmsSessionsTests(TestCase):
             HTTP_USER_AGENT="Browser-test / Windows",
         )
 
-    def client(self, access):
+    def auth_client(self, access):
         result = APIClient()
         result.credentials(HTTP_AUTHORIZATION="Bearer " + access)
         return result
@@ -36,7 +36,7 @@ class ManagedCmsSessionsTests(TestCase):
         sid_a = RefreshToken(a.data["refresh"])["cms_sid"]
         sid_b = RefreshToken(b.data["refresh"])["cms_sid"]
         self.assertNotEqual(sid_a, sid_b)
-        viewer_a, viewer_b = self.client(a.data["access"]), self.client(b.data["access"])
+        viewer_a, viewer_b = self.auth_client(a.data["access"]), self.auth_client(b.data["access"])
         inventory = viewer_a.get(self.base + "auth/sessions/")
         self.assertEqual(inventory.status_code, 200, inventory.data)
         self.assertEqual(inventory.data["current_session_id"], sid_a)
@@ -54,13 +54,13 @@ class ManagedCmsSessionsTests(TestCase):
 
     def test_revoke_others_then_revoke_all_invalidates_current_access_immediately(self):
         a, b, c = self.login().data, self.login().data, self.login().data
-        viewer = self.client(a["access"])
+        viewer = self.auth_client(a["access"])
         count = viewer.post(self.base + "auth/sessions/revoke-others/", {}, format="json")
         self.assertEqual(count.status_code, 200, count.data)
         self.assertEqual(count.data["revoked_count"], 2)
         self.assertEqual(viewer.get(self.base + "sites/").status_code, 200)
-        self.assertEqual(self.client(b["access"]).get(self.base + "sites/").status_code, 401)
-        self.assertEqual(self.client(c["access"]).get(self.base + "sites/").status_code, 401)
+        self.assertEqual(self.auth_client(b["access"]).get(self.base + "sites/").status_code, 401)
+        self.assertEqual(self.auth_client(c["access"]).get(self.base + "sites/").status_code, 401)
         no_confirm = viewer.post(self.base + "auth/sessions/revoke-all/", {}, format="json")
         self.assertEqual(no_confirm.status_code, 400)
         revoked = viewer.post(self.base + "auth/sessions/revoke-all/", {"confirm": True}, format="json")
@@ -72,10 +72,10 @@ class ManagedCmsSessionsTests(TestCase):
         mine = self.login().data
         foreign = self.login("other-managed-user").data
         foreign_id = RefreshToken(foreign["refresh"])["cms_sid"]
-        mine_client = self.client(mine["access"])
+        mine_client = self.auth_client(mine["access"])
         denied = mine_client.post(self.base + f"auth/sessions/{foreign_id}/revoke/", {}, format="json")
         self.assertEqual(denied.status_code, 404)
-        self.assertEqual(self.client(foreign["access"]).get(self.base + "sites/").status_code, 200)
+        self.assertEqual(self.auth_client(foreign["access"]).get(self.base + "sites/").status_code, 200)
         anonymous = APIClient().get(self.base + "auth/sessions/")
         self.assertIn(anonymous.status_code, (401, 403))
 
@@ -87,7 +87,7 @@ class ManagedCmsSessionsTests(TestCase):
         self.assertEqual(result.status_code, 200, result.data)
         self.assertEqual(AccessToken(result.data["access"])["cms_sid"], session_id)
         self.assertEqual(RefreshToken(result.data["refresh"])["cms_sid"], session_id)
-        client = self.client(result.data["access"])
+        client = self.auth_client(result.data["access"])
         self.assertEqual(client.post(self.base + "auth/logout/",
             {"refresh": result.data["refresh"]}, format="json").status_code, 204)
         self.assertEqual(client.get(self.base + "sites/").status_code, 401)
@@ -95,16 +95,16 @@ class ManagedCmsSessionsTests(TestCase):
 
     def test_logout_rejects_different_session_refresh_of_same_user(self):
         first, second = self.login().data, self.login().data
-        logout = self.client(first["access"]).post(
+        logout = self.auth_client(first["access"]).post(
             self.base + "auth/logout/", {"refresh": second["refresh"]}, format="json",
         )
         self.assertEqual(logout.status_code, 400, logout.data)
-        self.assertEqual(self.client(second["access"]).get(self.base + "sites/").status_code, 200)
+        self.assertEqual(self.auth_client(second["access"]).get(self.base + "sites/").status_code, 200)
 
     def test_strict_mode_rejects_unmanaged_legacy_access_tokens(self):
         unmanaged = str(RefreshToken.for_user(self.user).access_token)
         with override_settings(DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=True):
-            denied = self.client(unmanaged).get(self.base + "sites/")
+            denied = self.auth_client(unmanaged).get(self.base + "sites/")
             self.assertEqual(denied.status_code, 401)
             new = self.login().data
-            self.assertEqual(self.client(new["access"]).get(self.base + "sites/").status_code, 200)
+            self.assertEqual(self.auth_client(new["access"]).get(self.base + "sites/").status_code, 200)
