@@ -155,3 +155,46 @@ class ComponentApprovalTests(TestCase):
         response = self.client.get(self.url + "approved-manifest/")
         self.assertEqual(response.status_code, 400)
         self.assertIn("detail", response.data)
+
+
+    def test_first_approval_can_be_revoked_without_deleting_history(self):
+        self.assertEqual(self.approve(1).status_code, 200)
+        revoked = self.client.post(self.url + "revoke-approval/", {
+            "confirm": True, "expected_approved_version": 1,
+            "expected_draft_version": 1, "reason": "Host readiness failed",
+        }, format="json")
+        self.assertEqual(revoked.status_code, 200, revoked.data)
+        self.assertIsNone(revoked.data["approved_version"])
+        self.assertIsNone(revoked.data["approved_checksum"])
+        self.assertEqual(revoked.data["runtime_status"], "unverified")
+        self.assertEqual(self.client.get(self.url + "approved-manifest/").status_code, 400)
+        self.assertEqual(ComponentBindingRevision.objects.filter(draft_id=self.id).count(), 1)
+        events = list(ComponentBindingApprovalEvent.objects.filter(draft_id=self.id))
+        self.assertEqual([item.action for item in events], ["revoke", "approve"])
+        self.assertIsNone(events[0].to_version)
+        self.assertEqual(events[0].from_version, 1)
+        self.assertEqual(events[0].reason, "Host readiness failed")
+        again = self.client.post(self.url + "revoke-approval/", {
+            "confirm": True, "expected_approved_version": None,
+            "expected_draft_version": 1, "reason": "again",
+        }, format="json")
+        self.assertEqual(again.status_code, 400)
+        self.assertEqual(self.approve(1).status_code, 200)
+
+    def test_revoke_requires_reason_current_version_and_owner_or_admin(self):
+        self.assertEqual(self.approve(1).status_code, 200)
+        missing_reason = self.client.post(self.url + "revoke-approval/", {
+            "confirm": True, "expected_approved_version": 1,
+            "expected_draft_version": 1, "reason": "",
+        }, format="json")
+        self.assertEqual(missing_reason.status_code, 400)
+        stale = self.client.post(self.url + "revoke-approval/", {
+            "confirm": True, "expected_approved_version": None,
+            "expected_draft_version": 1, "reason": "race",
+        }, format="json")
+        self.assertEqual(stale.status_code, 409)
+        denied = self.auth(self.editor).post(self.url + "revoke-approval/", {
+            "confirm": True, "expected_approved_version": 1,
+            "expected_draft_version": 1, "reason": "unauthorized",
+        }, format="json")
+        self.assertEqual(denied.status_code, 403)
