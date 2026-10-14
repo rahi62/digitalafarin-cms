@@ -213,8 +213,8 @@ class ComponentBindingApprovalEvent(UUIDTimeStampedModel):
     draft = models.ForeignKey(ComponentBindingDraft, on_delete=models.PROTECT, related_name="approval_events")
     action = models.CharField(max_length=16, choices=[("approve", "Approve"), ("rollback", "Rollback"), ("revoke", "Revoke")])
     from_version = models.PositiveIntegerField(null=True, blank=True)
-    to_version = models.PositiveIntegerField()
-    checksum = models.CharField(max_length=64)
+    to_version = models.PositiveIntegerField(null=True, blank=True)
+    checksum = models.CharField(max_length=64, blank=True)
     reason = models.CharField(max_length=500, blank=True)
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
                                     on_delete=models.SET_NULL, related_name="cms_component_approval_events")
