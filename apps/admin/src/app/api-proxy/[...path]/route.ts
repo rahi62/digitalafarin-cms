@@ -5,8 +5,12 @@ export const dynamic = "force-dynamic";
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
   const { path = [] } = await context.params;
-  // Never expose refresh/access token obtain, refresh or blacklist responses to browser JS.
-  if (path[0] === "auth" && path[1] === "token") {
+  // Reject encoded traversal and disallow *all* Django token operations in browser-facing proxy.
+  if (path.some((segment) => !segment || segment === "." || segment === ".." ||
+      /[\\/%]/.test(segment) || /[\x00-\x1f]/.test(segment))) {
+    return Response.json({ detail: "Invalid CMS endpoint" }, { status: 400, headers: NO_STORE });
+  }
+  if (path[0] === "auth") {
     return Response.json({ detail: "Use the CMS session endpoints" }, { status: 404, headers: NO_STORE });
   }
   const method = request.method.toUpperCase();
