@@ -23,6 +23,9 @@ test('real host: draft preview, images, publish, list/detail, move, unpublish an
   expect(refreshCookie?.httpOnly).toBe(true);
   expect(accessCookie?.path).toBe('/cms');
   expect(refreshCookie?.sameSite).toBe('Strict');
+  expect(accessCookie?.secure).toBe(false); // isolated HTTP loopback fixture only
+  const verified = await page.request.get('/cms/session/status');
+  expect(verified.status(), JSON.stringify(await verified.json())).toBe(200);
   const routeReport = await page.request.get('/cms/route-explorer/report');
   expect(routeReport.status()).toBe(404);
   expect((await routeReport.json()).detail).toContain('No route report exported');
