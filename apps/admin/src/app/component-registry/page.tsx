@@ -1,0 +1,241 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
+import { adminPath } from "@/lib/admin-path";
+import { apiFetch, getAccessToken, Paginated } from "@/lib/api";
+import {
+  ComponentSlotDraft, RouteReportItem, SiteContentType,
+  customFieldSources, defaultPropSources, eligibleRoute,
+  generateRegistryCode, normalizeRegistryRoute, validateComponentSlots,
+} from "@/lib/component-wizard";
+
+type Report = {
+  version: number;
+  generated_at: string;
+  routes: RouteReportItem[];
+  mappings: Array<{ route: string; source: "cms" | "host"; content_type: string | null }>;
+  errors: string[];
+  warnings: string[];
+};
+type Site = { id: string; name: string; domain: string };
+
+function newSlot(route: string): ComponentSlotDraft {
+  return {
+    id: "HomeHero", component: "HeroSection", route,
+    props: [{ name: "heading", source: "content.title", required: true }],
+  };
+}
+
+export default function ComponentRegistryPage() {
+  const [report, setReport] = useState<Report | null>(null);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [siteId, setSiteId] = useState("");
+  const [types, setTypes] = useState<SiteContentType[]>([]);
+  const [contentType, setContentType] = useState("");
+  const [slots, setSlots] = useState<ComponentSlotDraft[]>([]);
+  const [selected, setSelected] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [typesLoading, setTypesLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const abort = new AbortController();
+    async function load() {
+      const token = getAccessToken();
+      if (!token) { setError("ابتدا به پنل CMS وارد شوید."); setLoading(false); return; }
+      setLoading(true);
+      try {
+        const [response, siteResponse] = await Promise.all([
+          fetch(adminPath("/route-explorer/report"), {
+            headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: abort.signal,
+          }),
+          apiFetch<Paginated<Site>>("/sites/?page_size=100", { signal: abort.signal }),
+        ]);
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.detail || "گزارش مسیرهای میزبان در دسترس نیست");
+        if (body.version !== 1 || !Array.isArray(body.routes)) throw new Error("گزارش مسیر معتبر نیست");
+        if (abort.signal.aborted) return;
+        const nextReport = body as Report;
+        setReport(nextReport);
+        setSites(siteResponse.results);
+        if (siteResponse.results[0]) setSiteId(siteResponse.results[0].id);
+        const urlRoute = new URLSearchParams(window.location.search).get("route");
+        const route = nextReport.routes.find((row) =>
+          eligibleRoute(row) && (row.url === urlRoute || normalizeRegistryRoute(row.url) === normalizeRegistryRoute(urlRoute || "")));
+        const first = route || nextReport.routes.find(eligibleRoute);
+        setSlots(first ? [newSlot(normalizeRegistryRoute(first.url) || first.url)] : []);
+        setSelected(0);
+      } catch (cause) {
+        if (!abort.signal.aborted) setError(cause instanceof Error ? cause.message : "دریافت گزارش ناموفق بود");
+      } finally {
+        if (!abort.signal.aborted) setLoading(false);
+      }
+    }
+    void load();
+    return () => abort.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!siteId) { setTypes([]); setContentType(""); return; }
+    const abort = new AbortController();
+    setTypesLoading(true);
+    apiFetch<Paginated<SiteContentType>>(`/content/types/?site=${encodeURIComponent(siteId)}&page_size=100`,
+      { signal: abort.signal })
+      .then(({ results }) => {
+        if (abort.signal.aborted) return;
+        setTypes(results);
+        setContentType(results[0]?.id || "");
+      })
+      .catch((cause) => { if (!abort.signal.aborted) setError(cause instanceof Error ? cause.message : "ساختارهای محتوا بارگذاری نشدند"); })
+      .finally(() => { if (!abort.signal.aborted) setTypesLoading(false); });
+    return () => abort.abort();
+  }, [siteId]);
+
+  const available = useMemo(() => (report?.routes || []).filter(eligibleRoute), [report]);
+  const active = slots[selected] || null;
+  const selectedType = types.find((item) => item.id === contentType);
+  const choices = useMemo(() => [
+    ...defaultPropSources,
+    ...customFieldSources(selectedType?.schema?.fields).map((item) => ({
+      ...item, label: `فیلد ${item.label}`,
+    })),
+  ], [selectedType]);
+  const issues = useMemo(() => validateComponentSlots(slots, report?.routes || []), [slots, report]);
+  const generated = useMemo(() => issues.length === 0 && slots.length > 0 ? generateRegistryCode(slots) : "", [slots, issues]);
+  const mapped = report?.mappings.find((item) => active && normalizeRegistryRoute(item.route) === normalizeRegistryRoute(active.route));
+
+  function updateActive(patch: Partial<ComponentSlotDraft>) {
+    setSlots((prev) => prev.map((item, index) => index === selected ? { ...item, ...patch } : item));
+    setCopied(false);
+  }
+  function changeProp(index: number, patch: Partial<ComponentSlotDraft["props"][number]>) {
+    if (!active) return;
+    updateActive({ props: active.props.map((item, position) => position === index ? { ...item, ...patch } : item) });
+  }
+  function addSlot() {
+    const base = available.find((route) => !slots.some((item) => normalizeRegistryRoute(item.route) === normalizeRegistryRoute(route.url))) || available[0];
+    if (!base) return;
+    setSlots((prev) => [...prev, { ...newSlot(normalizeRegistryRoute(base.url) || base.url), id: `Slot${prev.length + 1}` }]);
+    setSelected(slots.length);
+    setCopied(false);
+  }
+  function removeSlot() {
+    setSlots((prev) => prev.filter((_, i) => i !== selected));
+    setSelected(Math.max(0, selected - 1));
+    setCopied(false);
+  }
+  async function copyCode() {
+    if (!generated) return;
+    try {
+      await navigator.clipboard.writeText(generated);
+      setCopied(true);
+      setError("");
+    } catch {
+      setError("کپی خودکار در دسترس نیست؛ کد تولیدشده را به‌صورت دستی انتخاب کنید.");
+    }
+  }
+  return <>
+    <PageHeader title="اتصال بصری کامپوننت‌ها" description="اتصال فیلدهای محتوای CMS به کامپوننت‌های موجود Next.js بدون تغییر خودکار فایل‌های میزبان"
+      action={<Link className="btn secondary" href={adminPath("/route-explorer")}>بازگشت به کاوشگر مسیرها</Link>} />
+    <div className="registryNotice" role="note">
+      این ابزار فقط کد پیکربندی قابل‌بازبینی تولید می‌کند؛ اتصالات تا زمانی که توسعه‌دهنده کد را در پروژه میزبان اعمال نکرده، فعال نیستند. گزارش مسیرها نیز یک Snapshot است و اتصال واقعی API را تأیید نمی‌کند.
+    </div>
+    {loading && <div className="panel" role="status">در حال دریافت مسیرهای میزبان و سایت‌ها...</div>}
+    {error && <div className="error" role="alert">{error}</div>}
+    {!loading && !report && <div className="panel registryEmpty">
+      <h2>گزارش مسیرهای Next.js در دسترس نیست</h2>
+      <p>در پروژه میزبان، گزارش مسیرها را با CLI تولید و مسیر خروجی آن را برای سرور پنل تنظیم کنید.</p>
+      <code dir="ltr">npx @digitalafarin/cms-cli routes --frontend . --export-report</code>
+    </div>}
+    {report && <>
+      <div className="registryContext panel">
+        <label className="field"><span>سایت محتوایی</span>
+          <select value={siteId} onChange={(event) => setSiteId(event.target.value)}>
+            {sites.map((site) => <option key={site.id} value={site.id}>{site.name} — {site.domain}</option>)}
+          </select>
+        </label>
+        <label className="field"><span>ساختار محتوا برای انتخاب فیلد</span>
+          <select value={contentType} disabled={typesLoading} onChange={(event) => setContentType(event.target.value)}>
+            <option value="">انتخاب ساختار</option>
+            {types.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.slug})</option>)}
+          </select>
+        </label>
+        <span className="registryContextNote">{available.length.toLocaleString("fa-IR")} مسیر استاتیک مجاز؛ {report.errors.length.toLocaleString("fa-IR")} خطای گزارش</span>
+      </div>
+      {available.length === 0 && <div className="panel registryEmpty">
+        <p>در گزارش فعلی مسیر استاتیک قابل‌اتصال پیدا نشد. مسیرهای پویا یا زیرساختی در این نسخه عمداً مجاز نیستند.</p>
+      </div>}
+      {available.length > 0 && <div className="registryLayout">
+        <aside className="panel registrySlots">
+          <div className="registrySlotsHeader"><strong>اتصالات تعریف‌شده</strong>
+            <button type="button" className="btn secondary small" onClick={addSlot} disabled={slots.length >= 100}>+ افزودن</button>
+          </div>
+          {slots.map((slot, index) => <button type="button" key={index}
+            className={selected === index ? "registrySlot isActive" : "registrySlot"}
+            onClick={() => setSelected(index)}>
+            <strong>{slot.id || "بدون شناسه"}</strong><code dir="ltr">{slot.route}</code>
+            <small>{slot.component}</small>
+          </button>)}
+        </aside>
+        <div className="panel registryEditor">
+          {active && <>
+            <div className="registryEditorHeader"><h2>تنظیم اتصال</h2>
+              <button type="button" className="btn secondary small" onClick={removeSlot}>حذف اتصال</button>
+            </div>
+            <div className="registryEditorGrid">
+              <label className="field"><span>شناسه اتصال</span><input dir="ltr" value={active.id}
+                onChange={(event) => updateActive({ id: event.target.value })} placeholder="HomeHero" /></label>
+              <label className="field"><span>نام کامپوننت در پروژه Next.js</span><input dir="ltr" value={active.component}
+                onChange={(event) => updateActive({ component: event.target.value })} placeholder="HeroSection" /></label>
+              <label className="field"><span>مسیر صفحه میزبان</span><select dir="ltr" value={active.route}
+                onChange={(event) => updateActive({ route: event.target.value })}>
+                {available.map((route) => <option key={route.file} value={normalizeRegistryRoute(route.url) || route.url}>{route.url}</option>)}
+              </select></label>
+            </div>
+            <div className="registryRouteContext">
+              <strong>مالک مسیر در گزارش:</strong> {mapped?.source === "cms" ? `CMS · ${mapped.content_type || ""}` : mapped?.source === "host" ? "پروژه میزبان" : "هنوز تعیین نشده"}
+              <span>این تنظیم مالکیت مسیر را تغییر نمی‌دهد.</span>
+            </div>
+            <div className="registryPropsHeader"><h3>نگاشت فیلدها به Props</h3>
+              <button type="button" className="btn secondary small" disabled={active.props.length >= 50}
+                onClick={() => updateActive({ props: [...active.props, { name: `prop${active.props.length + 1}`, source: "content.title", required: false }] })}>
+                + افزودن Props
+              </button>
+            </div>
+            <div className="registryProps">
+              {active.props.map((prop, index) => <div className="registryProp" key={index}>
+                <label className="field"><span>نام Props</span><input dir="ltr" value={prop.name}
+                  onChange={(event) => changeProp(index, { name: event.target.value })} /></label>
+                <label className="field"><span>فیلد CMS</span><select dir="ltr" value={prop.source}
+                  onChange={(event) => changeProp(index, { source: event.target.value })}>
+                  {!choices.some((option) => option.value === prop.source) &&
+                    <option value={prop.source}>{prop.source} (در ساختار فعلی یافت نشد)</option>}
+                  {choices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label} — {choice.value}</option>)}
+                </select></label>
+                <label className="registryRequired"><input type="checkbox" checked={prop.required}
+                  onChange={(event) => changeProp(index, { required: event.target.checked })} /> الزامی</label>
+                <button type="button" className="btn secondary small" onClick={() =>
+                  updateActive({ props: active.props.filter((_, pos) => pos !== index) })}>حذف</button>
+              </div>)}
+            </div>
+          </>}
+        </div>
+      </div>}
+      <section className="panel registryOutput">
+        <h2>خروجی قابل‌استفاده در Next.js</h2>
+        {issues.length > 0 && <div role="alert" className="registryErrors">
+          <strong>پیش از تولید کد، خطاها را برطرف کنید:</strong>
+          <ul>{issues.map((issue, i) => <li key={i}>{issue}</li>)}</ul>
+        </div>}
+        {generated ? <>
+          <p>فایل پیشنهادی: <code dir="ltr">src/lib/cms-components.ts</code>. این کد بدون تغییر فایل‌های میزبان، آماده کپی و بازبینی است.</p>
+          <pre dir="ltr" className="registryCode">{generated}</pre>
+          <button type="button" className="btn" onClick={copyCode}>{copied ? "کد کپی شد" : "کپی پیکربندی TypeScript"}</button>
+        </> : <p className="muted">پس از انتخاب حداقل یک اتصال معتبر، کد اینجا تولید می‌شود.</p>}
+      </section>
+    </>}
+  </>;
+}

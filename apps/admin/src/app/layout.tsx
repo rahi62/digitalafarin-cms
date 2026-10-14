@@ -12,6 +12,7 @@ import "../styles/search-performance.css";
 import "../styles/seo-opportunities.css";
 import "../styles/professional-editor.css";
 import "../styles/route-explorer.css";
+import "../styles/component-registry.css";
 import "../styles/content-list.css";
 import "../styles/dashboard.css";
 import "../styles/sites.css";
