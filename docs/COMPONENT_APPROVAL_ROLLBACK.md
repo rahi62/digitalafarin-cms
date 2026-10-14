@@ -10,6 +10,7 @@ DigitalAfarin CMS stores editable binding drafts (`ComponentBindingDraft`) and i
 - Editing the draft creates a new version but **does not** change the approved version.
 - `ComponentBindingApprovalEvent` records every promotion or rollback with actor, previous/next versions, checksum and optional reason.
 - Rollback may target **only a previously approved version**. It changes the approval pointer, **not** the editable draft, and does not revert a Next.js deployment.
+- **Revoke approval** is available even after the first-ever approval; it sets the approved pointer back to NULL, keeps all revisions/audit events and requires a reason. This does not disable an already deployed host automatically.
 - `runtime_status` is intentionally `unverified` until a separate opt-in host handshake/deployment mechanism is established.
 
 ## API (authenticated; tenant-scoped)
@@ -22,6 +23,7 @@ For `/api/cms/v1/content/component-bindings/{id}/`:
 | `GET approved-manifest/` | Site members | Export approved immutable slots, version and SHA-256 digest |
 | `POST approve/` | Owner/Admin | Approve only **current saved draft revision** |
 | `POST rollback-approval/` | Owner/Admin | Move pointer to a **previously approved** revision |
+| `POST revoke-approval/` | Owner/Admin | Explicitly clear the approved version (reason required) |
 
 POST operations require:
 ```json
@@ -34,7 +36,7 @@ POST operations require:
 }
 ```
 
-Use `expected_approved_version: null` before first approval. If either observed version changed, the operation returns **409**, preserving concurrent changes. Rollbacks must include a nonempty reason. The target is validated under a database row lock and an atomic transaction; changes to pointer/event are all-or-nothing.
+Use `expected_approved_version: null` before first approval. If either observed version changed, the operation returns **409**, preserving concurrent changes. Rollbacks and revocations must include a nonempty reason. For revocation, omit `target_version` or send `null`. The target is validated under a database row lock and an atomic transaction; changes to pointer/event are all-or-nothing.
 
 The Admin shows the saved draft version versus approved version, requires an explicit confirmation, disables approval when form edits are unsaved and allows selecting prior-approved versions for rollback.
 
