@@ -23,7 +23,26 @@ const contentType = {
   ]},
 };
 
-type DraftState = { draft?: { id: string; site: string; host_key: string; version: number; slots: Array<Record<string, unknown>>; updated_at: string }; };
+type ApprovalEvent = {
+  id: string; action: string; from_version: number | null; to_version: number;
+  reason: string; created_at: string;
+};
+type DraftState = {
+  draft?: { id: string; site: string; host_key: string; version: number; slots: Array<Record<string, unknown>>; updated_at: string };
+  approvedVersion?: number | null;
+  events?: ApprovalEvent[];
+};
+function approvalSnapshot(state: DraftState) {
+  const approvedVersion = state.approvedVersion ?? null;
+  return {
+    draft_version: state.draft?.version || 0, approved_version: approvedVersion,
+    approved_checksum: approvedVersion ? "abc123" : null,
+    approved_at: approvedVersion ? "2026-10-14T10:00:00Z" : null,
+    runtime_status: "unverified",
+    has_unapproved_changes: approvedVersion !== null && approvedVersion !== state.draft?.version,
+    events: state.events || [],
+  };
+}
 async function mockDashboard(page: import("@playwright/test").Page, state: DraftState = {}) {
   await page.addInitScript(() => localStorage.setItem("cms_access_token", "e2e-access-token"));
   await page.route("**" + "/cms/route-explorer/report", async (route: Route) => {
@@ -47,6 +66,34 @@ async function mockDashboard(page: import("@playwright/test").Page, state: Draft
       return route.fulfill({ status: 200, contentType: "application/json",
         body: JSON.stringify({ count: state.draft ? 1 : 0, next: null, previous: null,
           results: state.draft ? [state.draft] : [] }) });
+    }
+    if (path === "/content/component-bindings/binding-1/approval/" && method === "GET") {
+      return route.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify(approvalSnapshot(state)) });
+    }
+    if (path === "/content/component-bindings/binding-1/approved-manifest/" && method === "GET") {
+      return route.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify({ format_version: 1, approved_version: state.approvedVersion, slots: state.draft?.slots, runtime_status: "unverified" }) });
+    }
+    if ((path === "/content/component-bindings/binding-1/approve/" ||
+         path === "/content/component-bindings/binding-1/rollback-approval/") && method === "POST") {
+      const data = route.request().postDataJSON() as {
+        target_version: number; expected_approved_version: number | null;
+        expected_draft_version: number; reason: string; confirm: boolean;
+      };
+      const previous = state.approvedVersion ?? null;
+      if (!data.confirm || data.expected_approved_version !== previous || data.expected_draft_version !== state.draft?.version) {
+        return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ detail: "Version conflict" }) });
+      }
+      state.approvedVersion = data.target_version;
+      state.events = [{
+        id: "event-" + ((state.events?.length || 0) + 1),
+        action: path.endsWith("rollback-approval/") ? "rollback" : "approve",
+        from_version: previous, to_version: data.target_version, reason: data.reason,
+        created_at: "2026-10-14T10:00:00Z",
+      }, ...(state.events || [])];
+      return route.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify(approvalSnapshot(state)) });
     }
     if (path === "/content/component-bindings/binding-1/history/" && method === "GET") {
       return route.fulfill({ status: 200, contentType: "application/json",
@@ -116,4 +163,31 @@ test("saved component draft can be loaded and updated without changing host sour
   await page.getByRole("combobox", { name: "نسخه ذخیره‌شده" }).selectOption("binding-1");
   await expect(page.getByRole("textbox", { name: "شناسه اتصال" })).toHaveValue("UpdatedHero");
   await expect(page.locator(".registryCode")).toContainText('"id": "UpdatedHero"');
+});
+
+test("admin approval and rollback remain manual and preserve editable versions", async ({ page }) => {
+  const state: DraftState = {};
+  await mockDashboard(page, state);
+  page.on("dialog", async (dialog) => { await dialog.accept(); });
+  await page.goto("/cms/component-registry?route=%2F");
+  await page.getByRole("button", { name: "ثبت پیش‌نویس" }).click();
+  await expect(page.getByRole("button", { name: "تأیید نسخه ذخیره‌شده" })).toBeEnabled();
+  await page.getByRole("button", { name: "تأیید نسخه ذخیره‌شده" }).click();
+  await expect(page.getByText("آخرین نسخه تأییدشده:")).toBeVisible();
+  expect(state.approvedVersion).toBe(1);
+  await expect(page.getByText("اجرا روی میزبان:")).toContainText("تأییدنشده");
+
+  await page.getByRole("textbox", { name: "شناسه اتصال" }).fill("NewHero");
+  await expect(page.getByRole("button", { name: "تأیید نسخه ذخیره‌شده" })).toBeDisabled();
+  await page.getByRole("button", { name: "ذخیره نسخه جدید" }).click();
+  await expect(page.getByRole("button", { name: "تأیید نسخه ذخیره‌شده" })).toBeEnabled();
+  await page.getByRole("button", { name: "تأیید نسخه ذخیره‌شده" }).click();
+  expect(state.approvedVersion).toBe(2);
+
+  await page.getByRole("combobox", { name: "نسخه قبلاً تأییدشده" }).selectOption("1");
+  await page.getByRole("textbox", { name: "دلیل بازگردانی" }).fill("مشکل در اعتبارسنجی میزبان");
+  await page.getByRole("button", { name: "ثبت Rollback تأیید" }).click();
+  expect(state.approvedVersion).toBe(1);
+  await expect(page.getByText("بازگردانی نسخه ۱")).toBeVisible();
+  await expect(page.getByText("اجرا روی میزبان:")).toContainText("تأییدنشده");
 });
