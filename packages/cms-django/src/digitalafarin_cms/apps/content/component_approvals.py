@@ -70,42 +70,51 @@ def approval_state(draft, *, include_history=False):
 
 @transaction.atomic
 def change_approval(draft, actor, *, action, data):
-    if action not in {"approve", "rollback"} or data.get("confirm") is not True:
+    if action not in {"approve", "rollback", "revoke"} or data.get("confirm") is not True:
         raise ValidationError({"confirm": "A true confirmation and valid action are required."})
     expected = _expected(data, "expected_approved_version")
     draft_expected = _expected(data, "expected_draft_version")
     target = data.get("target_version")
-    if type(target) is not int or target < 1:
+    if action == "revoke":
+        if target is not None:
+            raise ValidationError({"target_version": "Revoking approval does not select a version."})
+    elif type(target) is not int or target < 1:
         raise ValidationError({"target_version": "Choose a positive integer version."})
     reason = data.get("reason", "")
     if not isinstance(reason, str) or len(reason) > 500:
         raise ValidationError({"reason": "Reason must contain at most 500 characters."})
-    if action == "rollback" and not reason.strip():
+    if action in {"rollback", "revoke"} and not reason.strip():
         raise ValidationError({"reason": "Provide a reason for rollback."})
 
     locked = ComponentBindingDraft.objects.select_for_update().get(pk=draft.pk)
     if expected != locked.approved_version or draft_expected != locked.version:
         raise StaleComponentBinding()
-    if target == locked.approved_version:
+    if action == "revoke":
+        if locked.approved_version is None:
+            raise ValidationError({"detail": "There is no approved version to revoke."})
+    elif target == locked.approved_version:
         raise ValidationError({"target_version": "This version is already approved."})
     if action == "approve":
         if target != locked.version:
             raise ValidationError({"target_version": "Only the current working revision can be approved."})
-    else:
+    elif action == "rollback":
         if locked.approved_version is None:
             raise ValidationError({"target_version": "No approval is available to roll back."})
         if not locked.approval_events.filter(to_version=target).exists():
             raise ValidationError({"target_version": "Rollback requires a previously approved revision."})
 
-    revision = _revision(locked, target)
-    if not revision.slots:
-        raise ValidationError({"target_version": "An empty host registry cannot be approved."})
-    checksum = manifest_digest(revision.slots)
+    if action == "revoke":
+        checksum = ""
+    else:
+        revision = _revision(locked, target)
+        if not revision.slots:
+            raise ValidationError({"target_version": "An empty host registry cannot be approved."})
+        checksum = manifest_digest(revision.slots)
     previous = locked.approved_version
 
     locked.approved_version = target
     locked.approved_checksum = checksum
-    locked.approved_at = timezone.now()
+    locked.approved_at = timezone.now() if action != "revoke" else None
     locked.approved_by = actor
     locked.save(update_fields=[
         "approved_version", "approved_checksum", "approved_at", "approved_by", "updated_at",
