@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
-import { getAccessToken } from "@/lib/api";
+import { BFF_ENABLED, getAccessToken } from "@/lib/api";
 import { adminPath, stripAdminBasePath } from "@/lib/admin-path";
 
 export default function Shell({ children }: { children: React.ReactNode }) {
