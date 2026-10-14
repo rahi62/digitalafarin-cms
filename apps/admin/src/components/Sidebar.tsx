@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { clearTokens } from "@/lib/api";
+import { logout } from "@/lib/api";
 import { adminPath, stripAdminBasePath } from "@/lib/admin-path";
 
 const links=[
@@ -49,6 +49,6 @@ export default function Sidebar(){
       aria-label="ناوبری مدیریت محتوا">{links.map(([href,label,icon])=>
         <Link key={href} href={adminPath(href)} className={isActive(current,href)?"active":""}><b>{icon}</b>{label}</Link>
       )}</nav>
-    <button className="logout" onClick={()=>{clearTokens();window.location.href=adminPath("/login")}}>خروج</button>
+    <button className="logout" onClick={()=>{void logout().finally(()=>{window.location.href=adminPath("/login")});}}>خروج</button>
   </aside>;
 }
