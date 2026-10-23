@@ -16,3 +16,30 @@ def integration_checks(app_configs, **kwargs):
     if "wagtail.contrib.redirects.middleware.RedirectMiddleware" in getattr(settings, "MIDDLEWARE", []):
         issues.append(Warning("Wagtail redirect middleware may process CMS/media 404 responses.", hint="Call apply_defaults after MIDDLEWARE is defined, or use digitalafarin_cms.middleware.cms_aware_wagtail_redirect.", id="digitalafarin_cms.W001"))
     return issues
+
+
+@register()
+def session_authentication_checks(app_configs, **kwargs):
+    """Reject host settings that can authenticate JWTs before checking revocation."""
+    from django.utils.module_loading import import_string
+    from digitalafarin_cms.session_auth import CmsSessionJWTAuthentication
+
+    configured = getattr(settings, "REST_FRAMEWORK", {}).get(
+        "DEFAULT_AUTHENTICATION_CLASSES", (),
+    )
+    try:
+        first = configured[0]
+        first = import_string(first) if isinstance(first, str) else first
+        safe = isinstance(first, type) and issubclass(first, CmsSessionJWTAuthentication)
+    except (ImportError, IndexError, KeyError, TypeError, AttributeError, ValueError):
+        safe = False
+    if safe:
+        return []
+    return [Error(
+        "CMS session revocation requires a session-checking JWT authenticator first.",
+        hint=("Set REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'][0] to "
+              "'digitalafarin_cms.session_auth.CmsSessionJWTAuthentication' "
+              "or a subclass. Host authenticators may follow it; an earlier "
+              "authenticator can bypass CMS session revocation."),
+        id="digitalafarin_cms.E002",
+    )]

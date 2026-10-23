@@ -27,7 +27,7 @@ The `/cms/security/sessions` screen lists account sessions with current/active/r
 ## Compatibility and prerequisites
 
 - `apps/sites/migrations/0002_cms_user_sessions.py` creates one new table and index, without rewriting existing published CMS content. Rehearse with verified Postgres backup on staging before installing.
-- CMS default settings use session-checked JWT authentication, **but if a host project overrides `REST_FRAMEWORK.DEFAULT_AUTHENTICATION_CLASSES`, it MUST explicitly include `CmsSessionJWTAuthentication` to get immediate revocation on every endpoint.**
+- CMS default settings use session-checked JWT authentication, **but if a host project overrides `REST_FRAMEWORK.DEFAULT_AUTHENTICATION_CLASSES`, it MUST put `CmsSessionJWTAuthentication` (or a subclass) first. Django system check `digitalafarin_cms.E002` rejects missing, unimportable or earlier bypassing authenticators. Keep host authenticators after it. This check does not inspect per-view overrides; those still require review.**
 - Pre-existing access/refresh JWTs without `cms_sid` are provisionally accepted unless `DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=True`. Enable strict mode only after client and server rollout planning, otherwise legacy sessions can bypass this revocation registry. For production after rollout, strict mode is strongly recommended.
 - A host running multiple app instances must use the **same transactional database**. Stateless copies of this registry or stale query caches void the immediate-revocation guarantee.
 - Device labels derive from untrusted user-agent strings; they are informational, not cryptographically verified device identities.

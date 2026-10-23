@@ -70,6 +70,7 @@ jobs:
           test -f package-lock.json
           node -e "const l=require('./package-lock.json'); if(l.lockfileVersion<1) process.exit(1); console.log('lockfileVersion='+l.lockfileVersion)"
       - run: npm ci --ignore-scripts
+      - run: node --experimental-strip-types --test apps/admin/test/*.test.mjs
       - run: npm run check:versions
       - run: npm --workspace packages/cms-next run build
       - run: npm --workspace packages/cms-next run typecheck
