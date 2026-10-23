@@ -80,3 +80,19 @@ def managed_session_deployment_checks(app_configs, **kwargs):
             id='digitalafarin_cms.W003',
         ))
     return issues
+
+
+@register()
+def login_limit_checks(app_configs, **kwargs):
+    from django.core.exceptions import ImproperlyConfigured
+    from digitalafarin_cms.login_limits import login_limits
+    try:
+        login_limits()
+    except ImproperlyConfigured:
+        return [Error(
+            'CMS login rate-limit configuration is invalid.',
+            hint=('DIGITALAFARIN_CMS_LOGIN_LIMITS accepts window, ip, account and pair; '
+                  'each must be an integer between 1 and 3600.'),
+            id='digitalafarin_cms.E004',
+        )]
+    return []
