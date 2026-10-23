@@ -1,0 +1,68 @@
+# Product completion status
+
+Last verified: 2026-10-24. Working branch: `feat/cms-security-integration`, based on Draft PR #67. **Product feature completion has not been reached.** No merge, release, deployment, or production migration is authorized.
+
+Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but acceptance remains; BLOCKED = external dependency prevents progress; NOT STARTED = no implementation verified in this audit. Existing documentation checkboxes are not evidence of complete acceptance.
+
+## Verified repository baseline
+
+- Main: `095c836` (PR #56); #54–#56 are merged.
+- Draft dependency chain: #57 → #58 → #59 → #60 → #61 → #62 → #63 → #65 → #66 → #67.
+- Parallel #64 branches from #63; not merged or cherry-picked wholesale.
+- #65–#67 latest existing CI: Python 3.11/3.12/3.13 and Node succeeded. #64 Node failed; Python succeeded.
+- Other open PRs: #33, #46, #50–#53. Dependency upgrades and host-hardening changes require separate compatibility review.
+
+## Phase 0 and PR #64 comparison
+
+| Capability | Status | Evidence / gap |
+| --- | --- | --- |
+| PR dependency graph | DONE | GitHub open PR bases and heads inspected |
+| Authentication branch comparison | PARTIAL | Source/test comparison complete for session and proxy paths; full host E2E parity still pending |
+| #64 upstream manual redirects/timeouts | DONE | #66 already has these for token exchange; general proxy gains bounded requests and sanitized 503 handling |
+| #64 decoded endpoint segment validation | DONE | Ported to current proxy; traversal, encoded separators, control characters tested |
+| #64 token rotation/logout tests | PARTIAL | Equivalent core coverage in #65/#67; #64 generic blacklist endpoint intentionally not introduced (would bypass managed-session logout semantics) |
+| #64 browser security tests | PARTIAL | Existing BFF suite covers token exposure/CSRF; standalone host fixture parity still pending |
+| Migration graph and drift | DONE | Django system check and makemigrations --check --dry-run passed on working stack; no new migration |
+| Clean/existing-host integration | PARTIAL | 28 SDK/CLI integration tests pass, including preservation of existing routes and embedded styles; clean packed installation and real-host browser tests still pending |
+| Backend baseline | DONE | 158 tests + 25 subtests pass locally on Python 3.12; 21 warnings remain |
+| Admin typecheck | DONE | tsc --noEmit passed |
+| BFF browser regression | DONE | 2 tests passed with installed Chrome via CMS_E2E_BROWSER_PATH; CDN Chromium download returns location-based HTTP 403 |
+| Proxy safeguards | DONE | 4 Node tests cover invalid paths, upstream disconnect, manual redirects and the 20-second timeout |
+| Admin production build | DONE | next build passed locally |
+| Latest feature-branch CI | NOT STARTED | Must be recorded after push and Draft PR creation |
+| Full packaging / supported-version matrix | PARTIAL | Existing CI provides coverage; fresh branch package verification pending |
+
+## Product gaps
+
+| Area | Status | Existing implementation and remaining acceptance |
+| --- | --- | --- |
+| Session registry/revocation | PARTIAL | #67 checks session IDs, logout and per-device revocation; host settings now reject unsafe authenticator order with E002. Per-view overrides and host-specific authenticators still require review |
+| Refresh concurrency/multi-instance | PARTIAL | Rotation/blacklist exists; simultaneous refresh serialization and token-family reuse handling remain |
+| Login abuse protection | NOT STARTED | No verified database-backed rate limiting, backoff or credential-stuffing protection |
+| Security headers/CSP | NOT STARTED | Requires Next-compatible nonce policy and HTTPS/proxy tests |
+| Security audit | PARTIAL | Schema/component approval events exist; unified authentication/security event stream missing |
+| User/team management | PARTIAL | Membership/role APIs and Admin exist; invitations, account recovery, ownership transfer and full role matrix acceptance remain |
+| Content schema | PARTIAL | Typed fields, nested structures, relations, singleton support exist; controlled migration only supports bounded root rename |
+| Editorial workflow | PARTIAL | Published snapshots, revisions, scheduling, trash/restore exist; editor concurrency, autosave/conflict and SEO snapshot acceptance need full audit |
+| Reusable blocks | PARTIAL | Independent copies exist; controlled globally synced publication/versioning remains |
+| Hybrid integration | PARTIAL | Host-owned registries, persisted drafts, approval/rollback/checksums exist; deployment reporting, dynamic binding and full host verification remain |
+| Admin/onboarding | PARTIAL | Persian RTL Admin exists; complete permission-aware lifecycle, accessibility/mobile and diagnostic acceptance remain |
+| Media/menu/taxonomy/SEO | PARTIAL | Existing modules and public SDK exist; complete CRUD, dependency integrity and upload-abuse acceptance remain |
+| Bulk/import/export | NOT STARTED | No complete operational workflow verified |
+| Background jobs/operations | PARTIAL | Celery dependency and audit workflows exist; retry/cancellation/health/dead-letter acceptance remain |
+| SDK/extensions/webhooks | PARTIAL | Typed public SDK exists; full API versioning, webhook retry/idempotency and extension safety acceptance remain |
+| Comprehensive QA | PARTIAL | Existing automated suites pass locally as recorded; PostgreSQL concurrency, supported runtimes and browser/host matrix remain |
+| Release candidate | NOT STARTED | Requires P0/P1 completion, backup restore, upgrade/install and explicit release authorization |
+
+## Immediate implementation sequence
+
+1. Finish reviewable PR #64 safeguard port and authentication configuration detection; run CI.
+2. Enforce managed session checks across sensitive CMS endpoints despite host overrides; prove with API replay tests.
+3. Serialize managed refresh rotation across instances and test concurrency on PostgreSQL.
+4. Add shared login abuse controls and security audit, then complete remaining P0 security before user management.
+
+This file is an evidence ledger, not an assertion that entire phases are complete.
+
+## Review limits
+
+Independent focused review found no blocking issue. Proxy 503 sanitization covers failures before upstream headers arrive. A failure during an already streaming response terminates that response; the proxy does not buffer entire media/export bodies or replace a status already sent. Browser tests use an isolated upstream and do not substitute for the PostgreSQL/real-host acceptance matrix.

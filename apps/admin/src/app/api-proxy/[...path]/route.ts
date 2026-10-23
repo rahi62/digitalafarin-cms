@@ -1,4 +1,5 @@
 import { BFF_MODE, bffError, failure, names } from "@/lib/bff-session";
+import { validCmsEndpoint, fetchCmsUpstream } from "@/lib/proxy-security";
 import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ function upstreamBaseUrl() {
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
   const { path = [] } = await context.params;
+  if (!validCmsEndpoint(path)) return failure(400, "Invalid CMS endpoint");
   const incomingUrl = new URL(request.url);
   const suffix = path.map((segment) => encodeURIComponent(segment)).join("/");
   // Host Next.js may strip the browser's trailing slash. DRF's CMS routes require it.
@@ -49,7 +51,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path?: s
     init.body = await request.arrayBuffer();
   }
 
-  const upstream = await fetch(target, init);
+  const upstream = await fetchCmsUpstream(target, init);
   const responseHeaders = new Headers();
   for (const name of ["content-type", "content-disposition", "location", "cache-control"]) {
     const value = upstream.headers.get(name);

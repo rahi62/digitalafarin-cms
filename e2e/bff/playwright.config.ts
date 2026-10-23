@@ -5,7 +5,9 @@ export default defineConfig({
   timeout: 45_000, expect: { timeout: 12_000 },
   workers: 1, fullyParallel: false,
   reporter: process.env.CI ? [["line"]] : [["list"]],
-  use: { baseURL: "http://127.0.0.1:3104", ...devices["Desktop Chrome"] },
+  use: { baseURL: "http://127.0.0.1:3104", ...devices["Desktop Chrome"],
+    launchOptions: process.env.CMS_E2E_BROWSER_PATH ? { executablePath: process.env.CMS_E2E_BROWSER_PATH } : {},
+  },
   webServer: [
     {
       cwd: process.cwd(),
