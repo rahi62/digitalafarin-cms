@@ -26,6 +26,10 @@ http.createServer(async (req, res) => {
   const path = url.pathname.startsWith(prefix) ? url.pathname.slice(prefix.length) : "";
 
   if (path === "auth/token/") {
+    if (payload.username === "limited-user") {
+      res.setHeader("Retry-After", "17");
+      return respond(res, 429, { detail: "Request was throttled." });
+    }
     if (req.method !== "POST" || payload.username !== "testuser" || payload.password !== "testpass")
       return respond(res, 401, { detail: "Invalid credentials" });
     counter += 1;

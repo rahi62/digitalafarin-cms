@@ -101,3 +101,16 @@ test("session inventory can revoke other devices and all devices through protect
     await other.close();
   }
 });
+
+test("login retry window survives BFF and appears as an actionable Persian error", async ({ page }) => {
+  await page.goto('/cms/login');
+  await page.locator('input[autocomplete="username"]').fill('limited-user');
+  await page.locator('input[autocomplete="current-password"]').fill('test-password');
+  const pending = page.waitForResponse(response => response.url().endsWith('/auth/session/login'));
+  await page.getByRole('button', { name: 'ورود', exact: true }).click();
+  const response = await pending;
+  expect(response.status()).toBe(429);
+  expect(response.headers()['retry-after']).toBe('17');
+  await expect(page.getByText('تلاش‌های ورود بیش از حد مجاز است. پس از 17 ثانیه دوباره تلاش کنید.')).toBeVisible();
+  expect((await page.context().cookies()).some(cookie => cookie.name === 'cms_bff_access')).toBe(false);
+});

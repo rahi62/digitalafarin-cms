@@ -1,3 +1,4 @@
+import { loginRetrySeconds, loginRetryMessage } from "@/lib/login-errors";
 import { adminPath } from "@/lib/admin-path";
 
 export const BFF_ENABLED = process.env.NEXT_PUBLIC_DIGITALAFARIN_CMS_AUTH_MODE === "bff";
@@ -65,6 +66,7 @@ export async function login(username: string, password: string) {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }), cache: "no-store",
   });
+  if (res.status === 429) throw new Error(loginRetryMessage(loginRetrySeconds(res.headers.get("retry-after"))));
   if (!res.ok) throw new Error("نام کاربری یا رمز عبور نادرست است");
   const data = await res.json() as { access?: string; refresh?: string };
   if (typeof data.access !== "string" || typeof data.refresh !== "string") {

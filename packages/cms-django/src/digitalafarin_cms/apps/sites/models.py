@@ -41,3 +41,10 @@ class CmsUserSession(UUIDTimeStampedModel):
             models.Index(fields=["user", "revoked_at", "refresh_expires_at"],
                          name="cms_user_session_lookup"),
         ]
+
+
+class CmsLoginRateBucket(models.Model):
+    """Short-lived HMAC identifiers and counters; never raw account/IP/password data."""
+    key = models.CharField(max_length=64, primary_key=True)
+    attempts = models.PositiveIntegerField(default=0)
+    expires_at = models.DateTimeField(db_index=True)
