@@ -44,3 +44,17 @@ Django tests cover two independently issued sessions, refresh rotation, immediat
 ## Runtime enforcement regression
 
 The replay test discovers all 91 currently protected URL patterns, substitutes host `JWTAuthentication`, proves live access first, revokes the backing session and requires denial for GET/HEAD/POST/PUT/PATCH/DELETE/OPTIONS (637 requests). Public `AllowAny` endpoints retain their existing behavior. CMS permissions only inspect verified `Token`/mapping authentication results, never unsigned raw headers. Hosts defining new CMS endpoints must use `CmsIsAuthenticated`; removing the CMS permission itself is outside the supported integration contract.
+
+## Managed refresh concurrency
+
+Managed refresh rotation now runs inside an atomic transaction holding a `SELECT FOR UPDATE` lock on the backing session. The parent SimpleJWT serializer rechecks the blacklist after acquiring that lock. Separate server processes sharing PostgreSQL therefore cannot both consume the same refresh token: one succeeds and a later waiter receives 401. A concurrent committed revocation also denies refresh after the waiter acquires the lock. Expiry is checked again after lock acquisition, preventing a pre-expiry request from continuing after the absolute session lifetime. Rotation and blacklist writes roll back together on failure.
+
+This guarantee requires a database with real row locking (tested on PostgreSQL 16), shared by all API instances, and the default rotation/blacklist settings. SQLite remains usable for development but its ignored `SELECT FOR UPDATE` cannot prove multi-instance refresh safety. Legacy refresh tokens without `cms_sid` retain compatibility behavior; require managed sessions after the coordinated rollout. No claim is made here about token-family compromise detection or browser cross-tab refresh coordination.
+
+Run real concurrency verification against an isolated disposable database, never production:
+
+```sh
+DJANGO_SETTINGS_MODULE=tests.postgres_settings PYTHONPATH=packages/cms-django python -m pytest packages/cms-django/tests -q
+```
+
+Test connection uses `CMS_TEST_POSTGRES_HOST/PORT/DB/USER/PASSWORD`; defaults target localhost:55439 with test-only credentials. Django creates and removes its own test database. CI provisions an isolated PostgreSQL service and runs the full backend suite.

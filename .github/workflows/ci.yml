@@ -52,6 +52,36 @@ jobs:
           .smoke-python/bin/python -m pip install dist/python/*.whl
           .smoke-python/bin/python scripts/smoke-python-package.py
 
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cms_test
+          POSTGRES_PASSWORD: cms-test-only
+          POSTGRES_DB: cms_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cms_test -d cms_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install PostgreSQL test dependencies
+        run: python -m pip install pytest pytest-django -e "./packages/cms-django[postgres]"
+      - name: Verify backend and concurrent refresh on PostgreSQL
+        env:
+          DJANGO_SETTINGS_MODULE: tests.postgres_settings
+          PYTHONPATH: packages/cms-django
+          CMS_TEST_POSTGRES_PORT: "5432"
+        run: python -m pytest packages/cms-django/tests -q
+
   node:
     runs-on: ubuntu-latest
     steps:
