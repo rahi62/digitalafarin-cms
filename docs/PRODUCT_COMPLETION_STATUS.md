@@ -1,6 +1,6 @@
 # Product completion status
 
-Last verified: 2026-10-24. Working branch: `feat/cms-refresh-rotation-locking`, based on Draft PR #67. **Product feature completion has not been reached.** No merge, release, deployment, or production migration is authorized.
+Last verified: 2026-10-24. Working branch: `feat/cms-session-security-checks`, based on Draft PR #67. **Product feature completion has not been reached.** No merge, release, deployment, or production migration is authorized.
 
 Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but acceptance remains; BLOCKED = external dependency prevents progress; NOT STARTED = no implementation verified in this audit. Existing documentation checkboxes are not evidence of complete acceptance.
 
@@ -31,7 +31,8 @@ Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but a
 | Admin production build | DONE | next build passed locally |
 | PR #68 CI | DONE | Commit 7756dd7: Node and Python 3.11/3.12/3.13 all passed (run 40020523726) |
 | PR #69 runtime enforcement CI | DONE | Commit a71d1ce: all four jobs passed on rerun; initial Node editor-create timeout remains an intermittent issue |
-| Refresh locking CI | NOT STARTED | Pending Draft PR after local verification |
+| PR #70 refresh locking CI | DONE | Commit bca7d71: Node, PostgreSQL and Python 3.11/3.12/3.13 all passed (run 40029942477) |
+| Configuration-check CI | NOT STARTED | Pending Draft PR after local verification |
 | Full packaging / supported-version matrix | PARTIAL | Existing CI provides coverage; fresh branch package verification pending |
 
 ## Product gaps
@@ -39,7 +40,7 @@ Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but a
 | Area | Status | Existing implementation and remaining acceptance |
 | --- | --- | --- |
 | Session registry/revocation | PARTIAL | #67 checks session IDs, logout and per-device revocation; host settings reject unsafe authenticator order with E002; CMS permissions now recheck validated session claims even under host plain JWT overrides (91 routes × 7 verbs). Full strict-mode/host custom auth matrix remains |
-| Refresh concurrency/multi-instance | PARTIAL | PostgreSQL row lock now serializes managed refresh and concurrent revocation; fresh post-lock expiry check prevents expiry-during-wait bypass. Three real multi-connection regressions pass. Token-family compromise tracking, cross-tab refresh coordination and unsafe host rotation overrides remain |
+| Refresh concurrency/multi-instance | PARTIAL | PostgreSQL row lock now serializes managed refresh and concurrent revocation; fresh post-lock expiry check prevents expiry-during-wait bypass. Three real multi-connection regressions pass. Token-family compromise tracking, cross-tab refresh coordination and deployment compatibility mode remains an explicit transition; E003 now detects disabled rotation/blacklist and missing blacklist app |
 | Login abuse protection | NOT STARTED | No verified database-backed rate limiting, backoff or credential-stuffing protection |
 | Security headers/CSP | NOT STARTED | Requires Next-compatible nonce policy and HTTPS/proxy tests |
 | Security audit | PARTIAL | Schema/component approval events exist; unified authentication/security event stream missing |
@@ -68,3 +69,7 @@ This file is an evidence ledger, not an assertion that entire phases are complet
 ## Review limits
 
 Independent focused review found no blocking issue. Proxy 503 sanitization covers failures before upstream headers arrive. A failure during an already streaming response terminates that response; the proxy does not buffer entire media/export bodies or replace a status already sent. Browser tests use an isolated upstream and do not substitute for the PostgreSQL/real-host acceptance matrix.
+
+## Configuration detection increment
+
+E003 rejects disabled rotation/blacklist or a missing blacklist app. Deployment-only W002/W003 report compatibility mode and missing default-database row locks. Nine focused configuration tests and six subtests pass. See SECURITY_CONFIGURATION.md for rollout and database-router limitations. Full verification: SQLite 165 tests + 666 subtests passed (3 PostgreSQL-only skips); PostgreSQL 168 tests + 666 subtests passed. Configuration/migration/diff checks pass; no new migration. These checks are not login abuse protection.
