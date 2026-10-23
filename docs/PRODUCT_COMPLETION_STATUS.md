@@ -1,6 +1,6 @@
 # Product completion status
 
-Last verified: 2026-10-24. Working branch: `feat/cms-security-integration`, based on Draft PR #67. **Product feature completion has not been reached.** No merge, release, deployment, or production migration is authorized.
+Last verified: 2026-10-24. Working branch: `feat/cms-session-permission-enforcement`, based on Draft PR #67. **Product feature completion has not been reached.** No merge, release, deployment, or production migration is authorized.
 
 Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but acceptance remains; BLOCKED = external dependency prevents progress; NOT STARTED = no implementation verified in this audit. Existing documentation checkboxes are not evidence of complete acceptance.
 
@@ -24,19 +24,20 @@ Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but a
 | #64 browser security tests | PARTIAL | Existing BFF suite covers token exposure/CSRF; standalone host fixture parity still pending |
 | Migration graph and drift | DONE | Django system check and makemigrations --check --dry-run passed on working stack; no new migration |
 | Clean/existing-host integration | PARTIAL | 28 SDK/CLI integration tests pass, including preservation of existing routes and embedded styles; clean packed installation and real-host browser tests still pending |
-| Backend baseline | DONE | 158 tests + 25 subtests pass locally on Python 3.12; 21 warnings remain |
+| Backend baseline | DONE | 161 tests + 662 subtests pass locally on Python 3.12 after runtime enforcement; 23 warnings remain |
 | Admin typecheck | DONE | tsc --noEmit passed |
 | BFF browser regression | DONE | 2 tests passed with installed Chrome via CMS_E2E_BROWSER_PATH; CDN Chromium download returns location-based HTTP 403 |
 | Proxy safeguards | DONE | 4 Node tests cover invalid paths, upstream disconnect, manual redirects and the 20-second timeout |
 | Admin production build | DONE | next build passed locally |
-| Latest feature-branch CI | NOT STARTED | Must be recorded after push and Draft PR creation |
+| PR #68 CI | DONE | Commit 7756dd7: Node and Python 3.11/3.12/3.13 all passed (run 40020523726) |
+| Runtime permission enforcement CI | NOT STARTED | Pending Draft PR after local verification |
 | Full packaging / supported-version matrix | PARTIAL | Existing CI provides coverage; fresh branch package verification pending |
 
 ## Product gaps
 
 | Area | Status | Existing implementation and remaining acceptance |
 | --- | --- | --- |
-| Session registry/revocation | PARTIAL | #67 checks session IDs, logout and per-device revocation; host settings now reject unsafe authenticator order with E002. Per-view overrides and host-specific authenticators still require review |
+| Session registry/revocation | PARTIAL | #67 checks session IDs, logout and per-device revocation; host settings reject unsafe authenticator order with E002; CMS permissions now recheck validated session claims even under host plain JWT overrides (91 routes × 7 verbs). Full strict-mode/host custom auth matrix remains |
 | Refresh concurrency/multi-instance | PARTIAL | Rotation/blacklist exists; simultaneous refresh serialization and token-family reuse handling remain |
 | Login abuse protection | NOT STARTED | No verified database-backed rate limiting, backoff or credential-stuffing protection |
 | Security headers/CSP | NOT STARTED | Requires Next-compatible nonce policy and HTTPS/proxy tests |
@@ -57,7 +58,7 @@ Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but a
 ## Immediate implementation sequence
 
 1. Finish reviewable PR #64 safeguard port and authentication configuration detection; run CI.
-2. Enforce managed session checks across sensitive CMS endpoints despite host overrides; prove with API replay tests.
+2. Runtime enforcement implemented with API-wide replay tests; complete review and CI.
 3. Serialize managed refresh rotation across instances and test concurrency on PostgreSQL.
 4. Add shared login abuse controls and security audit, then complete remaining P0 security before user management.
 

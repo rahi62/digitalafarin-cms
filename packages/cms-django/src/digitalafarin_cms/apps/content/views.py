@@ -11,7 +11,8 @@ from django.utils.dateparse import parse_datetime
 from xml.sax.saxutils import escape as xml_escape
 from rest_framework import status as drf_status, viewsets, serializers
 from rest_framework.decorators import action, api_view, permission_classes, authentication_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
+from digitalafarin_cms.permissions import CmsIsAuthenticated as IsAuthenticated
 from rest_framework.response import Response
 
 from digitalafarin_cms.apps.common.tenancy import (

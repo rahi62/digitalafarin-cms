@@ -1,6 +1,6 @@
 """Blacklists the supplied refresh token; never trust client-provided identity."""
 from rest_framework import serializers, status
-from rest_framework.permissions import IsAuthenticated
+from digitalafarin_cms.permissions import CmsIsAuthenticated as IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
