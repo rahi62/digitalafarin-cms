@@ -27,7 +27,7 @@ The `/cms/security/sessions` screen lists account sessions with current/active/r
 ## Compatibility and prerequisites
 
 - `apps/sites/migrations/0002_cms_user_sessions.py` creates one new table and index, without rewriting existing published CMS content. Rehearse with verified Postgres backup on staging before installing.
-- CMS default settings use session-checked JWT authentication, **but if a host project overrides `REST_FRAMEWORK.DEFAULT_AUTHENTICATION_CLASSES`, it MUST put `CmsSessionJWTAuthentication` (or a subclass) first. Django system check `digitalafarin_cms.E002` rejects missing, unimportable or earlier bypassing authenticators. Keep host authenticators after it. This check does not inspect per-view overrides; those still require review.**
+- CMS default settings use session-checked JWT authentication, **but if a host project overrides `REST_FRAMEWORK.DEFAULT_AUTHENTICATION_CLASSES`, it MUST put `CmsSessionJWTAuthentication` (or a subclass) first. Django system check `digitalafarin_cms.E002` rejects missing, unimportable or earlier bypassing authenticators. Keep host authenticators after it. Protected CMS handlers also use `CmsIsAuthenticated`, which rechecks already authenticated session claims against the request user. Thus a host/plain JWT per-view override cannot bypass revocation. Strict managed-session mode also rejects authenticated host sessions or legacy tokens without `cms_sid`; compatibility mode preserves them.**
 - Pre-existing access/refresh JWTs without `cms_sid` are provisionally accepted unless `DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=True`. Enable strict mode only after client and server rollout planning, otherwise legacy sessions can bypass this revocation registry. For production after rollout, strict mode is strongly recommended.
 - A host running multiple app instances must use the **same transactional database**. Stateless copies of this registry or stale query caches void the immediate-revocation guarantee.
 - Device labels derive from untrusted user-agent strings; they are informational, not cryptographically verified device identities.
@@ -40,3 +40,7 @@ The `/cms/security/sessions` screen lists account sessions with current/active/r
 Django tests cover two independently issued sessions, refresh rotation, immediate API denial after revocation, cross-account protection, owner-only session view, current/all/others revocation, logout, and strict legacy-token rejection. Browser E2E covers independent BFF sessions, per-account revocation and cookie cleanup.
 
 **Do not deploy before migration rehearsal and host-client verification. No code was merged into main.**
+
+## Runtime enforcement regression
+
+The replay test discovers all 91 currently protected URL patterns, substitutes host `JWTAuthentication`, proves live access first, revokes the backing session and requires denial for GET/HEAD/POST/PUT/PATCH/DELETE/OPTIONS (637 requests). Public `AllowAny` endpoints retain their existing behavior. CMS permissions only inspect verified `Token`/mapping authentication results, never unsigned raw headers. Hosts defining new CMS endpoints must use `CmsIsAuthenticated`; removing the CMS permission itself is outside the supported integration contract.

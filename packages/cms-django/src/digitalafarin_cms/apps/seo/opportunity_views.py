@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from digitalafarin_cms.permissions import CmsIsAuthenticated as IsAuthenticated
 from rest_framework.response import Response
 
 from digitalafarin_cms.apps.common.tenancy import ensure_organization_access

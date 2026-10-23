@@ -6,7 +6,7 @@ from django.db import IntegrityError, transaction
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import APIException
-from rest_framework.permissions import IsAuthenticated
+from digitalafarin_cms.permissions import CmsIsAuthenticated as IsAuthenticated
 from rest_framework.response import Response
 
 from digitalafarin_cms.apps.common.tenancy import TenantScopedViewSetMixin, ensure_organization_roles
