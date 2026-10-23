@@ -43,3 +43,40 @@ def session_authentication_checks(app_configs, **kwargs):
               "authenticator can bypass CMS session revocation."),
         id="digitalafarin_cms.E002",
     )]
+
+
+@register()
+def refresh_rotation_checks(app_configs, **kwargs):
+    config = getattr(settings, 'SIMPLE_JWT', {})
+    if (config.get('ROTATE_REFRESH_TOKENS') is True
+            and config.get('BLACKLIST_AFTER_ROTATION') is True
+            and 'rest_framework_simplejwt.token_blacklist' in settings.INSTALLED_APPS):
+        return []
+    return [Error(
+        'CMS managed refresh requires rotation and blacklist protection.',
+        hint=('Enable SIMPLE_JWT ROTATE_REFRESH_TOKENS and BLACKLIST_AFTER_ROTATION, '
+              'install rest_framework_simplejwt.token_blacklist and apply its migrations.'),
+        id='digitalafarin_cms.E003',
+    )]
+
+
+@register(deploy=True)
+def managed_session_deployment_checks(app_configs, **kwargs):
+    from django.db import connections
+
+    issues = []
+    if not getattr(settings, 'DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS', False):
+        issues.append(Warning(
+            'CMS compatibility mode accepts authentication without a managed session.',
+            hint=('After coordinated client rollout, set '
+                  'DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=True to require revocable sessions.'),
+            id='digitalafarin_cms.W002',
+        ))
+    if not connections['default'].features.has_select_for_update:
+        issues.append(Warning(
+            'The default database cannot serialize managed refresh with row locks.',
+            hint=('Use a shared transactional database with SELECT FOR UPDATE '
+                  '(verified on PostgreSQL) for multi-instance session security.'),
+            id='digitalafarin_cms.W003',
+        ))
+    return issues
