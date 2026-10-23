@@ -7,11 +7,10 @@ from datetime import datetime, timedelta, timezone as dt_timezone
 from uuid import UUID
 
 from django.conf import settings
-from django.db.models import Q
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 
 from digitalafarin_cms.apps.sites.models import CmsUserSession
@@ -19,7 +18,7 @@ from digitalafarin_cms.apps.sites.models import CmsUserSession
 SESSION_CLAIM = "cms_sid"
 
 
-def managed_session(token, *, user_id=None):
+def managed_session(token, *, user_id=None, lock=False):
     raw = token.get(SESSION_CLAIM)
     if not raw:
         if getattr(settings, "DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS", False):
@@ -33,11 +32,14 @@ def managed_session(token, *, user_id=None):
         pk=session_id, revoked_at__isnull=True,
         refresh_expires_at__gt=timezone.now(),
     )
+    if lock:
+        query = query.select_for_update()
     actual_user = user_id if user_id is not None else token.get("user_id")
     if not actual_user:
         raise AuthenticationFailed("Session identity is missing.")
     session = query.filter(user_id=actual_user).first()
-    if session is None:
+    # The query may have waited on a lock past the cutoff computed above.
+    if session is None or session.revoked_at is not None or session.refresh_expires_at <= timezone.now():
         raise AuthenticationFailed("CMS session was revoked or expired.")
     return session
 
@@ -83,5 +85,9 @@ class CmsTokenObtainPairSerializer(TokenObtainPairSerializer):
 class CmsTokenRefreshSerializer(TokenRefreshSerializer):
     def validate(self, attrs):
         token = self.token_class(attrs["refresh"])
-        managed_session(token)
-        return super().validate(attrs)
+        with transaction.atomic():
+            # All API instances serialize on the same session row. The parent
+            # serializer revalidates the blacklist after acquiring this lock,
+            # so a waiter cannot rotate the same already-consumed refresh JWT.
+            managed_session(token, lock=True)
+            return super().validate(attrs)

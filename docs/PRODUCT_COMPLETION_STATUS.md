@@ -1,6 +1,6 @@
 # Product completion status
 
-Last verified: 2026-10-24. Working branch: `feat/cms-session-permission-enforcement`, based on Draft PR #67. **Product feature completion has not been reached.** No merge, release, deployment, or production migration is authorized.
+Last verified: 2026-10-24. Working branch: `feat/cms-refresh-rotation-locking`, based on Draft PR #67. **Product feature completion has not been reached.** No merge, release, deployment, or production migration is authorized.
 
 Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but acceptance remains; BLOCKED = external dependency prevents progress; NOT STARTED = no implementation verified in this audit. Existing documentation checkboxes are not evidence of complete acceptance.
 
@@ -30,7 +30,8 @@ Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but a
 | Proxy safeguards | DONE | 4 Node tests cover invalid paths, upstream disconnect, manual redirects and the 20-second timeout |
 | Admin production build | DONE | next build passed locally |
 | PR #68 CI | DONE | Commit 7756dd7: Node and Python 3.11/3.12/3.13 all passed (run 40020523726) |
-| Runtime permission enforcement CI | NOT STARTED | Pending Draft PR after local verification |
+| PR #69 runtime enforcement CI | DONE | Commit a71d1ce: all four jobs passed on rerun; initial Node editor-create timeout remains an intermittent issue |
+| Refresh locking CI | NOT STARTED | Pending Draft PR after local verification |
 | Full packaging / supported-version matrix | PARTIAL | Existing CI provides coverage; fresh branch package verification pending |
 
 ## Product gaps
@@ -38,7 +39,7 @@ Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but a
 | Area | Status | Existing implementation and remaining acceptance |
 | --- | --- | --- |
 | Session registry/revocation | PARTIAL | #67 checks session IDs, logout and per-device revocation; host settings reject unsafe authenticator order with E002; CMS permissions now recheck validated session claims even under host plain JWT overrides (91 routes × 7 verbs). Full strict-mode/host custom auth matrix remains |
-| Refresh concurrency/multi-instance | PARTIAL | Rotation/blacklist exists; simultaneous refresh serialization and token-family reuse handling remain |
+| Refresh concurrency/multi-instance | PARTIAL | PostgreSQL row lock now serializes managed refresh and concurrent revocation; fresh post-lock expiry check prevents expiry-during-wait bypass. Three real multi-connection regressions pass. Token-family compromise tracking, cross-tab refresh coordination and unsafe host rotation overrides remain |
 | Login abuse protection | NOT STARTED | No verified database-backed rate limiting, backoff or credential-stuffing protection |
 | Security headers/CSP | NOT STARTED | Requires Next-compatible nonce policy and HTTPS/proxy tests |
 | Security audit | PARTIAL | Schema/component approval events exist; unified authentication/security event stream missing |
@@ -59,7 +60,7 @@ Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but a
 
 1. Finish reviewable PR #64 safeguard port and authentication configuration detection; run CI.
 2. Runtime enforcement implemented with API-wide replay tests; complete review and CI.
-3. Serialize managed refresh rotation across instances and test concurrency on PostgreSQL.
+3. Managed refresh locking implemented; PostgreSQL full suite passes (164 tests, 662 subtests). Complete review and CI.
 4. Add shared login abuse controls and security audit, then complete remaining P0 security before user management.
 
 This file is an evidence ledger, not an assertion that entire phases are complete.
