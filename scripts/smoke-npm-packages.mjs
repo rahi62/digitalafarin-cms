@@ -152,6 +152,11 @@ try {
   if (!nginx.includes("location /cms/")) throw new Error("Nginx /cms route missing");
   console.log("@digitalafarin/cms-admin installed tarball scaffold OK");
 
+  // A fresh install can resolve optional editor dependencies differently from
+  // the monorepo lockfile. Fail on incompatible peers even if npm install exits 0.
+  run(npm, ["install", "--ignore-scripts"], directAdmin);
+  run(npm, ["ls", "@tiptap/core", "@tiptap/pm", "@tiptap/extension-bubble-menu", "@tiptap/extension-floating-menu"], directAdmin);
+
   const embeddedFrontend = path.join(app, "embedded-frontend");
   fs.mkdirSync(path.join(embeddedFrontend, "app"), { recursive: true });
   fs.writeFileSync(
@@ -205,6 +210,7 @@ try {
   }
 
   const embeddedPkg = JSON.parse(fs.readFileSync(path.join(embeddedFrontend, "package.json"), "utf8"));
+  run(npm, ["ls", "@tiptap/core", "@tiptap/pm", "@tiptap/extension-bubble-menu", "@tiptap/extension-floating-menu"], embeddedFrontend);
   if (!embeddedPkg.dependencies?.["@digitalafarin/cms-admin"]) {
     throw new Error("Embedded admin package was not installed into the host frontend");
   }
