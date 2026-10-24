@@ -62,3 +62,7 @@ Standalone mode creates its own Next.js app and therefore has its own `package.j
 The Admin includes the Tiptap-based Standard Editor with RTL/LTR, headings, formatting, links, tables, Media Library images, lists, quotes, code blocks, word count, focus mode, autosave/recovery and revision tooling.
 
 The structured Block Editor remains available as **Advanced Blocks**. CMS content is stored as structured `blocks`; rich prose uses the typed `rich_text` block whose canonical body is Tiptap JSON.
+
+### Existing-host TypeScript tooling
+
+`embed` installs only missing compiler/types dependencies. A missing compiler uses `typescript@^5.9.3`, compatible with Next 15 and 16; declared versions remain owned by the host. If no `tsconfig.json` exists, embed creates a package-export-aware `moduleResolution: "bundler"` configuration, extending `jsconfig.json` when present. Existing TypeScript JSONC, aliases, layouts and middleware are never rewritten. Existing legacy resolver/compiler choices require an explicit host compatibility review. `--skip-install` generates files but accurately reports missing tooling. Direct embed refuses an occupied CMS route before installing tooling; the outer CLI may already have installed packages.

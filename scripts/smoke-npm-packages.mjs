@@ -9,6 +9,7 @@ const root = path.resolve(here, "..");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "digitalafarin-npm-smoke-"));
 const tarballs = [];
+const embeddedNext = process.env.CMS_SMOKE_HOST_NEXT || "^16.3.0";
 
 function run(command, args, cwd = root, capture = false) {
   const result = spawnSync(command, args, {
@@ -165,8 +166,10 @@ try {
       name: "embedded-next-app",
       private: true,
       scripts: { build: "next build" },
+      // An explicit isolated-fixture decision, never an automatic host override.
+      ...(embeddedNext === "15.5.28" ? { overrides: { "next@15.5.28": { postcss: "8.5.23" } } } : {}),
       dependencies: {
-        next: "^16.3.0",
+        next: embeddedNext,
         react: "^19.3.0",
         "react-dom": "^19.2.0",
       },
@@ -211,6 +214,11 @@ try {
 
   const embeddedPkg = JSON.parse(fs.readFileSync(path.join(embeddedFrontend, "package.json"), "utf8"));
   run(npm, ["ls", "@tiptap/core", "@tiptap/pm", "@tiptap/extension-bubble-menu", "@tiptap/extension-floating-menu"], embeddedFrontend);
+  if (!embeddedPkg.devDependencies?.typescript?.startsWith("^5.9.")) {
+    throw new Error("Missing host tooling did not receive the compatible TypeScript compiler");
+  }
+  run(npm, ["ls", "typescript", "next"], embeddedFrontend);
+  run(npm, ["audit", "--audit-level=low"], embeddedFrontend);
   if (!embeddedPkg.dependencies?.["@digitalafarin/cms-admin"]) {
     throw new Error("Embedded admin package was not installed into the host frontend");
   }
