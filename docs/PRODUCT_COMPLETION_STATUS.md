@@ -1,6 +1,6 @@
 # Product completion status
 
-Last verified: 2026-10-24. Working branch: `feat/cms-admin-security-headers`, based on Draft PR #67. **Product feature completion has not been reached.** No merge, release, deployment, or production migration is authorized.
+Last verified: 2026-10-24. Working branch: `fix/cms-dependency-security-patches`, based on Draft PR #67. **Product feature completion has not been reached.** No merge, release, deployment, or production migration is authorized.
 
 Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but acceptance remains; BLOCKED = external dependency prevents progress; NOT STARTED = no implementation verified in this audit. Existing documentation checkboxes are not evidence of complete acceptance.
 
@@ -34,7 +34,8 @@ Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but a
 | PR #70 refresh locking CI | DONE | Commit bca7d71: Node, PostgreSQL and Python 3.11/3.12/3.13 all passed (run 40029942477) |
 | PR #71 configuration checks CI | DONE | Commit 7888434: all five jobs passed (run 40030720391) |
 | PR #72 login limits CI | DONE | Commit 5384a13: all five jobs passed (run 40032472400) |
-| CSP/header CI | NOT STARTED | Pending Draft PR after verification |
+| PR #73 CSP/header CI | DONE | Commit fb44079: all five jobs passed (run 40069835379) |
+| Dependency-security CI | NOT STARTED | Pending Draft PR after verification |
 | Full packaging / supported-version matrix | PARTIAL | Existing CI provides coverage; fresh branch package verification pending |
 
 ## Product gaps
@@ -87,3 +88,7 @@ Production build and typecheck pass. Two production browser tests verify nonce f
 ## Dependency security finding
 
 The registry audit at the header checkpoint reports three vulnerable installed packages: Next.js (critical), sharp (high), source-map-js (high). Primary GitHub advisories confirm affected ranges. Current stable patches verified from the registry: Next 16.4.3, sharp 0.35.5, source-map-js 1.2.2. A separate immediate dependency increment will update the owned manifests/lockfile and repeat audit/build/browser checks; this finding is not marked fixed until verified.
+
+## Dependency patch verification
+
+Targeted lock update resolves Next 16.4.3, sharp 0.35.5 and source-map-js 1.2.2; repository audit reports zero vulnerabilities. Admin/public example builds, 29 SDK/CLI tests, production CSP/editor two tests, editor seven and BFF three pass. Isolated Next 15.5.28 + TypeScript 5.9.3 + Next-scoped PostCSS 8.5.23 override passes audit (zero findings), build and production browser probe. Stock Next 15 retains vulnerable PostCSS; hosts must explicitly review the scoped override or use default Next 16. Next 15 + TypeScript 7 config-loader failure and fresh Tiptap optional-peer warnings remain packaging gaps, not silently completed. Packed SDK/CLI/Admin installation and clean embedded consumer build also pass; patched sharp native encode/decode passes. See SECURITY_DEPENDENCY_PATCHES.md.

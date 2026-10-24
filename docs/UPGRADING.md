@@ -354,3 +354,11 @@ npm run build
 ```
 
 Then verify at least one published resolver route, metadata output, menu endpoint and any scheduled publishing worker used in production.
+
+## Unreleased security dependency floors
+
+Admin hosts must use Next 15.5.28 or Next 16.4.3 (or compatible newer patches). Older peer versions are rejected by the updated package metadata. Review the host's own dependency/lockfile upgrade; CMS does not modify host routes/layouts/middleware. The SDK retains its prior Next 17 allowance without asserting a tested Next 17 matrix.
+
+Next 15 compatibility was verified with TypeScript 5.9.3 and a reviewed Next-scoped PostCSS 8.5.23 override. Stock Next 15.5.28 still audits vulnerable PostCSS dependencies; its peer floor alone is not a security attestation. Prefer the default Next 16.4.3 runtime, or follow the scoped override and host-lock audit in SECURITY_DEPENDENCY_PATCHES.md.
+
+TypeScript 5.9.3 is required by the verified Next 15 probe; TypeScript 7 cannot supply the compiler API used by that Next config loader. See `SECURITY_DEPENDENCY_PATCHES.md` for tested combinations and outstanding clean-scaffold Tiptap peer warnings. No content API, data migration or package publication accompanies this dependency update.
