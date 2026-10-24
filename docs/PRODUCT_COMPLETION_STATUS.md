@@ -1,6 +1,6 @@
 # Product completion status
 
-Last verified: 2026-10-24. Working branch: `feat/cms-login-rate-limits`, based on Draft PR #67. **Product feature completion has not been reached.** No merge, release, deployment, or production migration is authorized.
+Last verified: 2026-10-24. Working branch: `feat/cms-admin-security-headers`, based on Draft PR #67. **Product feature completion has not been reached.** No merge, release, deployment, or production migration is authorized.
 
 Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but acceptance remains; BLOCKED = external dependency prevents progress; NOT STARTED = no implementation verified in this audit. Existing documentation checkboxes are not evidence of complete acceptance.
 
@@ -33,7 +33,8 @@ Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but a
 | PR #69 runtime enforcement CI | DONE | Commit a71d1ce: all four jobs passed on rerun; initial Node editor-create timeout remains an intermittent issue |
 | PR #70 refresh locking CI | DONE | Commit bca7d71: Node, PostgreSQL and Python 3.11/3.12/3.13 all passed (run 40029942477) |
 | PR #71 configuration checks CI | DONE | Commit 7888434: all five jobs passed (run 40030720391) |
-| Login-rate-limit CI | NOT STARTED | Pending Draft PR after final verification |
+| PR #72 login limits CI | DONE | Commit 5384a13: all five jobs passed (run 40032472400) |
+| CSP/header CI | NOT STARTED | Pending Draft PR after verification |
 | Full packaging / supported-version matrix | PARTIAL | Existing CI provides coverage; fresh branch package verification pending |
 
 ## Product gaps
@@ -43,7 +44,7 @@ Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but a
 | Session registry/revocation | PARTIAL | #67 checks session IDs, logout and per-device revocation; host settings reject unsafe authenticator order with E002; CMS permissions now recheck validated session claims even under host plain JWT overrides (91 routes × 7 verbs). Full strict-mode/host custom auth matrix remains |
 | Refresh concurrency/multi-instance | PARTIAL | PostgreSQL row lock now serializes managed refresh and concurrent revocation; fresh post-lock expiry check prevents expiry-during-wait bypass. Three real multi-connection regressions pass. Token-family compromise tracking, cross-tab refresh coordination and deployment compatibility mode remains an explicit transition; E003 now detects disabled rotation/blacklist and missing blacklist app |
 | Login abuse protection | PARTIAL | Shared address/account/pair budgets, bounded Retry-After, Persian feedback and concurrent admission tests implemented. ATOMIC_REQUESTS bypass reproduced and fixed. Unified audit/adaptive controls remain |
-| Security headers/CSP | NOT STARTED | Requires Next-compatible nonce policy and HTTPS/proxy tests |
+| Security headers/CSP | PARTIAL | Standalone per-request nonce CSP and browser headers implemented; production parser blocks untrusted script/style, Tiptap nonce verified. Host composition and actual HTTPS/proxy/version matrix remain |
 | Security audit | PARTIAL | Schema/component approval events exist; unified authentication/security event stream missing |
 | User/team management | PARTIAL | Membership/role APIs and Admin exist; invitations, account recovery, ownership transfer and full role matrix acceptance remain |
 | Content schema | PARTIAL | Typed fields, nested structures, relations, singleton support exist; controlled migration only supports bounded root rename |
@@ -78,3 +79,11 @@ E003 rejects disabled rotation/blacklist or a missing blacklist app. Deployment-
 ## Login rate-limiting increment
 
 Additive migration: sites 0003_cms_login_rate_buckets. Full verification: PostgreSQL 178 tests + 673 subtests; SQLite 174 tests + 673 subtests, with four PostgreSQL-only skips. Three BFF browser tests, retry validation and Admin production build passed. Independent review identified ATOMIC_REQUESTS counter rollback; regression reproduced and fix verified. No production migration. See LOGIN_ABUSE_PROTECTION.md for policy and proxy/database limits.
+
+## Admin header increment
+
+Production build and typecheck pass. Two production browser tests verify nonce freshness/spoof rejection, script/style injection denial, framework hydration and accepted Tiptap styles. Seven editor and three BFF browser tests pass; five CSP policy tests and 29 SDK/CLI tests pass. Host middleware/layout byte preservation is covered. Review found Tiptap unnonced stylesheet injection; regression reproduced and corrected using injectNonce. No new migration. See ADMIN_SECURITY_HEADERS.md for reviewed style-attribute exception and explicit embedded-host composition.
+
+## Dependency security finding
+
+The registry audit at the header checkpoint reports three vulnerable installed packages: Next.js (critical), sharp (high), source-map-js (high). Primary GitHub advisories confirm affected ranges. Current stable patches verified from the registry: Next 16.4.3, sharp 0.35.5, source-map-js 1.2.2. A separate immediate dependency increment will update the owned manifests/lockfile and repeat audit/build/browser checks; this finding is not marked fixed until verified.
