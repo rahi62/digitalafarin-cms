@@ -22,7 +22,8 @@
     "test:e2e:editor": "playwright test --config=e2e/playwright.config.ts",
     "test:e2e:bff": "playwright test --config=e2e/bff/playwright.config.ts",
     "test:integration": "npm --workspace packages/cms-next run build && node --test packages/cms-next/test/*.test.mjs packages/cms-cli/test/*.test.mjs",
-    "test:e2e:host": "npm --workspace packages/cms-next run build && playwright test --config=e2e/host/playwright.config.ts"
+    "test:e2e:host": "npm --workspace packages/cms-next run build && playwright test --config=e2e/host/playwright.config.ts",
+    "test:e2e:security": "playwright test --config=e2e/security/playwright.config.ts"
   },
   "description": "SEO-first headless CMS monorepo for Django and Next.js",
   "license": "Apache-2.0",

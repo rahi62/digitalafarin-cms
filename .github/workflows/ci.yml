@@ -111,6 +111,8 @@ jobs:
       - run: npm --workspace examples/next-site run build
       - name: Install Chromium for editor browser tests
         run: npx playwright install --with-deps chromium
+      - name: Verify production CSP and nonce hydration
+        run: npm run test:e2e:security
       - run: npm run test:e2e:editor
       - name: Verify HttpOnly BFF session and CSRF
         run: npm run test:e2e:bff
