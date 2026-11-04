@@ -54,6 +54,10 @@ jobs:
 
   postgres:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        django: ["5.2.*", "6.0.*"]
     services:
       postgres:
         image: postgres:16-alpine
@@ -73,14 +77,36 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - name: Install PostgreSQL test dependencies
-        run: python -m pip install pytest pytest-django -e "./packages/cms-django[postgres]"
+      - name: Install PostgreSQL test dependencies (Django ${{ matrix.django }})
+        run: |
+          python -m pip install pytest pytest-django -e "./packages/cms-django[postgres]" "Django==${{ matrix.django }}"
+          python -c "import django; print('Django', django.get_version())"
       - name: Verify backend and concurrent refresh on PostgreSQL
         env:
           DJANGO_SETTINGS_MODULE: tests.postgres_settings
           PYTHONPATH: packages/cms-django
           CMS_TEST_POSTGRES_PORT: "5432"
         run: python -m pytest packages/cms-django/tests -q
+      - name: Verify the whole suite with strict managed sessions (the 0.8.0 default)
+        env:
+          DJANGO_SETTINGS_MODULE: tests.strict_settings
+          PYTHONPATH: packages/cms-django
+          CMS_TEST_POSTGRES_PORT: "5432"
+        run: python -m pytest packages/cms-django/tests -q
+
+  python-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Audit Python dependencies
+        run: |
+          python -m pip install pip-audit
+          python -m pip install "./packages/cms-django[all]"
+          python -m pip freeze --exclude digitalafarin-cms > /tmp/requirements.txt
+          python -m pip_audit -r /tmp/requirements.txt --no-deps --disable-pip
 
   node:
     runs-on: ubuntu-latest
@@ -102,6 +128,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: node --experimental-strip-types --test apps/admin/test/*.test.mjs
       - run: npm run check:versions
+      - run: npm audit --audit-level=low
       - run: npm --workspace packages/cms-next run build
       - run: npm --workspace packages/cms-next run typecheck
       - run: npm --workspace packages/cms-next run test:rich-text
