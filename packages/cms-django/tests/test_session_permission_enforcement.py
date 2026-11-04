@@ -70,7 +70,9 @@ class SessionPermissionEnforcementTests(TestCase):
         from django.test import override_settings
         user = get_user_model().objects.create_user(username='unmanaged-host-user')
         client = APIClient()
+        client._cms_unmanaged = True  # emulate a host session without CMS claims
         client.force_authenticate(user=user)
-        self.assertEqual(client.get('/api/cms/v1/sites/').status_code, 200)
+        with override_settings(DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=False):
+            self.assertEqual(client.get('/api/cms/v1/sites/').status_code, 200)
         with override_settings(DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=True):
             self.assertIn(client.get('/api/cms/v1/sites/').status_code, (401, 403))

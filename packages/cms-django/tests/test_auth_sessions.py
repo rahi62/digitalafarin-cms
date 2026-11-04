@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
@@ -41,6 +41,7 @@ class CmsSessionSecurityTests(TestCase):
         }, format="json")
         self.assertEqual(cannot_refresh.status_code, 401, cannot_refresh.data)
 
+    @override_settings(DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=False)  # compatibility mode: legacy refresh token without cms_sid
     def test_logout_prevents_cross_account_revocation(self):
         foreign = get_user_model().objects.create_user(username="other-session", password="another-secret")
         primary = self.login().data

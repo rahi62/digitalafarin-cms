@@ -60,3 +60,53 @@ class HostDrfIsolationTests(TestCase):
         client.force_login(self.user)
         response = client.get("/api/cms/v1/sites/")
         self.assertEqual(response.status_code, 401)
+
+
+UNSAFE_HOST_AUTH = {
+    # A host listing the plain JWT authenticator first would bypass session revocation on ITS views.
+    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework_simplejwt.authentication.JWTAuthentication"],
+}
+
+
+class UnsafeHostAuthenticatorOrderTests(TestCase):
+    """Downgrading E002 to W005 is only safe if CMS endpoints cannot be reached via a host authenticator."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(username="unsafe-user", password="secure-test-password")
+        org = Organization.objects.create(name="Unsafe", slug="unsafe")
+        Membership.objects.create(organization=org, user=self.user, role=Membership.Role.OWNER)
+        Site.objects.create(organization=org, name="U", domain="u.unsafe.example")
+
+    def login(self):
+        response = APIClient().post(
+            "/api/cms/v1/auth/token/", {"username": "unsafe-user", "password": "secure-test-password"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        return response.data
+
+    def bearer(self, access):
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION="Bearer " + access)
+        return client
+
+    @override_settings(REST_FRAMEWORK=UNSAFE_HOST_AUTH, DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=True)
+    def test_revoked_session_token_is_rejected_even_with_unsafe_host_auth(self):
+        tokens = self.login()
+        client = self.bearer(tokens["access"])
+        self.assertEqual(client.get("/api/cms/v1/sites/").status_code, 200)
+        logout = client.post("/api/cms/v1/auth/logout/", {"refresh": tokens["refresh"]}, format="json")
+        self.assertIn(logout.status_code, (200, 204, 205))
+        self.assertEqual(client.get("/api/cms/v1/sites/").status_code, 401)
+        self.assertEqual(client.get("/api/cms/v1/content/entries/").status_code, 401)
+
+    @override_settings(REST_FRAMEWORK=UNSAFE_HOST_AUTH, DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=True)
+    def test_plain_jwt_without_a_managed_session_is_rejected_in_strict_mode(self):
+        from rest_framework_simplejwt.tokens import AccessToken
+        plain = str(AccessToken.for_user(self.user))
+        self.assertEqual(self.bearer(plain).get("/api/cms/v1/sites/").status_code, 401)
+
+    @override_settings(REST_FRAMEWORK=UNSAFE_HOST_AUTH)
+    def test_the_host_misconfiguration_is_reported_as_a_warning(self):
+        from django.core.checks import run_checks
+        ids = [issue.id for issue in run_checks()]
+        self.assertIn("digitalafarin_cms.W005", ids)
