@@ -1,6 +1,6 @@
 """Public content reads only published snapshots, never mutable editor fields."""
 from digitalafarin_cms.throttles import PublicEntriesThrottle
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from rest_framework.decorators import throttle_classes, api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -8,7 +8,7 @@ from rest_framework import serializers
 
 from digitalafarin_cms.media import normalize_media_data
 from digitalafarin_cms.apps.sites.models import Site
-from .models import PublishedEntry
+from .models import PublishedEntry, PublishedEntryTerm
 
 
 def public_entries(site):
@@ -66,17 +66,12 @@ def list_public_entries(request):
     if search := request.query_params.get("search"):
         entries = entries.filter(Q(title__icontains=search) | Q(excerpt__icontains=search))
 
-    category = request.query_params.get("category")
-    tag = request.query_params.get("tag")
-    if category or tag:
-        # JSON array containment is not supported by all installed Django DBs.
-        # Filter frozen category/tag slugs, never the mutable editorial relations.
-        valid_ids = [
-            pk for pk, categories, tags in entries.values_list(
-                "pk", "category_slugs", "tag_slugs"
-            ).iterator() if (not category or category in categories) and (not tag or tag in tags)
-        ]
-        entries = entries.filter(pk__in=valid_ids)
+    for kind, param in ((PublishedEntryTerm.Kind.CATEGORY, "category"), (PublishedEntryTerm.Kind.TAG, "tag")):
+        slug = request.query_params.get(param)
+        if slug:
+            entries = entries.filter(Exists(PublishedEntryTerm.objects.filter(
+                published_entry=OuterRef("pk"), site=site, kind=kind, slug=slug,
+            )))
 
     entries = entries.order_by("-published_at", "-created_at", "id")
     count = entries.count()

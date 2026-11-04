@@ -5,12 +5,15 @@ import json
 
 from django.core.serializers.json import DjangoJSONEncoder
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from digitalafarin_cms.apps.seo.models import Redirect, SchemaMarkup, SeoMeta
 from digitalafarin_cms.apps.seo.serializers import SchemaMarkupSerializer, SeoMetaSerializer
-from .models import PublishedEntry
+from .models import PublishedEntry, PublishedEntryTerm
+from .routing import normalize_path
 
 
 def capture_publication(entry):
@@ -50,6 +53,29 @@ def capture_publication(entry):
     return payload, seo, schemas, categories, tags
 
 
+def canonical_path(path):
+    """Indexed lookup key for a published path (never raises)."""
+    try:
+        return normalize_path(path, reserved=False)
+    except DjangoValidationError:
+        return path
+
+
+def sync_terms(published, categories, tags):
+    """Replace the indexed category/tag rows for one published entry."""
+    PublishedEntryTerm.objects.filter(published_entry=published).delete()
+    rows = [
+        PublishedEntryTerm(site_id=published.site_id, published_entry=published,
+                           kind=PublishedEntryTerm.Kind.CATEGORY, slug=slug)
+        for slug in dict.fromkeys(row["slug"] for row in categories)
+    ] + [
+        PublishedEntryTerm(site_id=published.site_id, published_entry=published,
+                           kind=PublishedEntryTerm.Kind.TAG, slug=slug)
+        for slug in dict.fromkeys(row["slug"] for row in tags)
+    ]
+    PublishedEntryTerm.objects.bulk_create(rows)
+
+
 @transaction.atomic
 def publish_snapshot(entry):
     """Commit the full public projection and deferred redirect in one transaction.
@@ -77,6 +103,8 @@ def publish_snapshot(entry):
                 "site": entry.site,
                 "content_type": entry.content_type,
                 "path": new_path,
+                "normalized_path": canonical_path(new_path),
+                "last_published_at": timezone.now(),
                 "title": entry.title,
                 "excerpt": entry.excerpt,
                 "published_at": entry.published_at,
@@ -93,6 +121,8 @@ def publish_snapshot(entry):
         if isinstance(exc, IntegrityError):
             raise ValidationError({"path": "A different published entry owns this route."}) from exc
         raise
+
+    sync_terms(published, categories, tags)
 
     if old_path and old_path != new_path:
         Redirect.objects.filter(

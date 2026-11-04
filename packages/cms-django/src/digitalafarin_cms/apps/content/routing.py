@@ -96,15 +96,10 @@ def validate_entry_route(entry, previous=None):
         if normalized == path:
             raise ValidationError({"path": "Another entry already owns this path."})
     # A working-copy rename must never free the *live* URL for another entry.
-    for live_path in PublishedEntry.objects.filter(site_id=entry.site_id).exclude(
+    if PublishedEntry.objects.filter(site_id=entry.site_id, normalized_path=path).exclude(
         entry_id=entry.pk
-    ).values_list("path", flat=True):
-        try:
-            occupied = normalize_path(live_path, reserved=False) == path
-        except ValidationError:
-            occupied = live_path == path
-        if occupied:
-            raise ValidationError({"path": "Another published entry currently owns this URL."})
+    ).exists():
+        raise ValidationError({"path": "Another published entry currently owns this URL."})
     for source in Redirect.objects.filter(site_id=entry.site_id, is_active=True).values_list("source_path", flat=True):
         try:
             occupied = normalize_path(source, reserved=False) == path

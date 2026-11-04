@@ -498,23 +498,11 @@ def _resolve_path(request):
         except ContentEntry.DoesNotExist:
             return Response({"detail": "Preview content not found"}, status=404)
     else:
-        try:
-            published = public_entries(site).select_related("site", "content_type").filter(
-                Q(path=path) | Q(path=raw_path) | Q(path=path.rstrip("/") or "/")
-            ).order_by("path").first()
-            if published is None:
-                # Compatibility with NFD/encoded URLs, without mutating legacy published paths.
-                for item in public_entries(site).select_related("site", "content_type").iterator():
-                    try:
-                        matches = normalize_path(item.path) == path
-                    except ValidationError:
-                        matches = False
-                    if matches:
-                        published = item
-                        break
-            if published is None:
-                raise ContentEntry.DoesNotExist
-        except ContentEntry.DoesNotExist:
+        # One indexed equality lookup on (site, normalized_path); a miss is a 404, never a scan.
+        published = public_entries(site).select_related("site", "content_type").filter(
+            normalized_path=path,
+        ).first()
+        if published is None:
             return Response({"detail": "Content not found"}, status=404)
 
     related = public_entries(site).filter(

@@ -124,9 +124,15 @@ class PublishedEntry(UUIDTimeStampedModel):
     site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name="published_entries")
     content_type = models.ForeignKey(ContentTypeDefinition, on_delete=models.PROTECT, related_name="published_entries")
     path = models.CharField(max_length=500)
+    # Canonical lookup key (routing.normalize_path): the resolver does one indexed
+    # equality lookup on (site, normalized_path) instead of scanning published rows.
+    normalized_path = models.CharField(max_length=500, default="", editable=False)
     title = models.CharField(max_length=255)
     excerpt = models.TextField(blank=True)
+    # First publication; never changes on republish.
     published_at = models.DateTimeField()
+    # Latest publish/republish; drives sitemap lastmod.
+    last_published_at = models.DateTimeField(null=True, blank=True)
     payload = models.JSONField(default=dict)
     seo = models.JSONField(default=dict, blank=True)
     schemas = models.JSONField(default=list, blank=True)
@@ -137,9 +143,48 @@ class PublishedEntry(UUIDTimeStampedModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["site", "path"], name="unique_published_site_path"),
+            models.UniqueConstraint(
+                fields=["site", "normalized_path"], name="unique_published_site_normalized_path",
+            ),
         ]
         indexes = [
             models.Index(fields=["site", "-published_at"], name="cms_published_site_time"),
+        ]
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        from .routing import normalize_path
+        try:
+            self.normalized_path = normalize_path(self.path, reserved=False)
+        except ValidationError:
+            self.normalized_path = self.path
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "path" in update_fields:
+            kwargs["update_fields"] = {*update_fields, "normalized_path"}
+        super().save(*args, **kwargs)
+
+
+class PublishedEntryTerm(models.Model):
+    """Indexed category/tag membership of a published entry (filled on publish)."""
+
+    class Kind(models.TextChoices):
+        CATEGORY = "category", "Category"
+        TAG = "tag", "Tag"
+
+    id = models.BigAutoField(primary_key=True)
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name="published_terms")
+    published_entry = models.ForeignKey(PublishedEntry, on_delete=models.CASCADE, related_name="terms")
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    slug = models.CharField(max_length=255)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["published_entry", "kind", "slug"], name="unique_published_entry_term",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["site", "kind", "slug"], name="cms_pubterm_lookup"),
         ]
 
 
