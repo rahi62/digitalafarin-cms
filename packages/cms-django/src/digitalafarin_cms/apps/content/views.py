@@ -34,6 +34,7 @@ from .relations import find_relation_uses
 from .trash import move_to_trash, restore_from_trash
 from .schema_migration import preview_field_rename, execute_field_rename
 from .routing import normalize_path
+from .seo_files import build_robots, build_sitemap
 from .public import PublicEntrySerializer, public_entries, published_content
 from digitalafarin_cms.media import normalize_media_data
 
@@ -573,14 +574,15 @@ def sitemap(request):
         site = Site.objects.get(domain=domain, is_active=True)
     except Site.DoesNotExist:
         return HttpResponse("Site not found", status=404)
-    entries = public_entries(site).filter(is_indexable=True).order_by("path")
-    base = frontend_base_for(site)
-    rows = [
-        f"<url><loc>{xml_escape(base + entry.path)}</loc><lastmod>{entry.published_at.date().isoformat()}</lastmod></url>"
-        for entry in entries
-    ]
-    xml = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + "".join(rows) + "</urlset>"
-    return HttpResponse(xml, content_type="application/xml")
+    page = request.query_params.get("page")
+    if page is not None:
+        try:
+            page = int(page)
+        except (TypeError, ValueError):
+            return HttpResponse("Invalid page", status=400)
+    body, status = build_sitemap(site, frontend_base_for(site), page)
+    content_type = "application/xml; charset=utf-8" if status == 200 else "text/plain; charset=utf-8"
+    return HttpResponse(body.encode("utf-8"), status=status, content_type=content_type)
 
 
 @api_view(["GET"])
@@ -594,5 +596,7 @@ def robots_txt(request):
         site = Site.objects.get(domain=domain, is_active=True)
     except Site.DoesNotExist:
         return HttpResponse("Site not found", status=404)
-    body = f"User-agent: *\nAllow: /\nSitemap: https://{site.domain}/sitemap.xml\n"
-    return HttpResponse(body, content_type="text/plain")
+    return HttpResponse(
+        build_robots(site, frontend_base_for(site)).encode("utf-8"),
+        content_type="text/plain; charset=utf-8",
+    )

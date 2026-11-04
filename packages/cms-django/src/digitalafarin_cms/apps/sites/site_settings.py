@@ -57,6 +57,15 @@ def validate_site_settings(value):
 
     _validate_url(value.get("frontend_url"), "frontend_url")
     _validate_url(value.get("audit_base_url"), "audit_base_url")
+    rules = value.get("robots_rules")
+    if rules not in (None, ""):
+        from digitalafarin_cms.apps.content.seo_files import ROBOTS_RULE
+        if (not isinstance(rules, list) or len(rules) > 50
+                or any(not isinstance(rule, str) or len(rule) > 200 or not ROBOTS_RULE.match(rule.strip())
+                       for rule in rules)):
+            raise serializers.ValidationError({"robots_rules": (
+                "Must be a list of at most 50 robots.txt directive lines "
+                "(User-agent, Allow, Disallow, Crawl-delay, Sitemap, Host).")})
 
     seo = value.get("seo_defaults", {}) or {}
     if not isinstance(seo, dict):
