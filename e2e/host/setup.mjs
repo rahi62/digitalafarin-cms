@@ -30,6 +30,6 @@ for (const [file, text] of Object.entries(files)) {
 }
 run('packages/cms-cli/bin/cli.js', ['init', '--frontend', fixtureDir, '--skip-install', '--with-public-route', '--with-collection', '--content-type', 'news']);
 run('packages/cms-cli/bin/cli.js', ['apply-integration', '--frontend', fixtureDir]);
-run('apps/admin/bin/scaffold.js', ['embed', '--frontend', fixtureDir, '--api-url', 'http://127.0.0.1:8197/api/cms/v1', '--skip-install']);
+run('apps/admin/bin/scaffold.js', ['embed', '--frontend', fixtureDir, '--api-url', 'http://127.0.0.1:8197/api/cms/v1', '--skip-install', '--legacy-token-auth']);
 write('active-path.txt', fixtureDir);
 console.log('Fixture ready:', fixtureDir);
