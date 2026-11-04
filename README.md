@@ -4,7 +4,7 @@
 
 DigitalAfarin CMS combines a reusable Django/DRF content backend, a Next.js SDK, a visual Next.js Admin application and an installer CLI. It is designed for teams that want WordPress-like content management and SEO workflows without coupling rendering to WordPress.
 
-> Status: **0.7.0 / Community Edition (pre-1.0)**. The public API can still change before 1.0.
+> Status: **0.8.0 / Community Edition (pre-1.0)**. The public API can still change before 1.0. Component registry, visual component binding and approvals are **experimental** (see `docs/UPGRADING.md`).
 
 ## Packages
 
@@ -14,6 +14,54 @@ DigitalAfarin CMS combines a reusable Django/DRF content backend, a Next.js SDK,
 | `@digitalafarin/cms-next` | npm | Next.js resolver, metadata and JSON-LD helpers |
 | `@digitalafarin/cms-admin` | npm | Embeddable visual CMS Admin for an existing Next.js app, with optional standalone scaffolding |
 | `@digitalafarin/cms-cli` | npm | Installer/wiring CLI for Django + Next.js + CMS Admin |
+
+## 5-minute quickstart (Django + Next.js on one server)
+
+Target: Next.js App Router + Django/DRF + PostgreSQL on the same VPS. Only Next.js is public; Django listens on `127.0.0.1`.
+
+```bash
+# 1. backend package (inside your Django virtualenv)
+pip install "digitalafarin-cms[all]"
+
+# 2. wire both projects (settings + urls auto-detected; use --settings-file/--urls-file for unusual layouts)
+npx @digitalafarin/cms-cli init --backend backend --frontend frontend \
+  --with-public-route --with-admin --with-revalidate
+```
+
+3. Compose the host Next.js config (the CLI never edits it):
+
+```ts
+// next.config.ts
+import { withDigitalAfarinCms } from "@digitalafarin/cms-next/config";
+export default withDigitalAfarinCms({ /* your existing config */ });
+```
+
+4. Django settings (`ALLOWED_HOSTS`, `DATABASES` as usual) plus:
+
+```python
+DIGITALAFARIN_CMS_WEBHOOK_ALLOWED_HOSTS = ["127.0.0.1:3000"]   # the Next.js server on this machine
+DIGITALAFARIN_CMS_WEBHOOK_DISPATCH = "manual"                  # or run Celery and keep the default
+```
+
+5. Migrate, create an admin, start both servers:
+
+```bash
+python manage.py migrate && python manage.py createsuperuser
+gunicorn config.wsgi -b 127.0.0.1:8000            # Django
+npm run build && npm run start                    # Next.js on :3000
+```
+
+6. Keep deliveries and scheduled publishing moving (cron, once a minute; skip if you run Celery Beat):
+
+```cron
+* * * * * cd /srv/app/backend && .venv/bin/python manage.py cms_publish_due && .venv/bin/python manage.py cms_drain_webhooks
+```
+
+7. Open `https://your-site/cms`, sign in, then create: organization, site (**domain must equal `DIGITALAFARIN_CMS_SITE`** in `frontend/.env.local`), content type, and a webhook endpoint with URL `http://127.0.0.1:3000/api/cms/revalidate` and the `DIGITALAFARIN_CMS_WEBHOOK_SECRET` value from `.env.local`. Publishing a page now updates the site without a rebuild.
+
+Production checklist: HTTPS, `DIGITALAFARIN_CMS_PUBLIC_ORIGIN` (exact public origin) for the Admin session, `/media/` served with the headers from `docs/MEDIA_SECURITY.md`, `GET /api/cms/v1/health/` as the liveness probe. Details and every setting: `docs/UPGRADING.md`.
+
+**Rendering modes.** Hosts with `cacheComponents` (the new `create-next-app` default) get tag-cached pages; Next.js streams a noindex 404 page and client-side redirects there. Hosts without `cacheComponents` get real 404/308 status codes. Set `trailingSlash: true` if you want CMS URLs (which end in `/`) served without an extra 308.
 
 ## Installation
 

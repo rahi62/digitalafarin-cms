@@ -1,5 +1,7 @@
 # Controlled Component Registry Approval & Rollback
 
+> **Experimental (0.8):** this feature is not part of the supported 0.8 contract. It is off the critical path of publishing, resolving and SEO delivery, may change or be removed before 1.0, and has no compatibility promise.
+
 **Branch:** `feat/cms-component-approval-rollback`, Draft PR #63, dependent on #62 (and #61 through #57). Do not merge, publish or deploy.
 
 ## Semantics: approval is NOT remote code execution

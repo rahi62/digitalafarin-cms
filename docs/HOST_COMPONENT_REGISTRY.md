@@ -1,5 +1,7 @@
 # Host Component Registry — explicit Hybrid CMS binding (P0 foundation)
 
+> **Experimental (0.8):** this feature is not part of the supported 0.8 contract. It is off the critical path of publishing, resolving and SEO delivery, may change or be removed before 1.0, and has no compatibility promise.
+
 Draft branch `feat/cms-host-component-registry`. Depends on PR #59, which depends on #58 and #57. Not released.
 
 This is a **host-owned metadata contract**, not a visual page builder or a remotely executable plugin framework.

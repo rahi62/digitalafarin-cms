@@ -1,0 +1,105 @@
+{
+  "label": "HostB-extra",
+  "results": [
+    {
+      "check": "host DRF keeps LimitOffsetPagination (count/next/previous/results, limit=1 honoured)",
+      "pass": true,
+      "detail": "{\"count\":3,\"next\":\"http://localhost:8001/api/host/groups/?limit=1&offset=1\",\"previous\":null,\"results\":[{\"id\":1,\"name\":\"g1\"}]}"
+    },
+    {
+      "check": "host DRF PAGE_SIZE=2 still applies",
+      "pass": true,
+      "detail": "{\"count\":3,\"next\":\"http://localhost:8001/api/host/groups/?limit=2&offset=2\",\"previous\":null,\"results\":[{\"id\":1,\"name\":\"g"
+    },
+    {
+      "check": "host DRF SessionAuthentication behaviour unchanged (anonymous -> 403, no WWW-Authenticate)",
+      "pass": true,
+      "detail": "403 None"
+    },
+    {
+      "check": "host views ignore bearer tokens (host auth stack is not replaced)",
+      "pass": true,
+      "detail": "403"
+    },
+    {
+      "check": "CMS endpoint uses its own JWT auth (anonymous -> 401, not host 403)",
+      "pass": true,
+      "detail": "401"
+    },
+    {
+      "check": "CMS public health unaffected by host DRF settings",
+      "pass": true,
+      "detail": "{\"status\":\"ok\",\"version\":\"0.8.0\"}"
+    },
+    {
+      "check": "host base.py untouched by the CLI (no CMS block, REST_FRAMEWORK intact)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "CMS block added to the detected dev.py",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "CMS URLs added to the ROOT_URLCONF file only",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "no stray urls.py created beside the settings",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "effective REST_FRAMEWORK equals the host's own (apply_defaults did not inject)",
+      "pass": true,
+      "detail": "{'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework.authentication.SessionAuthentication'], 'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination', 'PAGE_SIZE': 2}"
+    },
+    {
+      "check": "--settings-file/--urls-file: block written to the file named by the flag (base.py)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "--settings-file/--urls-file: URLs written to the file named by the flag",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "existing host route / still wins over the CMS catch-all",
+      "pass": true,
+      "detail": "200"
+    },
+    {
+      "check": "existing host route /about still wins over the CMS catch-all",
+      "pass": true,
+      "detail": "200"
+    },
+    {
+      "check": "existing host route /products/widget still wins over the CMS catch-all",
+      "pass": true,
+      "detail": "200"
+    },
+    {
+      "check": "existing host API route unaffected",
+      "pass": true,
+      "detail": "{\"host\":\"b\",\"ok\":true}"
+    },
+    {
+      "check": "host's own next.config redirect preserved",
+      "pass": true,
+      "detail": "308 /about"
+    },
+    {
+      "check": "CLI respected pre-existing host env values",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "BFF secret file is git-ignored",
+      "pass": true,
+      "detail": "ng if needed)\n.env*\n\n# vercel\n.vercel\n\n# typescript\n*.tsbuildinfo\nnext-env.d.ts\n"
+    }
+  ]
+}

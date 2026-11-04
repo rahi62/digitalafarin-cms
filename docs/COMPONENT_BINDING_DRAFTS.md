@@ -1,5 +1,7 @@
 # Versioned Component Binding Drafts — CMS Authoring
 
+> **Experimental (0.8):** this feature is not part of the supported 0.8 contract. It is off the critical path of publishing, resolving and SEO delivery, may change or be removed before 1.0, and has no compatibility promise.
+
 Draft PR #62 depends on visual registry PR #61 and the earlier #57–#60 chain. Do **not** merge or deploy.
 
 ## Why

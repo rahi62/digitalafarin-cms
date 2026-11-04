@@ -4,7 +4,7 @@ Run `python -m django check` during host installation and CI. These checks repor
 
 | Code | Severity | Meaning |
 | --- | --- | --- |
-| digitalafarin_cms.E002 | Error | The first DRF authenticator must be CmsSessionJWTAuthentication or a subclass. Later host authenticators remain permitted. |
+| digitalafarin_cms.W005 | Warning | (0.8: was error `E002`.) Host-wide DRF authentication does not check CMS session revocation. CMS endpoints declare their own authenticator and are unaffected; the warning only concerns host views that accept CMS JWTs. |
 | digitalafarin_cms.E003 | Error | Managed refresh replay protection requires rotation, blacklist-after-rotation and the SimpleJWT blacklist app. |
 | digitalafarin_cms.W002 | Deployment warning | Compatibility mode accepts legacy/non-managed authentication. Enable strict mode after coordinating client rollout. |
 | digitalafarin_cms.W003 | Deployment warning | The default database does not implement SELECT FOR UPDATE; multi-instance refresh safety requires real row locks. |

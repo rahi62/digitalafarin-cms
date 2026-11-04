@@ -1,5 +1,7 @@
 # Visual Component Registry Builder — DigitalAfarin CMS
 
+> **Experimental (0.8):** this feature is not part of the supported 0.8 contract. It is off the critical path of publishing, resolving and SEO delivery, may change or be removed before 1.0, and has no compatibility promise.
+
 **Branch:** `feat/cms-visual-component-binding` (Draft PR #61, depends on PR #60). No merge, release or deploy.
 
 ## UI workflow

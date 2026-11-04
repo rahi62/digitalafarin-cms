@@ -1,59 +1,32 @@
-# Project status — Community Edition 0.2.0 alpha
+# Project status - v0.8.0 (release candidate)
 
-## Implemented
+Evidence-based: see `VALIDATION.md` for commands, versions and per-host results. Branch `release/v0.8.0`, code verified at `25b211a`.
 
-### Package/distribution
-- Installable Django/DRF package: `digitalafarin-cms`
-- Installable Next.js SDK: `@digitalafarin/cms-next`
-- Installer/wiring CLI: `@digitalafarin/cms-cli`
-- Apache-2.0 Community licensing
-- GitHub CI and OIDC Trusted-Publishing release workflows
-- Synchronized semantic version tooling
+## Supported in 0.8.0
 
-### CMS core
-- Organizations, sites and memberships
-- Tenant-scoped authenticated APIs
-- Role-aware writes; Viewer is read-only
-- Owner/Admin-only membership administration
-- Same-site relationship validation for core content/SEO entities
-- Dynamic content type definitions
-- Structured JSON blocks
-- Draft/review/scheduled/published/archived content states
-- Revision snapshots and restore endpoint
-- Categories, tags, menus and reusable blocks
-- Scheduled publishing foundation with Celery
+| Area | State |
+|---|---|
+| Multi-tenant content, taxonomy, menus, reusable blocks, revisions, trash | supported; tenancy fails closed |
+| Published snapshots, indexed resolver (`normalized_path`), public collection API | supported |
+| SEO metadata, JSON-LD, redirects (atomic hit counter), sitemap (index + children), robots from site settings | supported |
+| Media library with server-side validation | supported |
+| Signed webhooks + SDK revalidation handler, tagged SDK fetches | supported |
+| Managed sessions (strict by default), httpOnly BFF Admin session | supported |
+| Scheduled publishing, health endpoint, structured logging | supported |
+| Embedded Admin, CLI (`init`, split settings, `--with-revalidate`) | supported |
+| Next.js 16 (`cacheComponents` on and off), Django 5.2 and 6.0, PostgreSQL 16 | verified |
 
-### SEO core
-- Title/description/canonical/robots/Open Graph/Twitter metadata
-- Focus/secondary keywords and basic SEO analysis score
-- Keyword clusters and page mappings
-- JSON-LD schema storage
-- Redirect manager and public redirect resolver
-- Internal-link suggestion data model
-- Sitemap and robots endpoints
+## Experimental (no compatibility promise)
 
-### Platform
-- JWT authentication
-- Media API
-- Celery/Redis integration foundation
-- SEO audit run/issue foundation
-- Webhook registry
-- Example Django host project
-- Next.js admin application in the monorepo
-- Example Next.js consumer
+Component registry, visual component binding, binding drafts, approvals and rollback.
 
-## Intentionally not claimed as complete
+## Not verified / open
 
-These remain roadmap/commercial-grade modules rather than finished 0.2.0 features:
-- production-grade visual Gutenberg-style block editor
-- full crawler comparable with dedicated technical SEO crawlers
-- Google Search Console OAuth/ETL and historical intelligence
-- semantic/AI internal-link engine
-- production image transformation/storage pipeline for S3/R2
-- AI writing and optimization assistant
-- subscriptions, billing, quotas and license server
-- white-label/agency control plane
-- enterprise SSO/audit/compliance features
-- fine-grained per-content-type/per-field permissions beyond current organization-role isolation
+- `pip-audit` not executed locally (PyPI unreachable); runs in CI.
+- Admin `localStorage` content not inspected in a real browser.
+- CMS 404/redirect status codes on `cacheComponents` hosts are streamed (see `VALIDATION.md`).
+- Python 3.11 and 3.13 are covered by CI only; this run used 3.12.
 
-The public `0.2.0` release should be presented as **alpha Community Edition**, not as a 1.0 WordPress replacement yet.
+## Out of scope for 0.8
+
+Multilingual/hreflang, AI features, billing/licensing, code-first content types, migrations from Wagtail/Payload.
