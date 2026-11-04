@@ -75,6 +75,16 @@ function ensureEnvDefault(file, key, value) {
   fs.writeFileSync(file, `${text && !text.endsWith("\n") ? text + "\n" : text}${key}=${value}\n`);
   return true;
 }
+function ensureGitignored(frontend, entry) {
+  // Secrets must only ever live in a git-ignored file. Add the entry when the host ignores no .env.local pattern.
+  const file = path.join(frontend, ".gitignore");
+  const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  const ignored = text.split(/\r?\n/).map((line) => line.trim()).some((line) =>
+    line === entry || line === ".env*" || line === ".env*.local" || line === ".env.*" || line === "*.local");
+  if (ignored) return false;
+  fs.writeFileSync(file, `${text && !text.endsWith("\n") ? text + "\n" : text}# DigitalAfarin CMS secrets\n${entry}\n`);
+  return true;
+}
 function importPath(fromFile, targetDirectory) {
   let relative = path.relative(path.dirname(fromFile), targetDirectory).replaceAll(path.sep, "/");
   if (!relative.startsWith(".")) relative = `./${relative}`;
@@ -239,6 +249,7 @@ export default function DigitalAfarinCmsLayout({ children }: { children: React.R
     // Secure default: httpOnly session cookies via the Next.js BFF, no tokens in browser storage.
     // Existing values are never overwritten; the secret is generated once per host.
     ensureEnvDefault(envFile, "NEXT_PUBLIC_DIGITALAFARIN_CMS_AUTH_MODE", "bff");
+    ensureGitignored(frontend, ".env.local");
     ensureEnvDefault(envFile, "DIGITALAFARIN_CMS_BFF_SECRET", randomBytes(32).toString("hex"));
   }
 

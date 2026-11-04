@@ -20,9 +20,19 @@ function secret(): string {
   if (!value || value.length < 32) throw new Error("DIGITALAFARIN_CMS_BFF_SECRET must be at least 32 characters");
   return value;
 }
+let reportedMissingSecret = false;
 export function ready(): boolean {
   if (!BFF_MODE) return false;
-  try { secret(); return true; } catch { return false; }
+  try { secret(); return true; } catch {
+    if (!reportedMissingSecret) {
+      reportedMissingSecret = true;
+      // Fail loudly in server logs: without the secret every Admin session request is refused (HTTP 503).
+      console.error("[digitalafarin-cms] DIGITALAFARIN_CMS_BFF_SECRET is missing or shorter than 32 characters; " +
+        "the Admin BFF session is disabled. Set it in the server environment" +
+        (process.env.NODE_ENV === "production" ? " before starting the production server." : "."));
+    }
+    return false;
+  }
 }
 export function failure(status: number, detail: string) {
   return NextResponse.json({ detail }, {
