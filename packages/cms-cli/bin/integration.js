@@ -55,7 +55,7 @@ export function scaffoldIntegration(frontend, root, templates, options = {}) {
     const revalidateOwner = hostOwner(["app/api/cms/revalidate/route.ts", "app/api/cms/revalidate/route.js"]);
     if (revalidateOwner) warnings.push(`Host already provides a revalidate route (${revalidateOwner}); verify it uses createCmsRevalidateHandler.`);
     else put(path.join(app, "api/cms/revalidate/route.ts"), 'import { createCmsRevalidateHandler } from "@digitalafarin/cms-next/server";\nexport const POST = createCmsRevalidateHandler();\n');
-    warnings.push("Revalidation: create a CMS webhook endpoint pointing at https://<your-site>/api/cms/revalidate with the DIGITALAFARIN_CMS_WEBHOOK_SECRET value from .env.local, and make sure Celery or `manage.py cms_drain_webhooks` runs on the backend. Private/loopback receivers (Next.js on the same server) are blocked by default: add its host:port to DIGITALAFARIN_CMS_WEBHOOK_ALLOWED_HOSTS in Django settings, e.g. ["127.0.0.1:3000"].");
+    warnings.push("Revalidation: create a CMS webhook endpoint pointing at https://<your-site>/api/cms/revalidate with the DIGITALAFARIN_CMS_WEBHOOK_SECRET value from .env.local, and make sure Celery or `manage.py cms_drain_webhooks` runs on the backend. Private/loopback receivers (Next.js on the same server) are blocked by default: add its host:port to DIGITALAFARIN_CMS_WEBHOOK_ALLOWED_HOSTS in Django settings, e.g. [127.0.0.1:3000].");
   }
   put(path.join(app, "digitalafarin-cms-preview/[[...cms_path]]/page.tsx"), applySegmentConfig(frontend, fs.readFileSync(path.join(templates, "preview-page.tsx"), "utf8")));
   put(path.join(root, "components/digitalafarin-cms/BlockRenderer.tsx"), fs.readFileSync(path.join(templates, "BlockRenderer.tsx"), "utf8"));
