@@ -8,8 +8,10 @@ export default defineConfig({
     launchOptions: process.env.CMS_E2E_BROWSER_PATH ? { executablePath: process.env.CMS_E2E_BROWSER_PATH } : {},
   },
   webServer: {
-    cwd: process.cwd(),
-    command: 'npm --workspace apps/admin run start -- --hostname 127.0.0.1 --port 3105',
+    cwd: process.env.CMS_E2E_STANDALONE_DIR || process.cwd(),
+    command: process.env.CMS_E2E_STANDALONE_DIR
+      ? 'npm run start -- --hostname 127.0.0.1 --port 3105'
+      : 'npm --workspace apps/admin run start -- --hostname 127.0.0.1 --port 3105',
     url: 'http://127.0.0.1:3105/cms/login', reuseExistingServer: false, timeout: 60000,
   },
 });
