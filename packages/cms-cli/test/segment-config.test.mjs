@@ -50,9 +50,11 @@ test('a cacheComponents host never receives rejected route segment config', (t) 
   for (const file of generated) {
     assert.doesNotMatch(fs.readFileSync(file, 'utf8'), SEGMENT, path.relative(dir, file));
   }
-  for (const page of ['app/[...cms_path]/page.tsx', 'app/digitalafarin-cms-preview/[[...cms_path]]/page.tsx']) {
-    assert.match(fs.readFileSync(path.join(dir, page), 'utf8'), /^export const instant = false;$/m, page);
-  }
+  assert.match(fs.readFileSync(path.join(dir, 'app/digitalafarin-cms-preview/[[...cms_path]]/page.tsx'), 'utf8'), /^export const instant = false;$/m);
+  const catchAll = fs.readFileSync(path.join(dir, 'app/[...cms_path]/page.tsx'), 'utf8');
+  assert.match(catchAll, /resolveCmsPageCached/);
+  assert.doesNotMatch(catchAll, /searchParams/);
+  assert.doesNotMatch(catchAll, /force-dynamic/);
 });
 
 test('a classic host keeps per-request rendering for CMS pages but handlers carry no segment config', (t) => {

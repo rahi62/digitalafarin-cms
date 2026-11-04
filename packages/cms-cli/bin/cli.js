@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { inferDjangoFiles } from "./django-files.js";
-import { applySegmentConfig } from "./next-mode.js";
+import { applySegmentConfig, usesCacheComponents } from "./next-mode.js";
 import { scaffoldIntegration, applyIntegration, frontendDoctor } from "./integration.js";
 import { inventory, mapRoute, validateRoutes, routeMapFile, exportRouteReport } from "./routes.js";
 
@@ -124,7 +124,7 @@ function ensurePublicRoute(frontend) {
   fs.mkdirSync(componentDir, { recursive: true });
 
   if (!exists(routeFile)) {
-    fs.writeFileSync(routeFile, applySegmentConfig(frontend, fs.readFileSync(path.join(templateDir, "public-page.tsx"), "utf8")));
+    fs.writeFileSync(routeFile, applySegmentConfig(frontend, fs.readFileSync(path.join(templateDir, usesCacheComponents(frontend) ? "public-page.cache-components.tsx" : "public-page.tsx"), "utf8")));
   }
   if (!exists(rendererFile)) {
     fs.copyFileSync(path.join(templateDir, "BlockRenderer.tsx"), rendererFile);

@@ -9,6 +9,8 @@ export function withDigitalAfarinCms(config: NextConfig = {}): NextConfig {
   ];
   return {
     ...config,
+    // `@digitalafarin/cms-next/cache` uses the "use cache" directive, which Next.js only compiles in transpiled code.
+    transpilePackages: [...new Set([...(config.transpilePackages || []), "@digitalafarin/cms-next"])],
     async rewrites() {
       const original = await config.rewrites?.() || [];
       const grouped = Array.isArray(original) ? { beforeFiles: [], afterFiles: original, fallback: [] } : original;
