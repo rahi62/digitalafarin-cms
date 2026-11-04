@@ -56,7 +56,10 @@ def ensure_organization_roles(user, organization_id, roles, message=None) -> Non
 
 
 def ensure_organization_access(user, organization_id) -> None:
-    if organization_id is None or getattr(user, "is_superuser", False):
+    """Fail closed: an unresolved organization is never implicitly allowed."""
+    if organization_id is None:
+        raise PermissionDenied("The organization for this object could not be resolved.")
+    if getattr(user, "is_superuser", False):
         return
     allowed = allowed_organization_ids(user)
     if organization_id not in allowed:
@@ -64,7 +67,10 @@ def ensure_organization_access(user, organization_id) -> None:
 
 
 def ensure_organization_write_access(user, organization_id, allowed_roles=None) -> None:
-    if organization_id is None or getattr(user, "is_superuser", False):
+    """Fail closed: an unresolved organization is never implicitly writable."""
+    if organization_id is None:
+        raise PermissionDenied("The organization for this object could not be resolved.")
+    if getattr(user, "is_superuser", False):
         return
 
     from digitalafarin_cms.apps.sites.models import Membership
@@ -128,6 +134,38 @@ def organization_id_for_instance(value: Model | None, _seen: set[int] | None = N
     return None
 
 
+def _is_non_tenant_model(instance: Model) -> bool:
+    """True only for explicitly allowlisted models that are not tenant-owned.
+
+    Everything else (all CMS-owned models, unknown third-party models) must resolve
+    to an organization, otherwise access is denied.
+    """
+    from django.conf import settings
+
+    label = instance._meta.label_lower
+    allowlist = {settings.AUTH_USER_MODEL.lower(), "contenttypes.contenttype"}
+    allowlist.update(
+        str(item).lower()
+        for item in getattr(settings, "DIGITALAFARIN_CMS_NON_TENANT_MODELS", ())
+    )
+    return label in allowlist
+
+
+def require_organization_id_for_instance(instance: Model) -> int | None:
+    """Resolve the organization or raise PermissionDenied (fail closed).
+
+    Returns None only for allowlisted non-tenant models such as the user model.
+    """
+    organization_id = organization_id_for_instance(instance)
+    if organization_id is not None:
+        return organization_id
+    if _is_non_tenant_model(instance):
+        return None
+    raise PermissionDenied(
+        f"Cannot resolve the organization for {instance._meta.label}; access denied."
+    )
+
+
 def _iter_model_values(value):
     if isinstance(value, Model):
         yield value
@@ -160,21 +198,22 @@ class TenantScopedViewSetMixin:
     def get_object(self):
         instance = super().get_object()
         if self.request.method not in {"GET", "HEAD", "OPTIONS"}:
-            ensure_organization_write_access(
-                self.request.user,
-                organization_id_for_instance(instance),
-                self.write_roles,
-            )
+            organization_id = require_organization_id_for_instance(instance)
+            if organization_id is not None:
+                ensure_organization_write_access(
+                    self.request.user, organization_id, self.write_roles
+                )
         return instance
 
     def validate_tenant_serializer(self, serializer, *, require_write=False) -> None:
         organization_ids = set()
         for value in serializer.validated_data.values():
             for instance in _iter_model_values(value):
-                organization_id = organization_id_for_instance(instance)
+                organization_id = require_organization_id_for_instance(instance)
+                if organization_id is None:
+                    continue
                 ensure_organization_access(self.request.user, organization_id)
-                if organization_id is not None:
-                    organization_ids.add(organization_id)
+                organization_ids.add(organization_id)
 
         if require_write:
             for organization_id in organization_ids:
