@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { inventory, mapRoute, readRouteMap, validateRoutes, exportRouteReport } from '../bin/routes.js';
 
 function fixture(t, files) {
@@ -80,7 +81,7 @@ test('CLI commands expose read-only inventory and enforce explicit mapping', (t)
     'app/page.tsx': 'export default function Home() {}',
     'app/blog/page.tsx': 'cms.listEntries()',
   });
-  const cli = new URL('../bin/cli.js', import.meta.url).pathname;
+  const cli = fileURLToPath(new URL('../bin/cli.js', import.meta.url));
   const run = (...args) => {
     const result = spawnSync(process.execPath, [cli, ...args, '--frontend', root], { encoding: 'utf8', cwd: root });
     return result;
