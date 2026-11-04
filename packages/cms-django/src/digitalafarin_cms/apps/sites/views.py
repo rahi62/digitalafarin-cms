@@ -1,4 +1,5 @@
 from django.core.exceptions import PermissionDenied
+from digitalafarin_cms.apps.common.caching import public_cache
 from digitalafarin_cms.throttles import SiteContextThrottle
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -128,6 +129,7 @@ class MembershipViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 @authentication_classes([])
 @permission_classes([AllowAny])
 @throttle_classes([SiteContextThrottle])
+@public_cache
 def public_site_context_view(request):
     domain = (request.query_params.get("site") or "").strip()
     if not domain:

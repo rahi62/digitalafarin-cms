@@ -1,5 +1,6 @@
 from urllib.parse import urlencode
 
+from digitalafarin_cms.apps.common.caching import apply_public_cache, public_cache
 from digitalafarin_cms.throttles import ResolveThrottle, SitemapThrottle, RobotsThrottle
 from django.conf import settings
 from django.core import signing
@@ -451,11 +452,13 @@ class MenuViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 @throttle_classes([ResolveThrottle])
 def resolve_path(request):
     response = _resolve_path(request)
-    response["Cache-Control"] = "private, no-store" if "preview" in request.query_params else "no-store"
     if "preview" in request.query_params:
+        # Previews are per-user drafts: never cacheable, never indexable.
+        response["Cache-Control"] = "private, no-store"
         response["X-Robots-Tag"] = "noindex, nofollow"
         response["Referrer-Policy"] = "no-referrer"
-    return response
+        return response
+    return apply_public_cache(request, response)
 
 
 def _resolve_path(request):
@@ -563,6 +566,7 @@ def _resolve_path(request):
 @authentication_classes([])
 @permission_classes([AllowAny])
 @throttle_classes([SitemapThrottle])
+@public_cache
 def sitemap(request):
     domain = request.query_params.get("site")
     try:
@@ -583,6 +587,7 @@ def sitemap(request):
 @authentication_classes([])
 @permission_classes([AllowAny])
 @throttle_classes([RobotsThrottle])
+@public_cache
 def robots_txt(request):
     domain = request.query_params.get("site")
     try:

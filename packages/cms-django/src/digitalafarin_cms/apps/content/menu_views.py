@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from digitalafarin_cms.apps.common.caching import public_cache
 from digitalafarin_cms.throttles import MenuResolveThrottle
 from rest_framework.decorators import throttle_classes, api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny
@@ -25,6 +26,7 @@ class MenuItemViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 @authentication_classes([])
 @permission_classes([AllowAny])
 @throttle_classes([MenuResolveThrottle])
+@public_cache
 def resolve_menu(request):
     domain = (request.query_params.get("site") or "").strip()
     key = (request.query_params.get("key") or "").strip()

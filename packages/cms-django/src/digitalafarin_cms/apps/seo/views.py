@@ -1,6 +1,8 @@
+import logging
 import json
 import re
 
+from digitalafarin_cms.apps.common.caching import public_cache
 from digitalafarin_cms.throttles import RedirectResolveThrottle
 from rest_framework import viewsets
 from rest_framework.decorators import throttle_classes, action, api_view, authentication_classes, permission_classes
@@ -307,10 +309,32 @@ class InternalLinkSuggestionViewSet(TenantScopedViewSetMixin, viewsets.ModelView
         return Response({"count": len(serialized), "results": serialized})
 
 
+redirect_logger = logging.getLogger("digitalafarin_cms.seo")
+
+
+def _count_redirect_hit(pk):
+    """Atomic ``hits = hits + 1``; lookup must never fail because of the counter.
+
+    Disable entirely with ``DIGITALAFARIN_CMS_REDIRECT_HIT_COUNTER = False``.
+    """
+    from django.conf import settings
+    from django.db import DatabaseError, transaction
+    from django.db.models import F
+
+    if not getattr(settings, "DIGITALAFARIN_CMS_REDIRECT_HIT_COUNTER", True):
+        return
+    try:
+        with transaction.atomic():
+            Redirect.objects.filter(pk=pk).update(hits=F("hits") + 1)
+    except DatabaseError:
+        redirect_logger.warning("redirect hit counter update failed", exc_info=True)
+
+
 @api_view(["GET"])
 @authentication_classes([])
 @permission_classes([AllowAny])
 @throttle_classes([RedirectResolveThrottle])
+@public_cache
 def resolve_redirect(request):
     domain = request.query_params.get("site")
     path = request.query_params.get("path")
@@ -332,7 +356,7 @@ def resolve_redirect(request):
     ).first()
     if not redirect:
         return Response({"match": False})
-    Redirect.objects.filter(pk=redirect.pk).update(hits=redirect.hits + 1)
+    _count_redirect_hit(redirect.pk)
     return Response({
         "match": True,
         "type": int(redirect.redirect_type),

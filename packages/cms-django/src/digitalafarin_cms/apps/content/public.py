@@ -1,4 +1,5 @@
 """Public content reads only published snapshots, never mutable editor fields."""
+from digitalafarin_cms.apps.common.caching import public_cache
 from digitalafarin_cms.throttles import PublicEntriesThrottle
 from django.db.models import Exists, OuterRef, Q
 from rest_framework.decorators import throttle_classes, api_view, permission_classes, authentication_classes
@@ -44,6 +45,7 @@ class PublicEntrySerializer(serializers.BaseSerializer):
 @authentication_classes([])
 @permission_classes([AllowAny])
 @throttle_classes([PublicEntriesThrottle])
+@public_cache
 def list_public_entries(request):
     domain = request.query_params.get("site")
     if not domain:
@@ -84,5 +86,4 @@ def list_public_entries(request):
         "previous": page - 1 if page > 1 else None,
         "results": PublicEntrySerializer(entries[offset:offset + size], many=True).data,
     })
-    response["Cache-Control"] = "no-store"
     return response
