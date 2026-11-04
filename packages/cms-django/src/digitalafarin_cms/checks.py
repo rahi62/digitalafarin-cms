@@ -68,11 +68,11 @@ def managed_session_deployment_checks(app_configs, **kwargs):
     from django.db import connections
 
     issues = []
-    if not getattr(settings, 'DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS', False):
+    if not getattr(settings, 'DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS', True):
         issues.append(Warning(
-            'CMS compatibility mode accepts authentication without a managed session.',
-            hint=('After coordinated client rollout, set '
-                  'DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=True to require revocable sessions.'),
+            'CMS compatibility mode is enabled and accepts authentication without a managed session.',
+            hint=('Remove DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=False '
+                  '(strict managed sessions are the default since 0.8.0).'),
             id='digitalafarin_cms.W002',
         ))
     if not connections['default'].features.has_select_for_update:

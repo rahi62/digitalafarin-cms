@@ -69,3 +69,21 @@ class SessionConfigurationTests(SimpleTestCase):
             if app != 'rest_framework_simplejwt.token_blacklist'
         ]):
             self.assertIn('digitalafarin_cms.E003', [issue.id for issue in run_checks()])
+
+
+class StrictManagedSessionDefaultTests(SimpleTestCase):
+    def test_unset_setting_means_strict_managed_sessions(self):
+        from django.conf import settings
+        from digitalafarin_cms.session_auth import require_managed_sessions
+
+        with override_settings():
+            del settings.DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS
+            self.assertTrue(require_managed_sessions())
+            codes = [m.id for m in run_checks(include_deployment_checks=False)]
+        self.assertNotIn("digitalafarin_cms.W002", codes)
+
+    def test_explicit_false_keeps_compatibility_mode_and_warns_on_deploy(self):
+        from digitalafarin_cms.session_auth import require_managed_sessions
+
+        with override_settings(DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=False):
+            self.assertFalse(require_managed_sessions())

@@ -21,7 +21,7 @@ SESSION_CLAIM = "cms_sid"
 def managed_session(token, *, user_id=None, lock=False):
     raw = token.get(SESSION_CLAIM)
     if not raw:
-        if getattr(settings, "DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS", False):
+        if require_managed_sessions():
             raise AuthenticationFailed("CMS session is required.")
         return None
     try:
@@ -42,6 +42,11 @@ def managed_session(token, *, user_id=None, lock=False):
     if session is None or session.revoked_at is not None or session.refresh_expires_at <= timezone.now():
         raise AuthenticationFailed("CMS session was revoked or expired.")
     return session
+
+
+def require_managed_sessions() -> bool:
+    """Strict managed sessions are the default; set the setting to False for compatibility mode."""
+    return bool(getattr(settings, "DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS", True))
 
 
 class CmsSessionJWTAuthentication(JWTAuthentication):
