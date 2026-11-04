@@ -53,3 +53,30 @@ test('JavaScript host routes receive JavaScript adapters and changes after revie
   assert.match(result.stderr, /changed since review/);
   assert.match(fs.readFileSync(path.join(dir, 'app/blog/page.jsx'), 'utf8'), /edited after review/);
 });
+
+test('init scaffolds CMS sitemap and robots routes unless the host already owns those URLs', (t) => {
+  const make = (files) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cms-seo-host-'));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ dependencies: { next: '16.0.0' } }));
+    for (const [file, text] of Object.entries({ 'app/page.tsx': 'export default function Home() {}', ...files })) {
+      fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+      fs.writeFileSync(path.join(dir, file), text);
+    }
+    const result = spawnSync(process.execPath, [cli, 'init', '--frontend', dir, '--skip-install'], { cwd: dir, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    return dir;
+  };
+  const fresh = make({});
+  assert.match(fs.readFileSync(path.join(fresh, 'app/sitemap.xml/route.ts'), 'utf8'), /createCmsSitemapHandler/);
+  assert.match(fs.readFileSync(path.join(fresh, 'app/sitemaps/[page]/route.ts'), 'utf8'), /createCmsSitemapPageHandler/);
+  assert.match(fs.readFileSync(path.join(fresh, 'app/robots.txt/route.ts'), 'utf8'), /createCmsRobotsHandler/);
+
+  const owned = make({ 'app/sitemap.ts': 'export default () => []', 'public/robots.txt': 'User-agent: *' });
+  assert.ok(!fs.existsSync(path.join(owned, 'app/sitemap.xml/route.ts')));
+  assert.ok(!fs.existsSync(path.join(owned, 'app/robots.txt/route.ts')));
+  assert.equal(fs.readFileSync(path.join(owned, 'public/robots.txt'), 'utf8'), 'User-agent: *');
+  const manifest = JSON.parse(fs.readFileSync(path.join(owned, '.digitalafarin/integration.json'), 'utf8'));
+  assert.ok(manifest.warnings.some((w) => /sitemap\.xml \(app\/sitemap\.ts\)/.test(w)));
+  assert.ok(manifest.warnings.some((w) => /robots\.txt \(public\/robots\.txt\)/.test(w)));
+});
