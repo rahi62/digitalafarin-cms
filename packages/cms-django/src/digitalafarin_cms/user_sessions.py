@@ -7,6 +7,7 @@ from rest_framework import serializers, status
 from digitalafarin_cms.permissions import CmsIsAuthenticated as IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from digitalafarin_cms.api import CmsAPIViewMixin
 
 from digitalafarin_cms.apps.sites.models import CmsUserSession
 from digitalafarin_cms.session_auth import SESSION_CLAIM
@@ -35,7 +36,7 @@ def payload(request, session):
     }
 
 
-class CmsSessionListView(APIView):
+class CmsSessionListView(CmsAPIViewMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -46,7 +47,7 @@ class CmsSessionListView(APIView):
         })
 
 
-class CmsSessionRevokeView(APIView):
+class CmsSessionRevokeView(CmsAPIViewMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
@@ -62,7 +63,7 @@ class CmsSessionRevokeView(APIView):
         return Response({"revoked": str(session.pk), "current_revoked": session.pk == current_session_id(request)})
 
 
-class CmsSessionRevokeOthersView(APIView):
+class CmsSessionRevokeOthersView(CmsAPIViewMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -75,7 +76,7 @@ class CmsSessionRevokeOthersView(APIView):
         return Response({"revoked_count": count, "current_revoked": False})
 
 
-class CmsSessionRevokeAllView(APIView):
+class CmsSessionRevokeAllView(CmsAPIViewMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):

@@ -570,6 +570,7 @@ def _resolve_path(request):
     })
 
 @api_view(["GET"])
+@authentication_classes([])
 @permission_classes([AllowAny])
 def sitemap(request):
     domain = request.query_params.get("site")
@@ -588,6 +589,7 @@ def sitemap(request):
 
 
 @api_view(["GET"])
+@authentication_classes([])
 @permission_classes([AllowAny])
 def robots_txt(request):
     domain = request.query_params.get("site")

@@ -5,6 +5,8 @@ from collections.abc import Iterable
 from django.core.exceptions import PermissionDenied
 from django.db.models import Model
 
+from digitalafarin_cms.api import CmsViewSetMixin
+
 
 def allowed_organization_ids(user):
     """Return None for superusers, otherwise the organization ids visible to the user."""
@@ -179,7 +181,7 @@ def _iter_model_values(value):
             yield from _iter_model_values(nested)
 
 
-class TenantScopedViewSetMixin:
+class TenantScopedViewSetMixin(CmsViewSetMixin):
     """Scope reads to memberships and protect unsafe writes by organization role."""
 
     tenant_filter: str | None = None

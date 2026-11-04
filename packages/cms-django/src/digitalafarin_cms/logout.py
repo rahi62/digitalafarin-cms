@@ -3,6 +3,7 @@ from rest_framework import serializers, status
 from digitalafarin_cms.permissions import CmsIsAuthenticated as IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from digitalafarin_cms.api import CmsAPIViewMixin
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
@@ -10,7 +11,7 @@ from digitalafarin_cms.apps.sites.models import CmsUserSession
 from digitalafarin_cms.session_auth import SESSION_CLAIM
 
 
-class CmsLogoutView(APIView):
+class CmsLogoutView(CmsAPIViewMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):

@@ -2,7 +2,7 @@ import json
 import re
 
 from rest_framework import viewsets
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny
 from digitalafarin_cms.permissions import CmsIsAuthenticated as IsAuthenticated
 from rest_framework.response import Response
@@ -307,6 +307,7 @@ class InternalLinkSuggestionViewSet(TenantScopedViewSetMixin, viewsets.ModelView
 
 
 @api_view(["GET"])
+@authentication_classes([])
 @permission_classes([AllowAny])
 def resolve_redirect(request):
     domain = request.query_params.get("site")

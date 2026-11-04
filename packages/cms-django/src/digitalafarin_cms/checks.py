@@ -20,7 +20,11 @@ def integration_checks(app_configs, **kwargs):
 
 @register()
 def session_authentication_checks(app_configs, **kwargs):
-    """Reject host settings that can authenticate JWTs before checking revocation."""
+    """Warn when host-wide DRF auth could bypass revocation on the host's own views.
+
+    CMS endpoints declare their own authenticator and are not affected; this only
+    protects host views that share the CMS user and session model.
+    """
     from django.utils.module_loading import import_string
     from digitalafarin_cms.session_auth import CmsSessionJWTAuthentication
 
@@ -35,13 +39,12 @@ def session_authentication_checks(app_configs, **kwargs):
         safe = False
     if safe:
         return []
-    return [Error(
-        "CMS session revocation requires a session-checking JWT authenticator first.",
-        hint=("Set REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'][0] to "
-              "'digitalafarin_cms.session_auth.CmsSessionJWTAuthentication' "
-              "or a subclass. Host authenticators may follow it; an earlier "
-              "authenticator can bypass CMS session revocation."),
-        id="digitalafarin_cms.E002",
+    return [Warning(
+        "Host REST_FRAMEWORK default authentication does not check CMS session revocation.",
+        hint=("CMS endpoints use their own authenticator and are unaffected. Host views "
+              "that accept CMS JWTs should put "
+              "'digitalafarin_cms.session_auth.CmsSessionJWTAuthentication' first."),
+        id="digitalafarin_cms.W005",
     )]
 
 

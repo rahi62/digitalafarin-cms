@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from digitalafarin_cms.session_auth import CmsSessionJWTAuthentication
 from digitalafarin_cms.permissions import CmsIsAuthenticated as IsAuthenticated
 from rest_framework.response import Response
 
@@ -9,6 +10,7 @@ from .intelligence import build_seo_opportunities
 
 
 @api_view(["GET"])
+@authentication_classes([CmsSessionJWTAuthentication])
 @permission_classes([IsAuthenticated])
 def seo_opportunities(request):
     site_id = request.query_params.get("site")
