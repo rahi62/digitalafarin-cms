@@ -14,6 +14,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
     ...devices["Desktop Chrome"],
+    launchOptions: process.env.CMS_E2E_BROWSER_PATH ? { executablePath: process.env.CMS_E2E_BROWSER_PATH } : {},
   },
   webServer: {
     cwd: process.cwd(),

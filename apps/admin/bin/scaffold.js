@@ -187,6 +187,8 @@ function embed() {
     `${styleImports}
 import Shell from "${componentRoot}/Shell";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "DigitalAfarin SEO CMS",
   description: "Headless CMS & SEO Platform",

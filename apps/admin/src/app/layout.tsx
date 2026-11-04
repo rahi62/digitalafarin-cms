@@ -24,6 +24,9 @@ import "../styles/trash.css";
 import "../styles/session-security.css";
 import Shell from "@/components/Shell";
 
+// Nonce-bearing HTML must be rendered for each request, never statically cached.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "DigitalAfarin SEO CMS",
   description: "Headless CMS & SEO Platform",
