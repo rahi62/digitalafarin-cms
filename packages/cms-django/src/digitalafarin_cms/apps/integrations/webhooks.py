@@ -24,8 +24,6 @@ import logging
 import random
 import socket
 import time
-import urllib.error
-import urllib.request
 import uuid
 from datetime import timedelta
 from urllib.parse import urlsplit
@@ -113,38 +111,80 @@ def schedule_deliveries(delivery_ids, countdown: float | None = None):
             logger.warning("webhook enqueue failed; delivery stays pending delivery=%s", delivery_id, exc_info=True)
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args, **kwargs):
+def _allowed_hosts() -> set[str]:
+    return {str(item).strip().lower() for item in _setting("ALLOWED_HOSTS", ()) if str(item).strip()}
+
+
+def _is_public(address) -> bool:
+    return not (address.is_private or address.is_loopback or address.is_link_local
+                or address.is_reserved or address.is_multicast or address.is_unspecified)
+
+
+def resolve_target(url: str):
+    """Return the validated IP to connect to, or ``None`` when the target is not allowed.
+
+    * ``DIGITALAFARIN_CMS_WEBHOOK_ALLOWED_HOSTS`` (``host`` or ``host:port`` entries, exact match)
+      explicitly permits private/loopback targets such as the Next.js server on the same VPS.
+    * Every other target must resolve exclusively to public addresses.
+    * The caller connects to the returned IP, so DNS cannot change between check and use.
+    * ``DIGITALAFARIN_CMS_WEBHOOK_ALLOW_PRIVATE_NETWORKS`` is a documented last resort.
+    """
+    parts = urlsplit(url)
+    if parts.scheme not in {"http", "https"} or not parts.hostname:
         return None
+    host = parts.hostname.lower()
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    try:
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError:
+        return ""  # unresolved: let the connection attempt fail and be retried like a network error
+    addresses = [ipaddress.ip_address(info[4][0]) for info in infos]
+    if not addresses:
+        return None
+    allowed = _allowed_hosts()
+    if host in allowed or f"{host}:{port}" in allowed or _setting("ALLOW_PRIVATE_NETWORKS", False):
+        return str(addresses[0])
+    if all(_is_public(address) for address in addresses):
+        return str(addresses[0])
+    return None
 
 
 def _target_allowed(url: str) -> bool:
+    return resolve_target(url) is not None
+
+
+def post(url: str, body: bytes, headers: dict, timeout: float, ip: str | None = None) -> int:
+    """POST without following redirects, pinned to ``ip`` when given.
+
+    Returns the HTTP status; raises OSError on network failure.
+    """
+    import http.client
+    import ssl
+
     parts = urlsplit(url)
-    if parts.scheme not in {"http", "https"} or not parts.hostname:
-        return False
-    if _setting("ALLOW_PRIVATE_NETWORKS", False):
-        return True
+    host = parts.hostname
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    target = ip or host
+    path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
+    if parts.scheme == "https":
+        connection = http.client.HTTPSConnection(target, port, timeout=timeout, context=ssl.create_default_context())
+        if ip:
+            # Validate the certificate against the original hostname, not the pinned address.
+            raw = socket.create_connection((ip, port), timeout)
+            connection.sock = connection._context.wrap_socket(raw, server_hostname=host)
+    else:
+        connection = http.client.HTTPConnection(target, port, timeout=timeout)
+    request_headers = dict(headers)
+    request_headers["Host"] = parts.netloc.rsplit("@", 1)[-1]
     try:
-        infos = socket.getaddrinfo(parts.hostname, parts.port or (443 if parts.scheme == "https" else 80))
-    except OSError:
-        return True  # unresolved: the connection attempt fails and is retried like any network error
-    for info in infos:
-        address = ipaddress.ip_address(info[4][0])
-        if (address.is_private or address.is_loopback or address.is_link_local
-                or address.is_reserved or address.is_multicast):
-            return False
-    return True
-
-
-def post(url: str, body: bytes, headers: dict, timeout: float) -> int:
-    """POST without following redirects; returns the HTTP status (raises OSError on network failure)."""
-    request = urllib.request.Request(url, data=body, headers=headers, method="POST")
-    opener = urllib.request.build_opener(_NoRedirect)
-    try:
-        with opener.open(request, timeout=timeout) as response:
-            return response.status
-    except urllib.error.HTTPError as error:
-        return error.code
+        connection.request("POST", path, body=body, headers=request_headers)
+        response = connection.getresponse()
+        response.read(1024)
+        return response.status  # 3xx is returned as-is and never followed
+    except http.client.HTTPException as exc:
+        raise OSError(type(exc).__name__) from exc
+    finally:
+        connection.close()
 
 
 def _claim(delivery_id):
@@ -182,7 +222,7 @@ def deliver(delivery_id):
     status_code, error, retry = None, "", False
     if not endpoint.is_active:
         error = "Endpoint disabled."
-    elif not _target_allowed(endpoint.url):
+    elif (pinned := resolve_target(endpoint.url)) is None:
         error = "Target address is not allowed."
     else:
         body = serialize_body(delivery.payload)
@@ -197,7 +237,7 @@ def deliver(delivery_id):
         if endpoint.secret:
             headers["X-DigitalAfarin-Signature"] = sign(endpoint.secret, timestamp, body)
         try:
-            status_code = post(endpoint.url, body, headers, float(_setting("TIMEOUT_SECONDS", 10)))
+            status_code = post(endpoint.url, body, headers, float(_setting("TIMEOUT_SECONDS", 10)), ip=pinned or None)
         except OSError as exc:
             error, retry = f"Network error: {type(exc).__name__}", True
         else:

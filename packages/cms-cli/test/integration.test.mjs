@@ -102,5 +102,5 @@ test('--with-revalidate scaffolds the signed revalidation route, a secret and a 
   assert.match(fs.readFileSync(path.join(dir, '.env.local'), 'utf8'), /^DIGITALAFARIN_CMS_WEBHOOK_SECRET=[0-9a-f]{64}$/m);
   assert.match(fs.readFileSync(path.join(dir, 'lib/digitalafarin-cms.ts'), 'utf8'), /revalidate: false/);
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, '.digitalafarin/integration.json'), 'utf8'));
-  assert.ok(manifest.warnings.some((w) => /cms_drain_webhooks/.test(w)));
+  assert.ok(manifest.warnings.some((w) => /cms_drain_webhooks/.test(w) && /WEBHOOK_ALLOWED_HOSTS/.test(w)));
 });
