@@ -1,6 +1,7 @@
 """Public content reads only published snapshots, never mutable editor fields."""
+from digitalafarin_cms.throttles import PublicEntriesThrottle
 from django.db.models import Q
-from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.decorators import throttle_classes, api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import serializers
@@ -42,6 +43,7 @@ class PublicEntrySerializer(serializers.BaseSerializer):
 @api_view(["GET"])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([PublicEntriesThrottle])
 def list_public_entries(request):
     domain = request.query_params.get("site")
     if not domain:

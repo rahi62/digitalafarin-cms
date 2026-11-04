@@ -1,5 +1,6 @@
 from urllib.parse import urlencode
 
+from digitalafarin_cms.throttles import ResolveThrottle, SitemapThrottle, RobotsThrottle
 from django.conf import settings
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -10,7 +11,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from xml.sax.saxutils import escape as xml_escape
 from rest_framework import status as drf_status, viewsets, serializers
-from rest_framework.decorators import action, api_view, permission_classes, authentication_classes
+from rest_framework.decorators import throttle_classes, action, api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
 from digitalafarin_cms.permissions import CmsIsAuthenticated as IsAuthenticated
 from rest_framework.response import Response
@@ -447,6 +448,7 @@ class MenuViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 @api_view(["GET"])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([ResolveThrottle])
 def resolve_path(request):
     response = _resolve_path(request)
     response["Cache-Control"] = "private, no-store" if "preview" in request.query_params else "no-store"
@@ -572,6 +574,7 @@ def _resolve_path(request):
 @api_view(["GET"])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([SitemapThrottle])
 def sitemap(request):
     domain = request.query_params.get("site")
     try:
@@ -591,6 +594,7 @@ def sitemap(request):
 @api_view(["GET"])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([RobotsThrottle])
 def robots_txt(request):
     domain = request.query_params.get("site")
     try:
