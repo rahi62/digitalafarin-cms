@@ -3,6 +3,7 @@
 Host projects overriding REST_FRAMEWORK.DEFAULT_AUTHENTICATION_CLASSES must include
 CmsSessionJWTAuthentication for the revocation guarantee on all CMS views.
 """
+import logging
 from datetime import datetime, timedelta, timezone as dt_timezone
 from uuid import UUID
 
@@ -16,17 +17,25 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, Toke
 from digitalafarin_cms.apps.sites.models import CmsUserSession
 
 SESSION_CLAIM = "cms_sid"
+logger = logging.getLogger("digitalafarin_cms.auth")
+
+
+def _reject(reason):
+    # Reason code only: never log tokens, session ids or usernames.
+    logger.warning("authentication rejected reason=%s", reason)
 
 
 def managed_session(token, *, user_id=None, lock=False):
     raw = token.get(SESSION_CLAIM)
     if not raw:
         if require_managed_sessions():
+            _reject("session_required")
             raise AuthenticationFailed("CMS session is required.")
         return None
     try:
         session_id = UUID(str(raw))
     except (TypeError, ValueError, AttributeError):
+        _reject("invalid_session")
         raise AuthenticationFailed("Invalid CMS session.")
     query = CmsUserSession.objects.filter(
         pk=session_id, revoked_at__isnull=True,
@@ -36,10 +45,12 @@ def managed_session(token, *, user_id=None, lock=False):
         query = query.select_for_update()
     actual_user = user_id if user_id is not None else token.get("user_id")
     if not actual_user:
+        _reject("identity_missing")
         raise AuthenticationFailed("Session identity is missing.")
     session = query.filter(user_id=actual_user).first()
     # The query may have waited on a lock past the cutoff computed above.
     if session is None or session.revoked_at is not None or session.refresh_expires_at <= timezone.now():
+        _reject("revoked_or_expired")
         raise AuthenticationFailed("CMS session was revoked or expired.")
     return session
 

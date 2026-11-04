@@ -1,3 +1,4 @@
+import logging
 """Shared login budgets without a cache/Redis dependency."""
 from datetime import timedelta
 from math import ceil
@@ -13,6 +14,8 @@ from rest_framework.exceptions import Throttled
 from rest_framework.throttling import BaseThrottle
 
 from digitalafarin_cms.apps.sites.models import CmsLoginRateBucket
+
+logger = logging.getLogger("digitalafarin_cms.auth")
 
 
 def login_limits():
@@ -58,6 +61,7 @@ class CmsLoginThrottle(BaseThrottle):
                     waits.append(ceil((row.expires_at - now).total_seconds()))
             if waits:
                 # Roll back any newly created buckets for a denied request.
+                logger.warning("login throttled wait=%s", max(1, max(waits)))
                 raise Throttled(wait=max(1, max(waits)))
             for row, _ in rows:
                 row.attempts += 1

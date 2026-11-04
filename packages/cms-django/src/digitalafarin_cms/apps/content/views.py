@@ -1,3 +1,4 @@
+import logging
 from urllib.parse import urlencode
 
 from digitalafarin_cms.apps.common.caching import apply_public_cache, public_cache
@@ -38,6 +39,8 @@ from .publication import unpublish_snapshot
 from .seo_files import build_robots, build_sitemap
 from .public import PublicEntrySerializer, public_entries, published_content
 from digitalafarin_cms.media import normalize_media_data
+
+logger = logging.getLogger("digitalafarin_cms.content")
 
 
 PREVIEW_SALT = "digitalafarin-cms-preview"
@@ -125,7 +128,16 @@ class ContentTypeViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
                 "content_type": "Other content types reference this type.",
                 "referenced_by": dependencies[:10],
             })
+        logger.info("content type deleted content_type=%s site=%s", instance.pk, instance.site_id)
         instance.delete()
+
+    def perform_update(self, serializer):
+        schema_changed = "schema" in serializer.validated_data and \
+            serializer.validated_data["schema"] != (serializer.instance.schema or {})
+        super().perform_update(serializer)
+        if schema_changed:
+            logger.info("content type schema changed content_type=%s site=%s user=%s",
+                        serializer.instance.pk, serializer.instance.site_id, self.request.user.pk)
 
     @action(detail=True, methods=["post"], url_path="schema-rename")
     def schema_rename(self, request, pk=None):
@@ -144,6 +156,8 @@ class ContentTypeViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         result = execute_field_rename(
             content_type, source, destination, request.data.get("preview_token"), request.user,
         )
+        logger.info("schema field renamed content_type=%s site=%s user=%s",
+                    content_type.pk, content_type.site_id, request.user.pk)
         return Response(result)
 
     @action(detail=True, methods=["post"], url_path="schema-impact")
@@ -339,6 +353,7 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         _require_publisher(request.user, entry)
         entry.publish()
         create_revision(entry, request.user, "Published")
+        logger.info("content publish requested entry=%s site=%s user=%s", entry.pk, entry.site_id, request.user.pk)
         return Response(self.get_serializer(entry).data)
 
     @action(detail=True, methods=["post"])
@@ -355,6 +370,7 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         entry.published_at = None
         entry.save(update_fields=["status", "scheduled_at", "published_at", "updated_at"])
         create_revision(entry, request.user, "Scheduled publication")
+        logger.info("content scheduled entry=%s site=%s at=%s", entry.pk, entry.site_id, scheduled_at.isoformat())
         return Response(self.get_serializer(entry).data)
 
     @action(detail=True, methods=["post"])
@@ -367,6 +383,7 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         entry.scheduled_at = None
         entry.save(update_fields=["status", "scheduled_at", "updated_at"])
         create_revision(entry, request.user, "Schedule cancelled")
+        logger.info("content unscheduled entry=%s site=%s", entry.pk, entry.site_id)
         return Response(self.get_serializer(entry).data)
 
     @action(detail=True, methods=["post"], url_path="preview")

@@ -3,6 +3,7 @@ from django.db import transaction
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from digitalafarin_cms.session_auth import CmsTokenObtainPairSerializer, CmsTokenRefreshSerializer
 from digitalafarin_cms.logout import CmsLogoutView
+from digitalafarin_cms.health import health
 from digitalafarin_cms.login_limits import CmsLoginThrottle
 from digitalafarin_cms.user_sessions import (
     CmsSessionListView, CmsSessionRevokeView, CmsSessionRevokeOthersView, CmsSessionRevokeAllView,
@@ -18,6 +19,7 @@ class CmsRefreshView(TokenRefreshView):
 
 
 urlpatterns = [
+    path("health/", health, name="digitalafarin_cms_health"),
     path("auth/token/", transaction.non_atomic_requests(CmsObtainPairView.as_view()), name="digitalafarin_cms_token_obtain_pair"),
     path("auth/token/refresh/", CmsRefreshView.as_view(), name="digitalafarin_cms_token_refresh"),
     path("auth/logout/", CmsLogoutView.as_view(), name="digitalafarin_cms_logout"),
