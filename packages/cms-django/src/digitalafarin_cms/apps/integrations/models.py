@@ -75,3 +75,36 @@ class SearchPerformanceDaily(UUIDTimeStampedModel):
             models.Index(fields=["site", "date"], name="search_perf_site_date_idx"),
             models.Index(fields=["site", "path"], name="search_perf_site_path_idx"),
         ]
+
+
+class WebhookDelivery(UUIDTimeStampedModel):
+    """Outbox row: one signed event for one endpoint (created atomically with the change)."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        RETRYING = "retrying", "Retrying"
+        DELIVERED = "delivered", "Delivered"
+        FAILED = "failed", "Failed"
+
+    endpoint = models.ForeignKey(WebhookEndpoint, on_delete=models.CASCADE, related_name="deliveries")
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name="webhook_deliveries")
+    # Idempotency key sent to receivers; identical across retries and across endpoints.
+    event_id = models.UUIDField()
+    event_type = models.CharField(max_length=64)
+    payload = models.JSONField(default=dict)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    attempts = models.PositiveIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(null=True, blank=True)
+    leased_until = models.DateTimeField(null=True, blank=True)
+    last_status_code = models.PositiveIntegerField(null=True, blank=True)
+    last_error = models.CharField(max_length=500, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["endpoint", "event_id"], name="unique_webhook_delivery_event"),
+        ]
+        indexes = [
+            models.Index(fields=["status", "next_attempt_at"], name="cms_webhook_due_idx"),
+        ]

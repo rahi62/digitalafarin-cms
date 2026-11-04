@@ -34,6 +34,7 @@ from .relations import find_relation_uses
 from .trash import move_to_trash, restore_from_trash
 from .schema_migration import preview_field_rename, execute_field_rename
 from .routing import normalize_path
+from .publication import unpublish_snapshot
 from .seo_files import build_robots, build_sitemap
 from .public import PublicEntrySerializer, public_entries, published_content
 from digitalafarin_cms.media import normalize_media_data
@@ -328,7 +329,7 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
             entry.status = ContentEntry.Status.DRAFT
             entry.scheduled_at = None
             entry.save(update_fields=["status", "scheduled_at", "updated_at"])
-            PublishedEntry.objects.filter(entry=entry).delete()
+            unpublish_snapshot(entry)
             create_revision(entry, request.user, "Returned to draft")
         return Response(self.get_serializer(entry).data)
 

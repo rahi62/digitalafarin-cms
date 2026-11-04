@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import SearchImportRun, SearchPerformanceDaily, WebhookEndpoint
+from .models import SearchImportRun, SearchPerformanceDaily, WebhookDelivery, WebhookEndpoint
 
 
 @admin.register(SearchPerformanceDaily)
@@ -19,3 +19,10 @@ class SearchImportRunAdmin(admin.ModelAdmin):
 
 
 admin.site.register(WebhookEndpoint)
+
+
+@admin.register(WebhookDelivery)
+class WebhookDeliveryAdmin(admin.ModelAdmin):
+    list_display = ("event_type", "endpoint", "status", "attempts", "last_status_code", "created_at")
+    list_filter = ("status", "event_type", "site")
+    readonly_fields = ("payload", "last_error")

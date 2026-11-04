@@ -8,6 +8,7 @@ from digitalafarin_cms.apps.sites.models import Site
 from .models import ContentEntry, PublishedEntry
 from .relations import find_relation_uses
 from .routing import validate_entry_route
+from .publication import unpublish_snapshot
 from .services import create_revision
 
 
@@ -30,7 +31,7 @@ def move_to_trash(entry, actor):
     current.deleted_at = timezone.now()
     current.deleted_by = actor
     current.save(update_fields=["status", "scheduled_at", "deleted_at", "deleted_by", "updated_at"])
-    PublishedEntry.objects.filter(entry=current).delete()
+    unpublish_snapshot(current, event="content.deleted")
     create_revision(current, actor, "Moved to Trash")
     return current
 
