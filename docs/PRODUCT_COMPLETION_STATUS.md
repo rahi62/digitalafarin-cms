@@ -35,7 +35,7 @@ Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but a
 | PR #71 configuration checks CI | DONE | Commit 7888434: all five jobs passed (run 40030720391) |
 | PR #72 login limits CI | DONE | Commit 5384a13: all five jobs passed (run 40032472400) |
 | PR #73 CSP/header CI | DONE | Commit fb44079: all five jobs passed (run 40069835379) |
-| Dependency-security CI | NOT STARTED | Local recovery gates passed; Draft PR/CI pending |
+| Dependency-security CI | DONE | Draft #74, 3c9e79f, all five jobs passed in run 40100750602 |
 | Full packaging / supported-version matrix | PARTIAL | Existing CI provides coverage; fresh branch package verification pending |
 
 ## Product gaps
@@ -63,13 +63,13 @@ Statuses: DONE = scoped behavior verified; PARTIAL = implementation exists but a
 
 ## Recovery checkpoint and phase evidence (2026-10-24)
 
-`c5de0c8` was already pushed on `fix/cms-dependency-security-patches`; no PR existed for it at recovery. The working tree contained five tracked Tiptap/menu dependency and package-smoke changes. They were preserved in `/home/rahiwebmaster/cms-recovery/pre-recovery-working-tree.patch`. No stash, untracked files, reset, clean, force push or history rewrite. #73 remains the latest open feature draft, with all five jobs successful on `fb44079`. New working-tree claims below require fresh verification; earlier checkpoints are historical evidence only.
+`c5de0c8` was already pushed on `fix/cms-dependency-security-patches`; no PR existed for it at recovery. The working tree contained five tracked Tiptap/menu dependency and package-smoke changes. They were preserved in `/home/rahiwebmaster/cms-recovery/pre-recovery-working-tree.patch`. No stash, untracked files, reset, clean, force push or history rewrite. #73 remains the latest open feature draft, with all five jobs successful on `fb44079`. Dependency Draft #74 now contains the recovered changes at `3c9e79f`; all five CI jobs passed in run `40100750602`. Earlier checkpoints are historical evidence only.
 
 | Phase | Feature | Status | Evidence | Next Action |
 | --- | --- | --- | --- | --- |
 | Recovery | Git and draft dependency chain | DONE | Local status/log/reflog/stashes, fetch, remote PR bases and Actions inspected; original patch preserved | Keep each incremental change on a separate stacked draft |
 | P0 Security | Dependency patches and fresh package graph | DONE | Fresh audit: #73 has 1 critical/2 high packages, patched graph zero; 10 Admin + 29 SDK/CLI tests; typecheck/build; fresh standalone and embedded package graphs/build; 2 CSP + 7 editor + 3 BFF browser tests pass | Obtain latest-SHA CI on stacked dependency draft; next packaging gap is Next 15 tooling |
-| P0 Integration | Next 15 missing-tooling provisioning | PARTIAL | `apps/admin/bin/scaffold.js` installs unversioned tooling; documented TypeScript 7 lacks the compiler API used by Next 15 | Reproduce, constrain only newly provisioned tooling, preserve declared host versions |
+| P0 Integration | Next 15 missing-tooling provisioning | DONE | Seven direct-embed regressions; real packed Next 15.5.28 host now builds with missing compiler provisioned as ^5.9.3 and new bundler config; existing host JSONC/toolchain preserved | Complete stacked draft CI; supported OS/HTTPS matrix remains separate |
 | P0 Security | Authentication/session/refresh and #64 parity | PARTIAL | `session_auth.py`, `user_sessions.py`, BFF and proxy-security tests; #68 ports decoded-path/timeouts; #69–#72 enforce revocation/locking/login budgets | Host TLS/strict-mode acceptance; do not cherry-pick the parallel #64 auth contract |
 | P0 Security | CSP and browser headers | PARTIAL | #73 nonce middleware, policy tests and production browser suite; five CI jobs green | Retain browser regression and finish real host/proxy acceptance |
 | P0 Security | Durable security audit | PARTIAL | `ContentSchemaMigration` and component approval history exist; no unified authentication/role/session event model/API/Admin | Add scoped durable event stream, safe payloads, pagination/retention and negative tests |
@@ -128,3 +128,7 @@ Targeted lock update resolves Next 16.4.3, sharp 0.35.5 and source-map-js 1.2.2;
 ## Recovery verification increment
 
 Freshly rerun on the preserved dependency working tree: npm audit reports zero findings versus one critical and two high packages on the #73 lockfile; npm dependency graph is coherent; 10 Admin tests, 29 SDK/CLI tests, Admin typecheck/production build, installed standalone/embedded tarball checks and embedded production build pass. Playwright with local Chrome: 2 production CSP tests, 7 editor/registry tests and 3 BFF tests pass. Next-generated local next-env/tsconfig edits were archived outside Git and restored to their original tracked content; the generated Next agent guide is retained. The initial five-file patch remains backed up. No whole-product completion or new CI success is claimed.
+
+## Host tooling compatibility increment
+
+The fresh Next 15 package build reproduced both the missing TypeScript compiler-API failure and legacy resolver failures for exported SDK/Tiptap subpaths. The final fix provisions only a missing ^5.9.3 compiler and creates a bundler tsconfig only when absent, extending existing jsconfig. A proposed SDK declaration workaround was discarded because it did not address third-party subpaths; no SDK manifest/API change remains. Existing host config/toolchain bytes are preserved. Seven targeted regressions and 36 SDK/CLI integration tests pass. Next 15 packed-host build/audit passes with the explicit documented fixture PostCSS override; Next 16 packed-host build/audit also passes. Independent read-only review found no blocking issue; direct-embed preflight does not claim to cover earlier outer-CLI package installs. No production migration or release.

@@ -118,15 +118,40 @@ function embed() {
   const missingDevDependencies = requiredDevDependencies.filter(
     (name) => !pkg.dependencies?.[name] && !pkg.devDependencies?.[name],
   );
-  if (missingDevDependencies.length && !skipInstall) {
-    run("npm", ["install", "--save-dev", ...missingDevDependencies], frontend);
-  }
   const routeSegments = basePath.split("/").filter(Boolean);
   const routeDir = path.join(appDir, ...routeSegments);
   const embeddedRoot = path.join(sourceRoot, "digitalafarin-cms-admin");
 
   if (fs.existsSync(routeDir) && fs.readdirSync(routeDir).length > 0 && !force) {
     throw new Error(`CMS route already exists: ${routeDir}. Use --force only if you intend to refresh generated CMS files.`);
+  }
+
+  if (missingDevDependencies.length && !skipInstall) {
+    const ownPackage = readJson(path.join(packageRoot, "package.json"));
+    // Next 15 uses the JavaScript compiler API, which TypeScript 7 removed.
+    // Provision a supported compiler only when the host has not chosen one.
+    const tooling = missingDevDependencies.map((name) =>
+      `${name}@${name === "typescript" ? "^5.9.3" : ownPackage.devDependencies[name]}`,
+    );
+    run("npm", ["install", "--save-dev", ...tooling], frontend);
+  }
+
+  const tsconfig = path.join(frontend, "tsconfig.json");
+  if (!fs.existsSync(tsconfig)) {
+    // Next 15 otherwise creates a legacy resolver that cannot read Tiptap's
+    // exported subpaths. Initialize only a missing file; never rewrite host JSONC.
+    const config = {
+      ...(fs.existsSync(path.join(frontend, "jsconfig.json")) ? { extends: "./jsconfig.json" } : {}),
+      compilerOptions: {
+        target: "ES2017", lib: ["dom", "dom.iterable", "esnext"], allowJs: true,
+        skipLibCheck: true, noEmit: true, esModuleInterop: true, module: "esnext",
+        moduleResolution: "bundler", resolveJsonModule: true, isolatedModules: true,
+        jsx: "preserve", incremental: true, plugins: [{ name: "next" }],
+      },
+      include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+      exclude: ["node_modules"],
+    };
+    fs.writeFileSync(tsconfig, JSON.stringify(config, null, 2) + "\n");
   }
 
   fs.mkdirSync(routeDir, { recursive: true });
@@ -209,7 +234,9 @@ export default function DigitalAfarinCmsLayout({ children }: { children: React.R
   console.log(`Frontend: ${frontend}`);
   console.log(`Route: ${basePath}/`);
   console.log("Runtime: host Next.js application (no separate CMS node_modules)");
-  if (missingDevDependencies.length) console.log(`TypeScript tooling ensured: ${missingDevDependencies.join(", ")}`);
+  if (missingDevDependencies.length) {
+    console.log(`${skipInstall ? "Missing tooling (installation skipped)" : "TypeScript tooling ensured"}: ${missingDevDependencies.join(", ")}`);
+  }
   console.log(`Django upstream: ${apiUrl}`);
 }
 

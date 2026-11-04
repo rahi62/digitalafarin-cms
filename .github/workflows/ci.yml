@@ -121,6 +121,10 @@ jobs:
       - run: npm run test:e2e:host
       - name: Smoke test installed npm tarballs
         run: node scripts/smoke-npm-packages.mjs
+      - name: Verify packed Admin in a Next 15 host without preinstalled tooling
+        env:
+          CMS_SMOKE_HOST_NEXT: "15.5.28"
+        run: node scripts/smoke-npm-packages.mjs
       - name: Inspect npm package contents
         run: |
           npm --workspace apps/admin run pack:check
