@@ -1,3 +1,5 @@
+import os
+
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
@@ -51,10 +53,22 @@ class MediaAssetViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         self.validate_tenant_serializer(serializer, require_write=True)
-        uploaded = self.request.FILES.get("file")
-        serializer.save(
-            uploaded_by=self.request.user,
-            filename=getattr(uploaded, "name", "") if uploaded else "",
-            mime_type=getattr(uploaded, "content_type", "") if uploaded else "",
-            size_bytes=getattr(uploaded, "size", 0) if uploaded else 0,
-        )
+        serializer.save(uploaded_by=self.request.user, **self._upload_metadata(serializer))
+
+    def perform_update(self, serializer):
+        self.validate_tenant_serializer(serializer, require_write=True)
+        serializer.save(**self._upload_metadata(serializer))
+
+    @staticmethod
+    def _upload_metadata(serializer):
+        uploaded = serializer.validated_data.get("file")
+        info = getattr(uploaded, "cms_upload_info", None)
+        if info is None:
+            return {}
+        name = os.path.basename(str(uploaded.name).replace("\\", "/"))
+        stem = os.path.splitext(name)[0][:200] or "file"
+        return {
+            "filename": stem + info.extension,
+            "mime_type": info.mime_type,  # detected server-side, never the client header
+            "size_bytes": info.size_bytes,
+        }
