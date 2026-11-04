@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -11,7 +12,7 @@ const packageRoot = path.resolve(path.dirname(__filename), "..");
 const args = process.argv.slice(2);
 const command = args[0] || "init";
 if (!["init", "doctor", "admin", "admin-standalone", "apply-integration", "routes", "map-route", "validate-routes"].includes(command)) {
-  console.error("Usage: digitalafarin-cms [init|doctor|apply-integration|admin|admin-standalone|routes|map-route|validate-routes] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--with-collection] [--collection-path /blog] [--content-type post] [--with-admin] [--admin-base-path /cms] [--admin-api-url URL]");
+  console.error("Usage: digitalafarin-cms [init|doctor|apply-integration|admin|admin-standalone|routes|map-route|validate-routes] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--with-collection] [--with-revalidate] [--collection-path /blog] [--content-type post] [--with-admin] [--admin-base-path /cms] [--admin-api-url URL]");
   process.exit(2);
 }
 
@@ -75,24 +76,29 @@ function sourceRoot(frontend) {
   return exists(path.join(frontend, "src")) ? path.join(frontend, "src") : frontend;
 }
 
-function ensureEnv(frontend) {
+function ensureEnv(frontend, options = {}) {
   const envFile = path.join(frontend, ".env.local");
   let text = exists(envFile) ? fs.readFileSync(envFile, "utf8") : "";
   const lines = [];
   if (!/^DIGITALAFARIN_CMS_URL=/m.test(text)) lines.push("DIGITALAFARIN_CMS_URL=http://localhost:8000/api/cms/v1");
   if (!/^DIGITALAFARIN_CMS_SITE=/m.test(text)) lines.push("DIGITALAFARIN_CMS_SITE=localhost:3000");
+  if (options.withRevalidate && !/^DIGITALAFARIN_CMS_WEBHOOK_SECRET=/m.test(text)) {
+    // Generated once; paste the same value into the CMS webhook endpoint's secret.
+    lines.push(`DIGITALAFARIN_CMS_WEBHOOK_SECRET=${randomBytes(32).toString("hex")}`);
+  }
   if (lines.length) {
     if (text && !text.endsWith("\n")) text += "\n";
     text += lines.join("\n") + "\n";
     fs.writeFileSync(envFile, text);
   }
 }
-function ensureNextAdapter(frontend) {
+function ensureNextAdapter(frontend, options = {}) {
   const lib = path.join(sourceRoot(frontend), "lib");
   fs.mkdirSync(lib, { recursive: true });
   const file = path.join(lib, "digitalafarin-cms.ts");
   if (!exists(file)) {
-    fs.writeFileSync(file, `import { createCmsClientFromEnv } from "@digitalafarin/cms-next";\n\nexport const cms = createCmsClientFromEnv();\n`);
+    const config = options.withRevalidate ? "{ revalidate: false }" : "";
+    fs.writeFileSync(file, `import { createCmsClientFromEnv } from "@digitalafarin/cms-next";\n\nexport const cms = createCmsClientFromEnv(${config});\n`);
   }
 }
 
@@ -266,11 +272,12 @@ if (frontend) {
     run("npm", ["install", ...packages], { cwd: frontend });
   }
   if (command !== "admin") {
-    ensureEnv(frontend);
-    ensureNextAdapter(frontend);
+    ensureEnv(frontend, { withRevalidate: has("--with-revalidate") });
+    ensureNextAdapter(frontend, { withRevalidate: has("--with-revalidate") });
     if (has("--with-public-route")) ensurePublicRoute(frontend);
     scaffoldIntegration(frontend, sourceRoot(frontend), path.join(packageRoot, "templates/next"), {
       collection: has("--with-collection"), collectionPath: arg("--collection-path", "/blog"), contentType: arg("--content-type", "post"),
+      withRevalidate: has("--with-revalidate"),
     });
   }
   if (has("--with-admin") || command === "admin") embedAdmin(frontend);

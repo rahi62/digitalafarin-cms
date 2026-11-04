@@ -80,3 +80,27 @@ test('init scaffolds CMS sitemap and robots routes unless the host already owns 
   assert.ok(manifest.warnings.some((w) => /sitemap\.xml \(app\/sitemap\.ts\)/.test(w)));
   assert.ok(manifest.warnings.some((w) => /robots\.txt \(public\/robots\.txt\)/.test(w)));
 });
+
+test('--with-revalidate scaffolds the signed revalidation route, a secret and a tag-cached adapter', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cms-reval-host-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ dependencies: { next: '16.0.0' } }));
+  fs.mkdirSync(path.join(dir, 'app'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'app/page.tsx'), 'export default function Home() {}');
+  const plain = spawnSync(process.execPath, [cli, 'init', '--frontend', dir, '--skip-install'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(plain.status, 0, plain.stderr);
+  assert.ok(!fs.existsSync(path.join(dir, 'app/api/cms/revalidate/route.ts')), 'route is opt-in');
+  assert.doesNotMatch(fs.readFileSync(path.join(dir, '.env.local'), 'utf8'), /WEBHOOK_SECRET/);
+
+  fs.rmSync(path.join(dir, '.digitalafarin'), { recursive: true });
+  fs.rmSync(path.join(dir, 'lib'), { recursive: true });
+  const result = spawnSync(process.execPath, [cli, 'init', '--frontend', dir, '--skip-install', '--with-revalidate'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const route = fs.readFileSync(path.join(dir, 'app/api/cms/revalidate/route.ts'), 'utf8');
+  assert.match(route, /createCmsRevalidateHandler/);
+  assert.match(route, /export const POST/);
+  assert.match(fs.readFileSync(path.join(dir, '.env.local'), 'utf8'), /^DIGITALAFARIN_CMS_WEBHOOK_SECRET=[0-9a-f]{64}$/m);
+  assert.match(fs.readFileSync(path.join(dir, 'lib/digitalafarin-cms.ts'), 'utf8'), /revalidate: false/);
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, '.digitalafarin/integration.json'), 'utf8'));
+  assert.ok(manifest.warnings.some((w) => /cms_drain_webhooks/.test(w)));
+});

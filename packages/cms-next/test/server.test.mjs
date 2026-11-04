@@ -54,7 +54,7 @@ test('sitemap/robots handlers proxy a fixed upstream, tag fetches and never leak
   assert.equal(sitemap.status, 200);
   assert.equal(sitemap.headers.get('content-type'), 'application/xml; charset=utf-8');
   assert.equal(calls[0].url, 'https://cms.test/api/cms/v1/content/sitemap/?site=example.test');
-  assert.deepEqual(calls[0].init.next.tags, ['cms:site:example.test']);
+  assert.deepEqual(calls[0].init.next.tags, ['cms:site:example.test', 'cms:list:example.test']);
   assert.equal(calls[0].init.redirect, 'manual');
 
   const page = createCmsSitemapPageHandler(options);

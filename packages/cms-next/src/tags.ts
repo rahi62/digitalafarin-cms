@@ -12,3 +12,8 @@ export function cmsNormalizePath(path: string): string {
 export function cmsPathTag(path: string): string {
   return `cms:path:${cmsNormalizePath(path)}`;
 }
+
+/** Lists, menus and sitemaps: refreshed on every content change of the site. */
+export function cmsListTag(site: string): string {
+  return `cms:list:${site}`;
+}
