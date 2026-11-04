@@ -2,7 +2,6 @@ import { BFF_MODE, bffError, failure, names } from "@/lib/bff-session";
 import { validCmsEndpoint, fetchCmsUpstream } from "@/lib/proxy-security";
 import type { NextRequest } from "next/server";
 
-export const dynamic = "force-dynamic";
 
 function upstreamBaseUrl() {
   return (process.env.DIGITALAFARIN_CMS_API_URL || "http://127.0.0.1:8000/api/cms/v1").replace(/\/+$/, "");

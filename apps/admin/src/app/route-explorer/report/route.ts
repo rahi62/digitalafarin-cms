@@ -3,8 +3,6 @@ import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { BFF_MODE, names, ready } from "@/lib/bff-session";
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 const responseHeaders = { "Cache-Control": "private, no-store, max-age=0", "X-Content-Type-Options": "nosniff" };
 

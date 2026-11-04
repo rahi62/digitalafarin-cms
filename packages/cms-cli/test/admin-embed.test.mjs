@@ -44,5 +44,5 @@ test('embedded security helper preserves host middleware and layout byte for byt
   assert.equal(fs.readFileSync(path.join(frontend, 'middleware.ts'), 'utf8'), middleware);
   assert.equal(fs.readFileSync(path.join(frontend, 'app/layout.tsx'), 'utf8'), layout);
   assert.ok(fs.existsSync(path.join(frontend, 'digitalafarin-cms-admin/lib/security-headers.ts')));
-  assert.match(fs.readFileSync(path.join(frontend, 'app/cms/layout.tsx'), 'utf8'), /dynamic = "force-dynamic"/);
+  assert.match(fs.readFileSync(path.join(frontend, 'app/cms/layout.tsx'), 'utf8'), /<Suspense fallback=\{null\}><Shell>\{children\}<\/Shell><\/Suspense>/);
 });

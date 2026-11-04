@@ -2,8 +2,7 @@ import { CmsRequestError, toNextMetadata } from "@digitalafarin/cms-next";
 import { cms } from "../../../lib/digitalafarin-cms";
 import { DigitalAfarinBlockRenderer } from "../../../components/digitalafarin-cms/BlockRenderer";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+__CMS_SEGMENT_CONFIG__
 type Props = { params: Promise<{ cms_path?: string[] }>; searchParams: Promise<{ cms_preview?: string | string[] }> };
 async function preview(props: Props) {
   const params = await props.params;

@@ -210,9 +210,8 @@ function embed() {
   fs.writeFileSync(
     layoutFile,
     `${styleImports}
+import { Suspense } from "react";
 import Shell from "${componentRoot}/Shell";
-
-export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "DigitalAfarin SEO CMS",
@@ -220,7 +219,7 @@ export const metadata = {
 };
 
 export default function DigitalAfarinCmsLayout({ children }: { children: React.ReactNode }) {
-  return <div className="digitalafarinCmsAdmin" lang="fa" dir="rtl"><Shell>{children}</Shell></div>;
+  return <div className="digitalafarinCmsAdmin" lang="fa" dir="rtl"><Suspense fallback={null}><Shell>{children}</Shell></Suspense></div>;
 }
 `,
   );

@@ -12,7 +12,7 @@ function cmsPath(segments?: string[]) {
   return segments?.length ? `/${segments.join("/")}/` : "/";
 }
 
-export const dynamic = "force-dynamic";
+__CMS_SEGMENT_CONFIG__
 
 async function resolveCmsPage(path: string, previewToken?: string) {
   try {

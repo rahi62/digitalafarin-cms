@@ -2,8 +2,6 @@ import { loginRetrySeconds, loginRetryMessage } from "@/lib/login-errors";
 import { NextRequest, NextResponse } from "next/server";
 import { bffError, failure, newCsrf, parseTokenResponse, setSessionCookies, upstreamPost } from "@/lib/bff-session";
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   const denied = bffError(request, false);

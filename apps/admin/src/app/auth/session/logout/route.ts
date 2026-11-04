@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bffError, clearSessionCookies, names, upstreamPost, parseTokenResponse } from "@/lib/bff-session";
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   const denied = bffError(request);
