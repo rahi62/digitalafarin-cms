@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { inferDjangoFiles } from "./django-files.js";
 import { scaffoldIntegration, applyIntegration, frontendDoctor } from "./integration.js";
 import { inventory, mapRoute, validateRoutes, routeMapFile, exportRouteReport } from "./routes.js";
 
@@ -12,7 +13,7 @@ const packageRoot = path.resolve(path.dirname(__filename), "..");
 const args = process.argv.slice(2);
 const command = args[0] || "init";
 if (!["init", "doctor", "admin", "admin-standalone", "apply-integration", "routes", "map-route", "validate-routes"].includes(command)) {
-  console.error("Usage: digitalafarin-cms [init|doctor|apply-integration|admin|admin-standalone|routes|map-route|validate-routes] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--with-collection] [--with-revalidate] [--collection-path /blog] [--content-type post] [--with-admin] [--admin-base-path /cms] [--admin-api-url URL]");
+  console.error("Usage: digitalafarin-cms [init|doctor|apply-integration|admin|admin-standalone|routes|map-route|validate-routes] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--settings-file PATH] [--urls-file PATH] [--with-collection] [--with-revalidate] [--collection-path /blog] [--content-type post] [--with-admin] [--admin-base-path /cms] [--admin-api-url URL]");
   process.exit(2);
 }
 
@@ -57,18 +58,6 @@ function appendBlock(file, begin, end, body) {
   text += `\n${begin}\n${body.trim()}\n${end}\n`;
   fs.writeFileSync(file, text);
   return true;
-}
-function inferDjangoFiles(backend) {
-  const manage = fs.readFileSync(path.join(backend, "manage.py"), "utf8");
-  const match = manage.match(/DJANGO_SETTINGS_MODULE["']\s*,\s*["']([^"']+)["']/);
-  if (!match) throw new Error("Could not detect DJANGO_SETTINGS_MODULE from manage.py. Pass a conventional Django project or wire package manually.");
-  const moduleName = match[1];
-  const parts = moduleName.split(".");
-  const settingsFile = path.join(backend, ...parts) + ".py";
-  const urlsFile = path.join(backend, ...parts.slice(0, -1), "urls.py");
-  if (!exists(settingsFile)) throw new Error(`Settings file not found: ${settingsFile}`);
-  if (!exists(urlsFile)) throw new Error(`URLs file not found: ${urlsFile}`);
-  return { settingsFile, urlsFile };
 }
 function sourceRoot(frontend) {
   if (exists(path.join(frontend, "src", "app"))) return path.join(frontend, "src");
@@ -248,7 +237,10 @@ const adminPackage = arg("--admin-package", `@digitalafarin/cms-admin@${releaseV
 
 if (backend && command !== "admin") {
   if (!skipInstall) run(python, ["-m", "pip", "install", djangoPackage], { cwd: backend });
-  const { settingsFile, urlsFile } = inferDjangoFiles(backend);
+  const { settingsFile, urlsFile, urlsSource } = inferDjangoFiles(backend, {
+    settingsFile: arg("--settings-file", ""), urlsFile: arg("--urls-file", ""),
+  });
+  console.log(`Django settings: ${path.relative(backend, settingsFile)}; URLconf: ${path.relative(backend, urlsFile)} (${urlsSource})`);
   appendBlock(
     settingsFile,
     "# BEGIN DIGITALAFARIN CMS",
