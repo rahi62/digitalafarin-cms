@@ -14,7 +14,7 @@ const packageRoot = path.resolve(path.dirname(__filename), "..");
 const args = process.argv.slice(2);
 const command = args[0] || "init";
 if (!["init", "doctor", "admin", "admin-standalone", "apply-integration", "routes", "map-route", "validate-routes"].includes(command)) {
-  console.error("Usage: digitalafarin-cms [init|doctor|apply-integration|admin|admin-standalone|routes|map-route|validate-routes] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--settings-file PATH] [--urls-file PATH] [--with-collection] [--with-revalidate] [--collection-path /blog] [--content-type post] [--with-admin] [--admin-base-path /cms] [--admin-api-url URL]");
+  console.error("Usage: digitalafarin-cms [init|doctor|apply-integration|admin|admin-standalone|routes|map-route|validate-routes] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--settings-file PATH] [--urls-file PATH] [--with-collection] [--with-revalidate] [--legacy-token-auth] [--collection-path /blog] [--content-type post] [--with-admin] [--admin-base-path /cms] [--admin-api-url URL]");
   process.exit(2);
 }
 
@@ -143,6 +143,7 @@ function embedAdmin(frontend) {
     "--api-url", adminApiUrl,
   ];
   if (has("--force-admin")) commandArgs.push("--force");
+  if (has("--legacy-token-auth")) commandArgs.push("--legacy-token-auth");
   if (has("--skip-install")) commandArgs.push("--skip-install");
   run("npm", commandArgs, { cwd: frontend });
 }

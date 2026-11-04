@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(__filename), "..");
@@ -67,6 +68,12 @@ function ensureEnvValue(file, key, value) {
     text += `${line}\n`;
   }
   fs.writeFileSync(file, text);
+}
+function ensureEnvDefault(file, key, value) {
+  const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  if (new RegExp(`^${key}=`, "m").test(text)) return false;
+  fs.writeFileSync(file, `${text && !text.endsWith("\n") ? text + "\n" : text}${key}=${value}\n`);
+  return true;
 }
 function importPath(fromFile, targetDirectory) {
   let relative = path.relative(path.dirname(fromFile), targetDirectory).replaceAll(path.sep, "/");
@@ -228,10 +235,17 @@ export default function DigitalAfarinCmsLayout({ children }: { children: React.R
   ensureEnvValue(envFile, "NEXT_PUBLIC_DIGITALAFARIN_CMS_ADMIN_BASE_PATH", basePath);
   ensureEnvValue(envFile, "NEXT_PUBLIC_API_URL", `${basePath}/api-proxy`);
   ensureEnvValue(envFile, "DIGITALAFARIN_CMS_API_URL", apiUrl);
+  if (!has("--legacy-token-auth")) {
+    // Secure default: httpOnly session cookies via the Next.js BFF, no tokens in browser storage.
+    // Existing values are never overwritten; the secret is generated once per host.
+    ensureEnvDefault(envFile, "NEXT_PUBLIC_DIGITALAFARIN_CMS_AUTH_MODE", "bff");
+    ensureEnvDefault(envFile, "DIGITALAFARIN_CMS_BFF_SECRET", randomBytes(32).toString("hex"));
+  }
 
   console.log("\nDigitalAfarin CMS Admin embedded successfully.");
   console.log(`Frontend: ${frontend}`);
   console.log(`Route: ${basePath}/`);
+  console.log(has("--legacy-token-auth") ? "Auth mode: legacy bearer tokens (browser storage)" : "Auth mode: BFF httpOnly session cookies (set DIGITALAFARIN_CMS_PUBLIC_ORIGIN to your public origin in production)");
   console.log("Runtime: host Next.js application (no separate CMS node_modules)");
   if (missingDevDependencies.length) {
     console.log(`${skipInstall ? "Missing tooling (installation skipped)" : "TypeScript tooling ensured"}: ${missingDevDependencies.join(", ")}`);
