@@ -82,7 +82,8 @@ test('init and doctor warn that cacheComponents is not recommended for SEO-criti
   const initOn = spawnSync(process.execPath, [cli, 'init', '--frontend', on, '--skip-install', '--with-public-route'], { cwd: on, encoding: 'utf8' });
   assert.equal(initOn.status, 0, initOn.stderr + initOn.stdout);
   assert.match(initOn.stdout, marker);
-  assert.match(initOn.stdout, /0\.8\.1/);
+  assert.match(initOn.stdout, /proxy\.ts/);
+  assert.doesNotMatch(initOn.stdout, /0\.8\.1/);
   const doctorOn = spawnSync(process.execPath, [cli, 'doctor', '--frontend', on], { cwd: on, encoding: 'utf8' });
   assert.match(doctorOn.stdout, marker);
 

@@ -4,7 +4,7 @@
 
 DigitalAfarin CMS combines a reusable Django/DRF content backend, a Next.js SDK, a visual Next.js Admin application and an installer CLI. It is designed for teams that want WordPress-like content management and SEO workflows without coupling rendering to WordPress.
 
-> Status: **0.8.0 / Community Edition (pre-1.0)**. The public API can still change before 1.0. Component registry, visual component binding and approvals are **experimental** (see `docs/UPGRADING.md`).
+> Status: **0.8.1 / Community Edition (pre-1.0)**. The public API can still change before 1.0. Component registry, visual component binding and approvals are **experimental** (see `docs/UPGRADING.md`).
 
 ## Packages
 
@@ -61,7 +61,7 @@ npm run build && npm run start                    # Next.js on :3000
 
 Production checklist: HTTPS, `DIGITALAFARIN_CMS_PUBLIC_ORIGIN` (exact public origin) for the Admin session, `/media/` served with the headers from `docs/MEDIA_SECURITY.md`, `GET /api/cms/v1/health/` as the liveness probe. Details and every setting: `docs/UPGRADING.md`.
 
-**Rendering modes — for SEO-critical sites keep `cacheComponents` OFF.** Hosts without `cacheComponents` get real 404 and 308 status codes. Hosts with it ON (the new `create-next-app` default) get tag-cached pages, but Next.js fixes the HTTP status once streaming starts: a missing CMS page answers HTTP 200 with a noindex page and CMS redirects are client-side. Real status codes there (via `proxy.ts`) are planned for 0.8.1. `init --with-public-route` and `doctor` warn when the host config enables it. Set `trailingSlash: true` if you want CMS URLs (which end in `/`) served without an extra 308.
+**Rendering modes — for SEO-critical sites keep `cacheComponents` OFF.** Hosts without `cacheComponents` get real 404 and 308 status codes. Hosts with it ON (the new `create-next-app` default) get tag-cached pages, but Next.js fixes the HTTP status once streaming starts: a missing CMS page answers HTTP 200 with a noindex page and CMS redirects are client-side. Real status codes there (via `proxy.ts`) are planned for a later release. `init --with-public-route` and `doctor` warn when the host config enables it. Set `trailingSlash: true` if you want CMS URLs (which end in `/`) served without an extra 308.
 
 ## Installation
 

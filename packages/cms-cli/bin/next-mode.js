@@ -33,4 +33,4 @@ export function applySegmentConfig(frontend, text) {
 export const CACHE_COMPONENTS_SEO_WARNING =
   "Warning: this host enables `cacheComponents`. For SEO-critical sites keep it OFF: with it ON, missing CMS pages " +
   "answer HTTP 200 with a noindex page and CMS redirects are client-side instead of real 404/308 responses. " +
-  "Real status codes on cacheComponents hosts (via proxy.ts) are planned for 0.8.1. See docs/UPGRADING.md.";
+  "Real status codes on cacheComponents hosts (via proxy.ts) are planned for a later release. See docs/UPGRADING.md.";

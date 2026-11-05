@@ -1,6 +1,6 @@
-# Project status - v0.8.0 (release candidate)
+# Project status - v0.8.1
 
-Evidence-based: see `VALIDATION.md` for commands, versions and per-host results. Branch `release/v0.8.0`, code verified at `25b211a`.
+Evidence-based: see `VALIDATION.md` for commands, versions and per-host results. That evidence comes from the 0.8.0 release-candidate run (code verified at `25b211a`); 0.8.1 only adds a CLI warning and documentation on top.
 
 ## Supported in 0.8.0
 
@@ -26,7 +26,7 @@ Component registry, visual component binding, binding drafts, approvals and roll
 - Admin `localStorage` content not inspected in a real browser.
 - CMS 404/redirect status codes on `cacheComponents` hosts are streamed (see `VALIDATION.md`). Keep `cacheComponents` OFF for SEO-critical sites; the CLI warns when it is on.
 
-## Next milestone: 0.8.1
+## Next milestone
 
 - Real 404/308 status codes on `cacheComponents` hosts through `proxy.ts` (resolve the path before streaming starts).
 - Python 3.11 and 3.13 are covered by CI only; this run used 3.12.
