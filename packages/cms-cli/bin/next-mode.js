@@ -24,3 +24,13 @@ export function segmentConfig(frontend) {
 export function applySegmentConfig(frontend, text) {
   return text.replaceAll("__CMS_SEGMENT_CONFIG__", segmentConfig(frontend));
 }
+
+/**
+ * Shown by `init --with-public-route` and `doctor` when the host enables `cacheComponents`.
+ * Next.js fixes the HTTP status once streaming starts, so CMS 404s and redirects cannot be real
+ * status codes there; for SEO-critical sites the classic rendering mode is the safe choice.
+ */
+export const CACHE_COMPONENTS_SEO_WARNING =
+  "Warning: this host enables `cacheComponents`. For SEO-critical sites keep it OFF: with it ON, missing CMS pages " +
+  "answer HTTP 200 with a noindex page and CMS redirects are client-side instead of real 404/308 responses. " +
+  "Real status codes on cacheComponents hosts (via proxy.ts) are planned for 0.8.1. See docs/UPGRADING.md.";
