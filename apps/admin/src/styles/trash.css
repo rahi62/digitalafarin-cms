@@ -1,0 +1,10 @@
+.cmsTrashHeaderActions,.cmsTrashRowActions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.cmsTrashNotice{border:1px solid #fedf89;background:#fffaeb;color:#7a2e0e;padding:13px 16px;border-radius:12px;font-size:12px;line-height:1.9;margin:12px 0 18px;}
+.cmsTrashTop{display:flex;align-items:end;justify-content:space-between;gap:15px;flex-wrap:wrap;margin-bottom:16px;}
+.cmsTrashTop .field{min-width:min(310px,100%);}
+.cmsTrashTop>span{font-size:12px;color:#667085;}
+.cmsTrashTable td strong,.cmsTrashTable td small{display:block;}
+.cmsTrashTable td small{font-size:11px;color:#667085;margin-top:3px;}
+.cmsTrashTable code{display:block;font-size:12px;overflow-wrap:anywhere;max-width:260px;}
+.cmsTrashEmpty{text-align:center;padding:30px;color:#667085;font-size:13px;}
+@media(max-width:700px){.cmsTrashHeaderActions{width:100%;}.cmsTrashHeaderActions .btn{flex:1;text-align:center;}.cmsTrashTable code{max-width:160px;}.cmsTrashTop .field{width:100%;}.cmsTrashRowActions .btn{flex:1;}}

@@ -89,6 +89,9 @@ export default function RichTextEditor({ value, onChange, siteId }: Props) {
 
   const editor = useEditor({
     immediatelyRender: false,
+    // Next's document nonce also authorizes Tiptap's required runtime stylesheet.
+    injectNonce: typeof document === "undefined" ? undefined
+      : document.querySelector<HTMLScriptElement>("script[nonce]")?.nonce || undefined,
     textDirection: "rtl",
     extensions,
     content: value.doc,

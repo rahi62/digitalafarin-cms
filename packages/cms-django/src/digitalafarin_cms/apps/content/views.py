@@ -1,5 +1,8 @@
+import logging
 from urllib.parse import urlencode
 
+from digitalafarin_cms.apps.common.caching import apply_public_cache, public_cache
+from digitalafarin_cms.throttles import ResolveThrottle, SitemapThrottle, RobotsThrottle
 from django.conf import settings
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -10,8 +13,9 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from xml.sax.saxutils import escape as xml_escape
 from rest_framework import status as drf_status, viewsets, serializers
-from rest_framework.decorators import action, api_view, permission_classes, authentication_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.decorators import throttle_classes, action, api_view, permission_classes, authentication_classes
+from rest_framework.permissions import AllowAny
+from digitalafarin_cms.permissions import CmsIsAuthenticated as IsAuthenticated
 from rest_framework.response import Response
 
 from digitalafarin_cms.apps.common.tenancy import (
@@ -27,9 +31,16 @@ from .models import Category, ContentEntry, ContentRevision, ContentTypeDefiniti
 from .serializers import CategorySerializer, ContentEntrySerializer, ContentRevisionSerializer, ContentTypeSerializer, MenuSerializer, ReusableBlockSerializer, TagSerializer
 from .services import create_revision
 from .field_schema import find_breaking_schema_changes, validate_schema_fields, relation_targets
+from .relations import find_relation_uses
+from .trash import move_to_trash, restore_from_trash
+from .schema_migration import preview_field_rename, execute_field_rename
 from .routing import normalize_path
+from .publication import unpublish_snapshot
+from .seo_files import build_robots, build_sitemap
 from .public import PublicEntrySerializer, public_entries, published_content
 from digitalafarin_cms.media import normalize_media_data
+
+logger = logging.getLogger("digitalafarin_cms.content")
 
 
 PREVIEW_SALT = "digitalafarin-cms-preview"
@@ -86,6 +97,68 @@ class ContentTypeViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     filterset_fields = ["site", "is_public"]
     search_fields = ["name", "slug"]
     tenant_filter = "site__organization_id"
+
+    @action(detail=True, methods=["get"], url_path="singleton-entry")
+    def singleton_entry(self, request, pk=None):
+        content_type = self.get_object()
+        if content_type.kind != ContentTypeDefinition.Kind.SINGLETON:
+            return Response({"detail": "This content type is a collection."}, status=400)
+        record = ContentEntry.objects.filter(content_type=content_type).first()
+        return Response({
+            "exists": record is not None,
+            "entry_id": str(record.pk) if record else None,
+            "title": record.title if record else None,
+            "path": record.path if record else None,
+            "trashed": record.deleted_at is not None if record else False,
+        })
+
+    def perform_destroy(self, instance):
+        if instance.entries.exists():
+            raise serializers.ValidationError({
+                "content_type": "This content type contains entries; export or migrate them before removal."
+            })
+        dependencies = [
+            item.slug for item in ContentTypeDefinition.objects.filter(
+                site_id=instance.site_id
+            ).exclude(pk=instance.pk).only("slug", "schema")
+            if instance.slug in relation_targets((item.schema or {}).get("fields", []))
+        ]
+        if dependencies:
+            raise serializers.ValidationError({
+                "content_type": "Other content types reference this type.",
+                "referenced_by": dependencies[:10],
+            })
+        logger.info("content type deleted content_type=%s site=%s", instance.pk, instance.site_id)
+        instance.delete()
+
+    def perform_update(self, serializer):
+        schema_changed = "schema" in serializer.validated_data and \
+            serializer.validated_data["schema"] != (serializer.instance.schema or {})
+        super().perform_update(serializer)
+        if schema_changed:
+            logger.info("content type schema changed content_type=%s site=%s user=%s",
+                        serializer.instance.pk, serializer.instance.site_id, self.request.user.pk)
+
+    @action(detail=True, methods=["post"], url_path="schema-rename")
+    def schema_rename(self, request, pk=None):
+        content_type = self.get_object()
+        ensure_organization_roles(
+            request.user, content_type.site.organization_id,
+            (Membership.Role.OWNER, Membership.Role.ADMIN),
+            "Only Owner and Admin can run schema migrations.",
+        )
+        source = request.data.get("source_key")
+        destination = request.data.get("destination_key")
+        if request.data.get("mode") == "preview":
+            return Response(preview_field_rename(content_type, source, destination))
+        if request.data.get("mode") != "execute" or request.data.get("confirm") is not True:
+            raise serializers.ValidationError({"confirm": "Explicit confirmation is required."})
+        result = execute_field_rename(
+            content_type, source, destination, request.data.get("preview_token"), request.user,
+        )
+        logger.info("schema field renamed content_type=%s site=%s user=%s",
+                    content_type.pk, content_type.site_id, request.user.pk)
+        return Response(result)
 
     @action(detail=True, methods=["post"], url_path="schema-impact")
     def schema_impact(self, request, pk=None):
@@ -144,6 +217,37 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
     search_fields = ["title", "slug", "path", "excerpt"]
     ordering_fields = ["created_at", "updated_at", "published_at", "scheduled_at", "title"]
     tenant_filter = "site__organization_id"
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if getattr(self, "action", None) in {"restore", "trashed"}:
+            return queryset.filter(deleted_at__isnull=False)
+        return queryset.filter(deleted_at__isnull=True)
+
+    def perform_destroy(self, instance):
+        if instance.status in PROTECTED_STATUSES or PublishedEntry.objects.filter(entry_id=instance.pk).exists():
+            _require_publisher(self.request.user, instance)
+        move_to_trash(instance, self.request.user)
+
+    @action(detail=True, methods=["post"], url_path="trash")
+    def trash(self, request, pk=None):
+        entry = self.get_object()
+        self.perform_destroy(entry)
+        return Response({"id": str(entry.pk), "trashed": True, "restorable": True})
+
+    @action(detail=True, methods=["post"], url_path="restore")
+    def restore(self, request, pk=None):
+        entry = self.get_object()
+        restored = restore_from_trash(entry, request.user)
+        return Response(self.get_serializer(restored).data)
+
+    @action(detail=False, methods=["get"], url_path="trashed")
+    def trashed(self, request):
+        queryset = self.filter_queryset(self.get_queryset()).order_by("-deleted_at", "-created_at")
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            return self.get_paginated_response(self.get_serializer(page, many=True).data)
+        return Response(self.get_serializer(queryset, many=True).data)
 
     @action(detail=False, methods=["post"], url_path="path-preview")
     def path_preview(self, request):
@@ -239,7 +343,7 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
             entry.status = ContentEntry.Status.DRAFT
             entry.scheduled_at = None
             entry.save(update_fields=["status", "scheduled_at", "updated_at"])
-            PublishedEntry.objects.filter(entry=entry).delete()
+            unpublish_snapshot(entry)
             create_revision(entry, request.user, "Returned to draft")
         return Response(self.get_serializer(entry).data)
 
@@ -249,6 +353,7 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         _require_publisher(request.user, entry)
         entry.publish()
         create_revision(entry, request.user, "Published")
+        logger.info("content publish requested entry=%s site=%s user=%s", entry.pk, entry.site_id, request.user.pk)
         return Response(self.get_serializer(entry).data)
 
     @action(detail=True, methods=["post"])
@@ -265,6 +370,7 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         entry.published_at = None
         entry.save(update_fields=["status", "scheduled_at", "published_at", "updated_at"])
         create_revision(entry, request.user, "Scheduled publication")
+        logger.info("content scheduled entry=%s site=%s at=%s", entry.pk, entry.site_id, scheduled_at.isoformat())
         return Response(self.get_serializer(entry).data)
 
     @action(detail=True, methods=["post"])
@@ -277,6 +383,7 @@ class ContentEntryViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         entry.scheduled_at = None
         entry.save(update_fields=["status", "scheduled_at", "updated_at"])
         create_revision(entry, request.user, "Schedule cancelled")
+        logger.info("content unscheduled entry=%s site=%s", entry.pk, entry.site_id)
         return Response(self.get_serializer(entry).data)
 
     @action(detail=True, methods=["post"], url_path="preview")
@@ -361,13 +468,16 @@ class MenuViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
 @api_view(["GET"])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([ResolveThrottle])
 def resolve_path(request):
     response = _resolve_path(request)
-    response["Cache-Control"] = "private, no-store" if "preview" in request.query_params else "no-store"
     if "preview" in request.query_params:
+        # Previews are per-user drafts: never cacheable, never indexable.
+        response["Cache-Control"] = "private, no-store"
         response["X-Robots-Tag"] = "noindex, nofollow"
         response["Referrer-Policy"] = "no-referrer"
-    return response
+        return response
+    return apply_public_cache(request, response)
 
 
 def _resolve_path(request):
@@ -410,23 +520,11 @@ def _resolve_path(request):
         except ContentEntry.DoesNotExist:
             return Response({"detail": "Preview content not found"}, status=404)
     else:
-        try:
-            published = public_entries(site).select_related("site", "content_type").filter(
-                Q(path=path) | Q(path=raw_path) | Q(path=path.rstrip("/") or "/")
-            ).order_by("path").first()
-            if published is None:
-                # Compatibility with NFD/encoded URLs, without mutating legacy published paths.
-                for item in public_entries(site).select_related("site", "content_type").iterator():
-                    try:
-                        matches = normalize_path(item.path) == path
-                    except ValidationError:
-                        matches = False
-                    if matches:
-                        published = item
-                        break
-            if published is None:
-                raise ContentEntry.DoesNotExist
-        except ContentEntry.DoesNotExist:
+        # One indexed equality lookup on (site, normalized_path); a miss is a 404, never a scan.
+        published = public_entries(site).select_related("site", "content_type").filter(
+            normalized_path=path,
+        ).first()
+        if published is None:
             return Response({"detail": "Content not found"}, status=404)
 
     related = public_entries(site).filter(
@@ -484,30 +582,39 @@ def _resolve_path(request):
     })
 
 @api_view(["GET"])
+@authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([SitemapThrottle])
+@public_cache
 def sitemap(request):
     domain = request.query_params.get("site")
     try:
         site = Site.objects.get(domain=domain, is_active=True)
     except Site.DoesNotExist:
         return HttpResponse("Site not found", status=404)
-    entries = public_entries(site).filter(is_indexable=True).order_by("path")
-    base = frontend_base_for(site)
-    rows = [
-        f"<url><loc>{xml_escape(base + entry.path)}</loc><lastmod>{entry.published_at.date().isoformat()}</lastmod></url>"
-        for entry in entries
-    ]
-    xml = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + "".join(rows) + "</urlset>"
-    return HttpResponse(xml, content_type="application/xml")
+    page = request.query_params.get("page")
+    if page is not None:
+        try:
+            page = int(page)
+        except (TypeError, ValueError):
+            return HttpResponse("Invalid page", status=400)
+    body, status = build_sitemap(site, frontend_base_for(site), page)
+    content_type = "application/xml; charset=utf-8" if status == 200 else "text/plain; charset=utf-8"
+    return HttpResponse(body.encode("utf-8"), status=status, content_type=content_type)
 
 
 @api_view(["GET"])
+@authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([RobotsThrottle])
+@public_cache
 def robots_txt(request):
     domain = request.query_params.get("site")
     try:
         site = Site.objects.get(domain=domain, is_active=True)
     except Site.DoesNotExist:
         return HttpResponse("Site not found", status=404)
-    body = f"User-agent: *\nAllow: /\nSitemap: https://{site.domain}/sitemap.xml\n"
-    return HttpResponse(body, content_type="text/plain")
+    return HttpResponse(
+        build_robots(site, frontend_base_for(site)).encode("utf-8"),
+        content_type="text/plain; charset=utf-8",
+    )

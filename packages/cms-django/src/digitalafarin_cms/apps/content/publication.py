@@ -5,12 +5,20 @@ import json
 
 from django.core.serializers.json import DjangoJSONEncoder
 
+import logging
+
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from digitalafarin_cms.apps.seo.models import Redirect, SchemaMarkup, SeoMeta
 from digitalafarin_cms.apps.seo.serializers import SchemaMarkupSerializer, SeoMetaSerializer
-from .models import PublishedEntry
+from digitalafarin_cms.apps.integrations import webhooks
+from .models import PublishedEntry, PublishedEntryTerm
+from .routing import normalize_path
+
+logger = logging.getLogger("digitalafarin_cms.content")
 
 
 def capture_publication(entry):
@@ -50,6 +58,50 @@ def capture_publication(entry):
     return payload, seo, schemas, categories, tags
 
 
+def content_event_data(entry, paths):
+    collection = (entry.content_type.collection_path or "").rstrip("/")
+    ordered = list(dict.fromkeys(paths + ([collection + "/"] if collection else [])))
+    return {
+        "entry_id": str(entry.pk), "content_type": entry.content_type.slug,
+        "path": paths[0], "paths": ordered,
+    }
+
+
+def unpublish_snapshot(entry, *, event="content.unpublished"):
+    """Remove the public projection and tell receivers which URL went away."""
+    published = PublishedEntry.objects.filter(entry=entry).first()
+    if published is None:
+        return False
+    path = published.path
+    published.delete()
+    webhooks.emit_event(entry.site, event, content_event_data(entry, [path]))
+    logger.info("content %s entry=%s site=%s", event.split(".")[1], entry.pk, entry.site_id)
+    return True
+
+
+def canonical_path(path):
+    """Indexed lookup key for a published path (never raises)."""
+    try:
+        return normalize_path(path, reserved=False)
+    except DjangoValidationError:
+        return path
+
+
+def sync_terms(published, categories, tags):
+    """Replace the indexed category/tag rows for one published entry."""
+    PublishedEntryTerm.objects.filter(published_entry=published).delete()
+    rows = [
+        PublishedEntryTerm(site_id=published.site_id, published_entry=published,
+                           kind=PublishedEntryTerm.Kind.CATEGORY, slug=slug)
+        for slug in dict.fromkeys(row["slug"] for row in categories)
+    ] + [
+        PublishedEntryTerm(site_id=published.site_id, published_entry=published,
+                           kind=PublishedEntryTerm.Kind.TAG, slug=slug)
+        for slug in dict.fromkeys(row["slug"] for row in tags)
+    ]
+    PublishedEntryTerm.objects.bulk_create(rows)
+
+
 @transaction.atomic
 def publish_snapshot(entry):
     """Commit the full public projection and deferred redirect in one transaction.
@@ -77,6 +129,8 @@ def publish_snapshot(entry):
                 "site": entry.site,
                 "content_type": entry.content_type,
                 "path": new_path,
+                "normalized_path": canonical_path(new_path),
+                "last_published_at": timezone.now(),
                 "title": entry.title,
                 "excerpt": entry.excerpt,
                 "published_at": entry.published_at,
@@ -94,12 +148,23 @@ def publish_snapshot(entry):
             raise ValidationError({"path": "A different published entry owns this route."}) from exc
         raise
 
-    if old_path and old_path != new_path:
-        Redirect.objects.filter(
-            site_id=entry.site_id, destination_path=old_path, is_active=True,
-        ).update(destination_path=new_path)
-        Redirect.objects.update_or_create(
-            site_id=entry.site_id, source_path=old_path,
-            defaults={"destination_path": new_path, "redirect_type": "301", "is_active": True},
-        )
+    sync_terms(published, categories, tags)
+
+    suppressed = webhooks.suppress_redirect_events.set(True)
+    try:
+        if old_path and old_path != new_path:
+            Redirect.objects.filter(
+                site_id=entry.site_id, destination_path=old_path, is_active=True,
+            ).update(destination_path=new_path)
+            Redirect.objects.update_or_create(
+                site_id=entry.site_id, source_path=old_path,
+                defaults={"destination_path": new_path, "redirect_type": "301", "is_active": True},
+            )
+    finally:
+        webhooks.suppress_redirect_events.reset(suppressed)
+    # Exactly one event per publish; it names every URL whose cached output may be stale.
+    webhooks.emit_event(entry.site, "content.published", content_event_data(
+        entry, [new_path] + ([old_path] if old_path and old_path != new_path else []),
+    ))
+    logger.info("content published entry=%s site=%s", entry.pk, entry.site_id)
     return published

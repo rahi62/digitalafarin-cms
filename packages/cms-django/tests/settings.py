@@ -15,5 +15,8 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
 ]
+# Most API tests authenticate with force_authenticate (no managed session), so the
+# suite runs in compatibility mode; strict mode (the 0.8.0 default) has dedicated tests.
+DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS = False
 from digitalafarin_cms.settings import apply_defaults
 apply_defaults(globals())

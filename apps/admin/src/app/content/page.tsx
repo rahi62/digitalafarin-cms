@@ -35,6 +35,7 @@ export default function ContentPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
+  const [removingId, setRemovingId] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -79,13 +80,22 @@ export default function ContentPage() {
     setPage(1);
     setAppliedQuery(query.trim());
   }
+  async function removeEntry(item: Entry) {
+    if (!window.confirm(`«${item.title}» به سطل زباله منتقل شود؟ اگر منتشر شده باشد، صفحه از سایت خارج می‌شود. بازیابی فقط به حالت پیش‌نویس انجام خواهد شد.`)) return;
+    setRemovingId(item.id); setError("");
+    try {
+      await apiFetch(`/content/entries/${item.id}/`, { method: "DELETE" });
+      setReload((value) => value + 1);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "انتقال به سطل زباله ناموفق بود"); }
+    finally { setRemovingId(""); }
+  }
   function reset() {
     setQuery(""); setAppliedQuery(""); setSite(""); setType(""); setStatus(""); setPage(1); setReload((value) => value + 1);
   }
 
   return <>
     <PageHeader title="مدیریت محتوا" description="جستجو و مدیریت نوشته‌ها، صفحه‌ها و نوع‌های محتوایی چند سایت"
-      action={<Link href={adminPath("/content/new")} className="btn">+ محتوای جدید</Link>} />
+      action={<div className="cmsTrashHeaderActions"><Link href={adminPath("/content/trash")} className="btn secondary">سطل زباله</Link><Link href={adminPath("/content/new")} className="btn">+ محتوای جدید</Link></div>} />
     <div className="panel">
       <form onSubmit={search} className="contentListFilters">
         <label className="field"><span>جستجو</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="عنوان، مسیر یا خلاصه..." /></label>
@@ -108,7 +118,7 @@ export default function ContentPage() {
             <td>{item.content_type_slug || "—"}</td>
             <td><span className={`badge ${item.status === "published" ? "green" : item.status === "scheduled" ? "warn" : ""}`}>{statusNames[item.status] || item.status}</span></td>
             <td>{dateTime(item.updated_at)}</td>
-            <td><Link className="btn secondary small" href={adminPath(`/content/${item.id}`)}>ویرایش</Link></td>
+            <td><div className="cmsTrashRowActions"><Link className="btn secondary small" href={adminPath(`/content/${item.id}`)}>ویرایش</Link><button type="button" className="btn secondary small" disabled={Boolean(removingId)} onClick={() => removeEntry(item)}>{removingId === item.id ? "در حال انتقال..." : "سطل زباله"}</button></div></td>
           </tr>)}</tbody>
         </table>
         {!loading && !error && entries?.results.length === 0 && <div className="contentListEmpty">محتوایی مطابق فیلترهای انتخاب‌شده وجود ندارد.</div>}

@@ -1,8 +1,11 @@
 #!/usr/bin/env node
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { inferDjangoFiles } from "./django-files.js";
+import { applySegmentConfig, usesCacheComponents } from "./next-mode.js";
 import { scaffoldIntegration, applyIntegration, frontendDoctor } from "./integration.js";
 import { inventory, mapRoute, validateRoutes, routeMapFile, exportRouteReport } from "./routes.js";
 
@@ -11,7 +14,7 @@ const packageRoot = path.resolve(path.dirname(__filename), "..");
 const args = process.argv.slice(2);
 const command = args[0] || "init";
 if (!["init", "doctor", "admin", "admin-standalone", "apply-integration", "routes", "map-route", "validate-routes"].includes(command)) {
-  console.error("Usage: digitalafarin-cms [init|doctor|apply-integration|admin|admin-standalone|routes|map-route|validate-routes] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--with-collection] [--collection-path /blog] [--content-type post] [--with-admin] [--admin-base-path /cms] [--admin-api-url URL]");
+  console.error("Usage: digitalafarin-cms [init|doctor|apply-integration|admin|admin-standalone|routes|map-route|validate-routes] [--backend DIR] [--frontend DIR] [--python CMD] [--skip-install] [--skip-migrate] [--with-public-route] [--settings-file PATH] [--urls-file PATH] [--with-collection] [--with-revalidate] [--legacy-token-auth] [--collection-path /blog] [--content-type post] [--with-admin] [--admin-base-path /cms] [--admin-api-url URL]");
   process.exit(2);
 }
 
@@ -57,42 +60,35 @@ function appendBlock(file, begin, end, body) {
   fs.writeFileSync(file, text);
   return true;
 }
-function inferDjangoFiles(backend) {
-  const manage = fs.readFileSync(path.join(backend, "manage.py"), "utf8");
-  const match = manage.match(/DJANGO_SETTINGS_MODULE["']\s*,\s*["']([^"']+)["']/);
-  if (!match) throw new Error("Could not detect DJANGO_SETTINGS_MODULE from manage.py. Pass a conventional Django project or wire package manually.");
-  const moduleName = match[1];
-  const parts = moduleName.split(".");
-  const settingsFile = path.join(backend, ...parts) + ".py";
-  const urlsFile = path.join(backend, ...parts.slice(0, -1), "urls.py");
-  if (!exists(settingsFile)) throw new Error(`Settings file not found: ${settingsFile}`);
-  if (!exists(urlsFile)) throw new Error(`URLs file not found: ${urlsFile}`);
-  return { settingsFile, urlsFile };
-}
 function sourceRoot(frontend) {
   if (exists(path.join(frontend, "src", "app"))) return path.join(frontend, "src");
   if (exists(path.join(frontend, "app"))) return frontend;
   return exists(path.join(frontend, "src")) ? path.join(frontend, "src") : frontend;
 }
 
-function ensureEnv(frontend) {
+function ensureEnv(frontend, options = {}) {
   const envFile = path.join(frontend, ".env.local");
   let text = exists(envFile) ? fs.readFileSync(envFile, "utf8") : "";
   const lines = [];
   if (!/^DIGITALAFARIN_CMS_URL=/m.test(text)) lines.push("DIGITALAFARIN_CMS_URL=http://localhost:8000/api/cms/v1");
   if (!/^DIGITALAFARIN_CMS_SITE=/m.test(text)) lines.push("DIGITALAFARIN_CMS_SITE=localhost:3000");
+  if (options.withRevalidate && !/^DIGITALAFARIN_CMS_WEBHOOK_SECRET=/m.test(text)) {
+    // Generated once; paste the same value into the CMS webhook endpoint's secret.
+    lines.push(`DIGITALAFARIN_CMS_WEBHOOK_SECRET=${randomBytes(32).toString("hex")}`);
+  }
   if (lines.length) {
     if (text && !text.endsWith("\n")) text += "\n";
     text += lines.join("\n") + "\n";
     fs.writeFileSync(envFile, text);
   }
 }
-function ensureNextAdapter(frontend) {
+function ensureNextAdapter(frontend, options = {}) {
   const lib = path.join(sourceRoot(frontend), "lib");
   fs.mkdirSync(lib, { recursive: true });
   const file = path.join(lib, "digitalafarin-cms.ts");
   if (!exists(file)) {
-    fs.writeFileSync(file, `import { createCmsClientFromEnv } from "@digitalafarin/cms-next";\n\nexport const cms = createCmsClientFromEnv();\n`);
+    const config = options.withRevalidate ? "{ revalidate: false }" : "";
+    fs.writeFileSync(file, `import { createCmsClientFromEnv } from "@digitalafarin/cms-next";\n\nexport const cms = createCmsClientFromEnv(${config});\n`);
   }
 }
 
@@ -128,7 +124,7 @@ function ensurePublicRoute(frontend) {
   fs.mkdirSync(componentDir, { recursive: true });
 
   if (!exists(routeFile)) {
-    fs.copyFileSync(path.join(templateDir, "public-page.tsx"), routeFile);
+    fs.writeFileSync(routeFile, applySegmentConfig(frontend, fs.readFileSync(path.join(templateDir, usesCacheComponents(frontend) ? "public-page.cache-components.tsx" : "public-page.tsx"), "utf8")));
   }
   if (!exists(rendererFile)) {
     fs.copyFileSync(path.join(templateDir, "BlockRenderer.tsx"), rendererFile);
@@ -147,6 +143,7 @@ function embedAdmin(frontend) {
     "--api-url", adminApiUrl,
   ];
   if (has("--force-admin")) commandArgs.push("--force");
+  if (has("--legacy-token-auth")) commandArgs.push("--legacy-token-auth");
   if (has("--skip-install")) commandArgs.push("--skip-install");
   run("npm", commandArgs, { cwd: frontend });
 }
@@ -242,7 +239,10 @@ const adminPackage = arg("--admin-package", `@digitalafarin/cms-admin@${releaseV
 
 if (backend && command !== "admin") {
   if (!skipInstall) run(python, ["-m", "pip", "install", djangoPackage], { cwd: backend });
-  const { settingsFile, urlsFile } = inferDjangoFiles(backend);
+  const { settingsFile, urlsFile, urlsSource } = inferDjangoFiles(backend, {
+    settingsFile: arg("--settings-file", ""), urlsFile: arg("--urls-file", ""),
+  });
+  console.log(`Django settings: ${path.relative(backend, settingsFile)}; URLconf: ${path.relative(backend, urlsFile)} (${urlsSource})`);
   appendBlock(
     settingsFile,
     "# BEGIN DIGITALAFARIN CMS",
@@ -266,11 +266,12 @@ if (frontend) {
     run("npm", ["install", ...packages], { cwd: frontend });
   }
   if (command !== "admin") {
-    ensureEnv(frontend);
-    ensureNextAdapter(frontend);
+    ensureEnv(frontend, { withRevalidate: has("--with-revalidate") });
+    ensureNextAdapter(frontend, { withRevalidate: has("--with-revalidate") });
     if (has("--with-public-route")) ensurePublicRoute(frontend);
     scaffoldIntegration(frontend, sourceRoot(frontend), path.join(packageRoot, "templates/next"), {
       collection: has("--with-collection"), collectionPath: arg("--collection-path", "/blog"), contentType: arg("--content-type", "post"),
+      withRevalidate: has("--with-revalidate"),
     });
   }
   if (has("--with-admin") || command === "admin") embedAdmin(frontend);

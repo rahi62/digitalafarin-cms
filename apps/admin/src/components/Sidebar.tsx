@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { clearTokens } from "@/lib/api";
+import { logout } from "@/lib/api";
 import { adminPath, stripAdminBasePath } from "@/lib/admin-path";
 
 const links=[
@@ -14,6 +14,7 @@ const links=[
   ["/content-types","ساختار محتوا","◇"],
   ["/reusable-blocks","بلوک‌های آماده","▦"],
   ["/route-explorer","کاوشگر مسیرها","◎"],
+  ["/component-registry","اتصال کامپوننت‌ها","▤"],
   ["/taxonomies","دسته‌ها و تگ‌ها","#"],
   ["/menus","منوها","☰"],
   ["/media","رسانه","▧"],
@@ -24,6 +25,7 @@ const links=[
   ["/audit","SEO Audit","✓"],
   ["/audit-trends","Audit Trends","↗"],
   ["/search-performance","Search Performance","⌁"],
+  ["/security/sessions","نشست‌های من","♙"],
   ["/settings","تنظیمات سایت","⚙"]
 ] as const;
 
@@ -48,6 +50,6 @@ export default function Sidebar(){
       aria-label="ناوبری مدیریت محتوا">{links.map(([href,label,icon])=>
         <Link key={href} href={adminPath(href)} className={isActive(current,href)?"active":""}><b>{icon}</b>{label}</Link>
       )}</nav>
-    <button className="logout" onClick={()=>{clearTokens();window.location.href=adminPath("/login")}}>خروج</button>
+    <button className="logout" onClick={()=>{void logout().finally(()=>{window.location.href=adminPath("/login")});}}>خروج</button>
   </aside>;
 }

@@ -3,7 +3,7 @@ import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { cms } from "__CMS_LIB__";
 import { DigitalAfarinBlockRenderer } from "__CMS_RENDERER__";
 
-export const dynamic = "force-dynamic";
+__CMS_SEGMENT_CONFIG__
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ cms_preview?: string }> };
 
 function routeSlug(value: string) {

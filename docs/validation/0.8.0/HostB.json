@@ -1,0 +1,180 @@
+{
+  "label": "HostB",
+  "results": [
+    {
+      "check": "django /health/ ok",
+      "pass": true,
+      "detail": "{\"status\":\"ok\",\"version\":\"0.8.0\"}"
+    },
+    {
+      "check": "admin login with wrong password rejected",
+      "pass": true,
+      "detail": "401"
+    },
+    {
+      "check": "admin login sets httpOnly session cookies",
+      "pass": true,
+      "detail": "200  Path=/cms; Expires=Wed, 04 Nov 2026 21:08:42 GMT; Max-Age=1800; Secure; HttpOnl"
+    },
+    {
+      "check": "login response body carries no tokens",
+      "pass": true,
+      "detail": "{\"authenticated\":true}"
+    },
+    {
+      "check": "session status authenticated",
+      "pass": true,
+      "detail": "{\"configured\":true,\"hasSession\":true}"
+    },
+    {
+      "check": "admin shell page has no tokens in HTML",
+      "pass": true,
+      "detail": "200"
+    },
+    {
+      "check": "create organization",
+      "pass": true,
+      "detail": "201"
+    },
+    {
+      "check": "create site",
+      "pass": true,
+      "detail": "201"
+    },
+    {
+      "check": "create content type",
+      "pass": true,
+      "detail": "201"
+    },
+    {
+      "check": "register revalidation webhook",
+      "pass": true,
+      "detail": "201"
+    },
+    {
+      "check": "create draft entry",
+      "pass": true,
+      "detail": "/blog/hello/"
+    },
+    {
+      "check": "draft is not public (404 / noindex 404 page)",
+      "pass": true,
+      "detail": "404"
+    },
+    {
+      "check": "publish entry",
+      "pass": true,
+      "detail": "200"
+    },
+    {
+      "check": "published page renders (200)",
+      "pass": true,
+      "detail": "200"
+    },
+    {
+      "check": "meta title + description",
+      "pass": true,
+      "detail": "['<title>Hello SEO Title']"
+    },
+    {
+      "check": "canonical link",
+      "pass": true,
+      "detail": "['<link rel=\"canonical\" href=\"http://localhost:3001/blog/hello/\"/>']"
+    },
+    {
+      "check": "JSON-LD present",
+      "pass": true,
+      "detail": "1"
+    },
+    {
+      "check": "page is indexable (no noindex)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "missing CMS page is a 404 (real status on classic, noindex 404 page on cacheComponents)",
+      "pass": true,
+      "detail": "404 mode=classic"
+    },
+    {
+      "check": "existing host route /about still wins",
+      "pass": true,
+      "detail": "200"
+    },
+    {
+      "check": "preview renders the draft",
+      "pass": true,
+      "detail": "200"
+    },
+    {
+      "check": "preview is noindex",
+      "pass": true,
+      "detail": "noindex, nofollow"
+    },
+    {
+      "check": "preview is no-store",
+      "pass": true,
+      "detail": "private, no-store, max-age=0"
+    },
+    {
+      "check": "draft without token stays hidden",
+      "pass": true,
+      "detail": "404"
+    },
+    {
+      "check": "redirect works with an HTTP 308/301",
+      "pass": true,
+      "detail": "308 /blog/hello/"
+    },
+    {
+      "check": "sitemap lists the published page",
+      "pass": true,
+      "detail": "200"
+    },
+    {
+      "check": "robots allows + blocks admin/preview + sitemap",
+      "pass": true,
+      "detail": "User-agent: * | Allow: / | Disallow: /cms/ | Disallow: /digitalafarin-cms-preview/ | Disallow: /__cms_preview/ | Sitemap: http://localhost:3001/sitemap.xml | "
+    },
+    {
+      "check": "webhook drained and delivered",
+      "pass": true,
+      "detail": "webhook deliveries: {'delivered': 3}\nSystem check identified some issues:\n\nWARNINGS:\n?: (digitalafarin_cms.W005) Host REST_FRAMEWORK default authentication does not check CMS session revocation.\n\tHINT: CMS endpoints use their own authenticator and are unaffected. Host views that accept CMS JWTs should put 'digitalafarin_cms.session_auth.CmsSessionJWTAuthentication' first."
+    },
+    {
+      "check": "page shows new content after revalidation without rebuild",
+      "pass": true,
+      "detail": "stale-before-drain=True"
+    },
+    {
+      "check": "sitemap lastmod changes after republish",
+      "pass": true,
+      "detail": "2026-11-04T20:38:43+00:00 -> 2026-11-04T20:38:44+00:00"
+    },
+    {
+      "check": "exactly one content.published event per publish",
+      "pass": true,
+      "detail": "42 objects imported automatically (use -v 2 for details).\n\n[('content.published', 'delivered'), ('content.published', 'delivered'), ('redirect.changed', 'delivered')]"
+    },
+    {
+      "check": "robots Disallow: / when robots_index=false",
+      "pass": true,
+      "detail": "User-agent: * | Disallow: / | "
+    },
+    {
+      "check": "logout succeeds",
+      "pass": true,
+      "detail": "204"
+    },
+    {
+      "check": "API denied after logout",
+      "pass": true,
+      "detail": "401"
+    },
+    {
+      "check": "trailing-slash redirects observed",
+      "pass": true,
+      "detail": "/blog/draft-only/ -> /blog/draft-only (308); /blog/draft-only/?cms_preview=.eJwly1EKgzAMANC79Huh1aY23WUkTdJNEB2uPzJ29wn7f-_jbOvHOS_q7s5SDhIrA0YeAakIVKUGUjGT8Vgam7u599LtHxpNJrkFSCESoIUMRXSCAVMZRFUJ9Qov7s9L-7ruD68Htw77tp7efX9LYiVz:1xOhkp:tCuckctty5XEpPDNK9rT1W3_ddaEzLgU7X6Jx1YeAtE -> /blog/draft-only?cms_preview=.eJwly1EKgzAMANC79Huh1aY23WUkTdJNEB2uPzJ29wn7f-_jbOvHOS_q7s5SDhIrA0YeAakIVKUGUjGT8Vgam7u599LtHxpNJrkFSCESoIUMRXSCAVMZRFUJ9Qov7s9L-7ruD68Htw77tp7efX9LYiVz%3A1xOhkp%3AtCuckctty5XEpPDNK9rT1W3_ddaEzLgU7X6Jx1YeAtE (308); /blog/hello/ -> /blog/hello (308); /blog/missing-page/ -> /blog/missing-"
+    }
+  ]
+}

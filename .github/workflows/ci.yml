@@ -52,6 +52,62 @@ jobs:
           .smoke-python/bin/python -m pip install dist/python/*.whl
           .smoke-python/bin/python scripts/smoke-python-package.py
 
+  postgres:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        django: ["5.2.*", "6.0.*"]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cms_test
+          POSTGRES_PASSWORD: cms-test-only
+          POSTGRES_DB: cms_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cms_test -d cms_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install PostgreSQL test dependencies (Django ${{ matrix.django }})
+        run: |
+          python -m pip install pytest pytest-django -e "./packages/cms-django[postgres]" "Django==${{ matrix.django }}"
+          python -c "import django; print('Django', django.get_version())"
+      - name: Verify backend and concurrent refresh on PostgreSQL
+        env:
+          DJANGO_SETTINGS_MODULE: tests.postgres_settings
+          PYTHONPATH: packages/cms-django
+          CMS_TEST_POSTGRES_PORT: "5432"
+        run: python -m pytest packages/cms-django/tests -q
+      - name: Verify the whole suite with strict managed sessions (the 0.8.0 default)
+        env:
+          DJANGO_SETTINGS_MODULE: tests.strict_settings
+          PYTHONPATH: packages/cms-django
+          CMS_TEST_POSTGRES_PORT: "5432"
+        run: python -m pytest packages/cms-django/tests -q
+
+  python-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Audit Python dependencies
+        run: |
+          python -m pip install pip-audit
+          python -m pip install "./packages/cms-django[all]"
+          python -m pip freeze --exclude digitalafarin-cms > /tmp/requirements.txt
+          python -m pip_audit -r /tmp/requirements.txt --no-deps --disable-pip
+
   node:
     runs-on: ubuntu-latest
     steps:
@@ -70,7 +126,9 @@ jobs:
           test -f package-lock.json
           node -e "const l=require('./package-lock.json'); if(l.lockfileVersion<1) process.exit(1); console.log('lockfileVersion='+l.lockfileVersion)"
       - run: npm ci --ignore-scripts
+      - run: node --experimental-strip-types --test apps/admin/test/*.test.mjs
       - run: npm run check:versions
+      - run: npm audit --audit-level=low
       - run: npm --workspace packages/cms-next run build
       - run: npm --workspace packages/cms-next run typecheck
       - run: npm --workspace packages/cms-next run test:rich-text
@@ -80,11 +138,19 @@ jobs:
       - run: npm --workspace examples/next-site run build
       - name: Install Chromium for editor browser tests
         run: npx playwright install --with-deps chromium
+      - name: Verify production CSP and nonce hydration
+        run: npm run test:e2e:security
       - run: npm run test:e2e:editor
+      - name: Verify HttpOnly BFF session and CSRF
+        run: npm run test:e2e:bff
       - name: Install Django package for host integration E2E
         run: python -m pip install -e "./packages/cms-django[all]"
       - run: npm run test:e2e:host
       - name: Smoke test installed npm tarballs
+        run: node scripts/smoke-npm-packages.mjs
+      - name: Verify packed Admin in a Next 15 host without preinstalled tooling
+        env:
+          CMS_SMOKE_HOST_NEXT: "15.5.28"
         run: node scripts/smoke-npm-packages.mjs
       - name: Inspect npm package contents
         run: |

@@ -39,3 +39,53 @@ test('preview config precedes filesystem and keeps host rewrites excluding previ
   const headers = await config.headers();
   assert.ok(headers.some((r) => r.headers.some((h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer')));
 });
+
+test('sitemap/robots handlers proxy a fixed upstream, tag fetches and never leak upstream errors', async (t) => {
+  const { createCmsSitemapHandler, createCmsSitemapPageHandler, createCmsRobotsHandler } = await import('../dist/server.js');
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    calls.push({ url: String(url), init });
+    if (String(url).includes('page=9')) return new Response('<html>debug</html>', { status: 404 });
+    if (String(url).includes('/robots/')) return new Response('User-agent: *\nDisallow: /cms/\n', { status: 200, headers: { etag: 'W/"r"', 'cache-control': 'public, max-age=0, s-maxage=60' } });
+    return new Response('<urlset></urlset>', { status: 200 });
+  });
+  const options = { baseUrl: 'https://cms.test/api/cms/v1', site: 'example.test' };
+  const sitemap = await createCmsSitemapHandler(options)();
+  assert.equal(sitemap.status, 200);
+  assert.equal(sitemap.headers.get('content-type'), 'application/xml; charset=utf-8');
+  assert.equal(calls[0].url, 'https://cms.test/api/cms/v1/content/sitemap/?site=example.test');
+  assert.deepEqual(calls[0].init.next.tags, ['cms:site:example.test', 'cms:list:example.test']);
+  assert.equal(calls[0].init.redirect, 'manual');
+
+  const page = createCmsSitemapPageHandler(options);
+  assert.equal((await page(new Request('https://h.test/x'), { params: Promise.resolve({ page: '2.xml' }) })).status, 200);
+  assert.match(calls[1].url, /sitemap\/\?site=example\.test&page=2$/);
+  for (const bad of ['0.xml', 'abc', '1.xml.evil', '../x', '']) {
+    assert.equal((await page(new Request('https://h.test/x'), { params: Promise.resolve({ page: bad }) })).status, 404);
+  }
+  const missing = await page(new Request('https://h.test/x'), { params: Promise.resolve({ page: '9.xml' }) });
+  assert.equal(missing.status, 404);
+  assert.doesNotMatch(await missing.text(), /debug/);
+
+  const robots = await createCmsRobotsHandler(options)();
+  assert.equal(robots.headers.get('content-type'), 'text/plain; charset=utf-8');
+  assert.equal(robots.headers.get('etag'), 'W/"r"');
+  assert.match(await robots.text(), /Disallow: \/cms\//);
+});
+
+test('sitemap handler reports misconfiguration and upstream failure without throwing', async (t) => {
+  const { createCmsSitemapHandler } = await import('../dist/server.js');
+  const saved = { ...process.env };
+  delete process.env.DIGITALAFARIN_CMS_URL; delete process.env.DIGITALAFARIN_CMS_SITE;
+  t.after(() => Object.assign(process.env, saved));
+  assert.equal((await createCmsSitemapHandler()()).status, 503);
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('ECONNREFUSED'); });
+  assert.equal((await createCmsSitemapHandler({ baseUrl: 'https://cms.test/api', site: 's.test' })()).status, 502);
+});
+
+test('cache tag helpers normalise paths like the CMS', async () => {
+  const { cmsSiteTag, cmsPathTag } = await import('../dist/index.js');
+  assert.equal(cmsSiteTag('a.test'), 'cms:site:a.test');
+  assert.equal(cmsPathTag('blog//post'), 'cms:path:/blog/post/');
+  assert.equal(cmsPathTag('/'), 'cms:path:/');
+});

@@ -2,7 +2,7 @@ import { cms } from "__CMS_LIB__";
 import { isCmsNotFoundError } from "@digitalafarin/cms-next";
 import { notFound } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+__CMS_SEGMENT_CONFIG__
 export default async function CmsCollection({ searchParams }: { searchParams: Promise<{ page?: string; search?: string; category?: string }> }) {
   const query = await searchParams;
   const pageNumber = Number(query.page || 1);

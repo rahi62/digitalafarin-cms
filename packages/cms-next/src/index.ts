@@ -3,3 +3,5 @@ export * from "./client.js";
 export * from "./metadata.js";
 export * from "./schema.js";
 export * from "./rich-text.js";
+export * from "./component-registry.js";
+export * from "./tags.js";

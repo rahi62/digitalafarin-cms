@@ -14,6 +14,7 @@ type ContentType = {
   slug: string;
   icon: string;
   is_public: boolean;
+  kind: "collection" | "singleton";
   collection_path: string;
   entry_path_pattern: string;
   schema: ContentTypeSchema;
@@ -64,7 +65,7 @@ const presets: Record<string, CustomFieldDefinition[]> = {
 };
 
 function emptyType(site = ""): ContentType {
-  return { site, name: "", slug: "", icon: "", is_public: true, collection_path: "", entry_path_pattern: "", schema: { fields: [] } };
+  return { site, name: "", slug: "", icon: "", is_public: true, kind: "collection", collection_path: "", entry_path_pattern: "", schema: { fields: [] } };
 }
 
 function slugify(value: string) {
@@ -100,6 +101,10 @@ export default function ContentTypesPage() {
   const [editing, setEditing] = useState<ContentType>(() => emptyType());
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [renameSource, setRenameSource] = useState("");
+  const [renameTarget, setRenameTarget] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameReport, setRenameReport] = useState<{ can_execute: boolean; total_entries: number; changed_entries: number; live_entries: number; issues: string[]; preview_token: string | null } | null>(null);
   const [checking, setChecking] = useState(false);
   const [impact, setImpact] = useState<{ safe: boolean; affected_entries: number; warnings: string[]; sample_entries: Array<{ id: string; title: string }> } | null>(null);
 
@@ -133,6 +138,8 @@ export default function ContentTypesPage() {
     () => (editing.schema?.fields || []).map(normalizeField),
     [editing.schema],
   );
+
+  useEffect(() => { setRenameSource(""); setRenameTarget(""); setRenameReport(null); }, [editing.id]);
 
   function setFields(next: CustomFieldDefinition[]) {
     setImpact(null);
@@ -180,6 +187,39 @@ export default function ContentTypesPage() {
     finally { setChecking(false); }
   }
 
+  async function renameField(mode: "preview" | "execute") {
+    if (!editing.id || !renameSource || !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(renameTarget)) {
+      setMessage("فیلد اصلی و شناسه جدید معتبر را وارد کنید."); return;
+    }
+    if (mode === "execute") {
+      if (!renameReport?.can_execute || !renameReport.preview_token) return;
+      if (!window.confirm(`شناسه «${renameSource}» به «${renameTarget}» تغییر کند؟ این تغییر در داده‌های ویرایشی اعمال می‌شود و نیازمند بررسی پیش از انتشار نسخه بعدی سایت است.`)) return;
+    }
+    setRenameBusy(true); setMessage("");
+    try {
+      if (mode === "preview") {
+        const report = await apiFetch<NonNullable<typeof renameReport>>(`/content/types/${editing.id}/schema-rename/`, {
+          method: "POST", body: JSON.stringify({
+            mode: "preview", source_key: renameSource, destination_key: renameTarget,
+          }),
+        });
+        setRenameReport(report);
+      } else {
+        await apiFetch(`/content/types/${editing.id}/schema-rename/`, {
+          method: "POST", body: JSON.stringify({
+            mode: "execute", confirm: true, source_key: renameSource,
+            destination_key: renameTarget, preview_token: renameReport?.preview_token,
+          }),
+        });
+        const updated = await apiFetch<ContentType>(`/content/types/${editing.id}/`);
+        setEditing(updated); setRenameReport(null); setRenameSource(""); setRenameTarget("");
+        setMessage("تغییر شناسه و انتقال داده‌های ویرایشی با موفقیت انجام شد.");
+        await loadTypes(updated.site);
+      }
+    } catch (error) { setRenameReport(null); setMessage(error instanceof Error ? error.message : "عملیات مهاجرت انجام نشد"); }
+    finally { setRenameBusy(false); }
+  }
+
   async function save() {
     if (!editing.site || !editing.name.trim() || !editing.slug.trim()) {
       setMessage("سایت، نام و slug الزامی هستند");
@@ -194,6 +234,7 @@ export default function ContentTypesPage() {
         slug: editing.slug.trim(),
         icon: editing.icon.trim(),
         is_public: editing.is_public,
+        kind: editing.kind || "collection",
         collection_path: editing.collection_path || "",
         entry_path_pattern: editing.entry_path_pattern || "",
         schema: { ...editing.schema, fields },
@@ -251,7 +292,7 @@ export default function ContentTypesPage() {
             {rows.map((item) => (
               <button type="button" key={item.id} className={editing.id === item.id ? "active" : ""} onClick={() => { setImpact(null); setEditing({ ...item, schema: item.schema || { fields: [] } }); }}>
                 <span className="contentTypeIcon">{item.icon || "◇"}</span>
-                <span><strong>{item.name}</strong><small>/{item.slug} · {(item.schema?.fields || []).length} field</small></span>
+                <span><strong>{item.name}</strong><small>/{item.slug} · {(item.schema?.fields || []).length} field · {item.kind === "singleton" ? "یکتا" : "مجموعه"}</small></span>
                 <b>{item.is_public ? "Public" : "Private"}</b>
               </button>
             ))}
@@ -271,9 +312,14 @@ export default function ContentTypesPage() {
               setEditing((current) => ({ ...current, name, slug: current.id || current.slug ? current.slug : slugify(name) }));
             }} placeholder="مثلاً Tour" /></div>
             <div className="field"><label>Slug</label><input dir="ltr" value={editing.slug} onChange={(e) => setEditing({ ...editing, slug: slugify(e.target.value) })} placeholder="tour" /></div>
+            <div className="field"><label>مدل محتوا</label><select value={editing.kind || "collection"} onChange={(e) => {
+              const kind = e.target.value as "collection" | "singleton";
+              setEditing({ ...editing, kind, collection_path: kind === "singleton" ? "" : editing.collection_path, entry_path_pattern: kind === "singleton" ? "" : editing.entry_path_pattern });
+            }}><option value="collection">مجموعه (Collection) — چندین محتوا</option><option value="singleton">صفحه یکتا (Singleton) — فقط یک محتوا</option></select><small>تغییر مدل ساختار دارای محتوا نیازمند مهاجرت داده است.</small></div>
             <div className="field"><label>Icon</label><input value={editing.icon} onChange={(e) => setEditing({ ...editing, icon: e.target.value })} placeholder="✈" /></div>
-            <div className="field"><label>مسیر فهرست</label><input dir="ltr" placeholder="/blog" value={editing.collection_path || ""} onChange={(e) => setEditing({ ...editing, collection_path: e.target.value })} /></div>
-            <div className="field"><label>الگوی آدرس محتوا</label><input dir="ltr" placeholder="/blog/{slug}/" value={editing.entry_path_pattern || ""} onChange={(e) => setEditing({ ...editing, entry_path_pattern: e.target.value })} /><small>برای Page و صفحهٔ اصلی هر دو فیلد مسیر را خالی بگذارید. تغییر الگو، آدرس محتوای موجود را جابه‌جا نمی‌کند.</small></div>
+            {editing.kind !== "singleton" && <div className="field"><label>مسیر فهرست</label><input dir="ltr" placeholder="/blog" value={editing.collection_path || ""} onChange={(e) => setEditing({ ...editing, collection_path: e.target.value })} /></div>}
+            {editing.kind !== "singleton" && <div className="field"><label>الگوی آدرس محتوا</label><input dir="ltr" placeholder="/blog/{slug}/" value={editing.entry_path_pattern || ""} onChange={(e) => setEditing({ ...editing, entry_path_pattern: e.target.value })} /><small>برای Page و صفحهٔ اصلی هر دو فیلد مسیر را خالی بگذارید. تغییر الگو، آدرس محتوای موجود را جابه‌جا نمی‌کند.</small></div>}
+            {editing.kind === "singleton" && <p className="cmsSingletonHint">این نوع محتوا فقط یک رکورد دارد؛ آدرس آن را هنگام ساخت همان صفحه تعیین می‌کنید. مسیرهای اختصاصی Next.js بدون اجازه تغییر نمی‌کنند.</p>}
             <label className="contentTypePublic"><input type="checkbox" checked={editing.is_public} onChange={(e) => setEditing({ ...editing, is_public: e.target.checked })} /><span><strong>Public</strong><small>قابل استفاده در خروجی عمومی سایت</small></span></label>
           </div>
 
@@ -311,6 +357,29 @@ export default function ContentTypesPage() {
             ))}
             {fields.length === 0 && <button type="button" className="fieldBuilderEmpty" onClick={addField}><strong>هنوز فیلدی تعریف نشده</strong><span>اولین Custom Field را اضافه کنید.</span></button>}
           </div>
+
+          {editing.id && <section className="cmsRenameWizard" aria-label="مهاجرت امن شناسه فیلد">
+            <h3>مهاجرت کنترل‌شده فیلد</h3>
+            <p>برای تغییر شناسه یک فیلد ریشه و انتقال مقدارهای قبلی، ابتدا بررسی ایمن انجام دهید. این عملیات برای ساختار دارای محتوای منتشرشده مسدود است و نسخه عمومی را تغییر نمی‌دهد.</p>
+            <div className="cmsRenameInputs">
+              <label className="field"><span>شناسه فعلی</span><select value={renameSource} onChange={(e) => { setRenameSource(e.target.value); setRenameReport(null); }}>
+                <option value="">یک فیلد انتخاب کنید</option>
+                {(editing.schema?.fields || []).map((field) => <option key={field.key} value={field.key}>{field.label || field.key} — {field.key}</option>)}
+              </select></label>
+              <label className="field"><span>شناسه جدید</span><input dir="ltr" value={renameTarget} placeholder="new_field_key"
+                onChange={(e) => { setRenameTarget(e.target.value); setRenameReport(null); }} /></label>
+            </div>
+            <div className="cmsRenameActions">
+              <button type="button" className="btn secondary" disabled={renameBusy || !renameSource || !renameTarget} onClick={() => renameField("preview")}>
+                {renameBusy ? "در حال بررسی..." : "پیش‌نمایش مهاجرت"}</button>
+              {renameReport?.can_execute && <button type="button" className="btn" disabled={renameBusy} onClick={() => renameField("execute")}>تأیید و اجرای مهاجرت</button>}
+            </div>
+            {renameReport && <div className={renameReport.can_execute ? "cmsSchemaImpact isSafe" : "cmsSchemaImpact"} role="status">
+              <strong>{renameReport.can_execute ? "آماده اجرای تأییدشده" : "مهاجرت ایمن نیست و مسدود شد"}</strong>
+              <span>{renameReport.total_entries.toLocaleString("fa-IR")} رکورد بررسی شد؛ {renameReport.changed_entries.toLocaleString("fa-IR")} رکورد نیازمند تغییر؛ {renameReport.live_entries.toLocaleString("fa-IR")} نسخه عمومی</span>
+              {renameReport.issues.length > 0 && <ul>{renameReport.issues.map((issue, index) => <li key={index} dir="ltr">{issue}</li>)}</ul>}
+            </div>}
+          </section>}
 
           {impact && <div className={impact.safe ? "cmsSchemaImpact isSafe" : "cmsSchemaImpact"} role="status">
             <strong>{impact.safe ? "تغییر ساختار از نظر سازگاری مجاز است" : "تغییر ناسازگار؛ ذخیره تا مهاجرت داده مسدود است"}</strong>

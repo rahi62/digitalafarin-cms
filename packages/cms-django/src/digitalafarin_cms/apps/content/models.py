@@ -5,6 +5,11 @@ from digitalafarin_cms.apps.common.models import UUIDTimeStampedModel
 from digitalafarin_cms.apps.sites.models import Site
 
 class ContentTypeDefinition(UUIDTimeStampedModel):
+    class Kind(models.TextChoices):
+        COLLECTION = "collection", "Collection"
+        SINGLETON = "singleton", "Singleton"
+
+    kind = models.CharField(max_length=16, choices=Kind.choices, default=Kind.COLLECTION)
     site=models.ForeignKey(Site,on_delete=models.CASCADE,related_name="content_types")
     name=models.CharField(max_length=120)
     slug=models.SlugField(max_length=120)
@@ -23,6 +28,18 @@ class ContentTypeDefinition(UUIDTimeStampedModel):
             previous = type(self).objects.filter(pk=self.pk).first() if not self._state.adding else None
             validate_collection_claim(self.site_id, self.collection_path, previous)
             return super().save(*args, **kwargs)
+
+class ContentSchemaMigration(UUIDTimeStampedModel):
+    """Audit trail for explicit, approved schema/data transformations."""
+    content_type=models.ForeignKey(ContentTypeDefinition,on_delete=models.PROTECT,related_name="schema_migrations")
+    operation=models.CharField(max_length=50)
+    source_key=models.CharField(max_length=120)
+    destination_key=models.CharField(max_length=120)
+    before_schema=models.JSONField(default=dict)
+    after_schema=models.JSONField(default=dict)
+    affected_entries=models.PositiveIntegerField(default=0)
+    executed_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True)
+
 
 class Category(UUIDTimeStampedModel):
     site=models.ForeignKey(Site,on_delete=models.CASCADE,related_name="categories")
@@ -44,6 +61,7 @@ class ContentEntry(UUIDTimeStampedModel):
         DRAFT="draft","Draft"; REVIEW="review","Review"; SCHEDULED="scheduled","Scheduled"; PUBLISHED="published","Published"; ARCHIVED="archived","Archived"
     site=models.ForeignKey(Site,on_delete=models.CASCADE,related_name="entries")
     content_type=models.ForeignKey(ContentTypeDefinition,on_delete=models.PROTECT,related_name="entries")
+    singleton_slot=models.OneToOneField(ContentTypeDefinition,null=True,blank=True,editable=False,on_delete=models.PROTECT,related_name="singleton_entry")
     title=models.CharField(max_length=255)
     slug=models.SlugField(max_length=255,allow_unicode=True)
     path=models.CharField(max_length=500,help_text="Canonical site path, e.g. /blog/example/")
@@ -59,6 +77,9 @@ class ContentEntry(UUIDTimeStampedModel):
     published_at=models.DateTimeField(null=True,blank=True)
     scheduled_at=models.DateTimeField(null=True,blank=True)
     is_featured=models.BooleanField(default=False)
+    deleted_at=models.DateTimeField(null=True,blank=True,db_index=True)
+    deleted_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,
+                                 on_delete=models.SET_NULL,related_name="cms_trashed_entries")
     class Meta:
         constraints=[models.UniqueConstraint(fields=["site","path"],name="unique_entry_site_path")]
         ordering=["-published_at","-created_at"]
@@ -70,10 +91,15 @@ class ContentEntry(UUIDTimeStampedModel):
         with transaction.atomic():
             # Serializes route claims for one site, including legacy encoded aliases.
             Site.objects.select_for_update().get(pk=self.site_id)
+            content_type = ContentTypeDefinition.objects.get(pk=self.content_type_id)
+            self.singleton_slot_id = self.content_type_id if content_type.kind == ContentTypeDefinition.Kind.SINGLETON else None
+            if self.singleton_slot_id and self.path_mode != "manual":
+                from django.core.exceptions import ValidationError
+                raise ValidationError({"path_mode": "Singleton pages require a manually controlled route."})
             previous = type(self).objects.filter(pk=self.pk).first() if not self._state.adding else None
             self.path = validate_entry_route(self, previous)
             if kwargs.get("update_fields") is not None:
-                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"path"}
+                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"path", "singleton_slot"}
             result = super().save(*args, **kwargs)
             # Editing a published entry changes the working copy only. Route redirects and
             # the public representation are changed exclusively by explicit publication.
@@ -98,9 +124,15 @@ class PublishedEntry(UUIDTimeStampedModel):
     site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name="published_entries")
     content_type = models.ForeignKey(ContentTypeDefinition, on_delete=models.PROTECT, related_name="published_entries")
     path = models.CharField(max_length=500)
+    # Canonical lookup key (routing.normalize_path): the resolver does one indexed
+    # equality lookup on (site, normalized_path) instead of scanning published rows.
+    normalized_path = models.CharField(max_length=500, default="", editable=False)
     title = models.CharField(max_length=255)
     excerpt = models.TextField(blank=True)
+    # First publication; never changes on republish.
     published_at = models.DateTimeField()
+    # Latest publish/republish; drives sitemap lastmod.
+    last_published_at = models.DateTimeField(null=True, blank=True)
     payload = models.JSONField(default=dict)
     seo = models.JSONField(default=dict, blank=True)
     schemas = models.JSONField(default=list, blank=True)
@@ -111,9 +143,48 @@ class PublishedEntry(UUIDTimeStampedModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["site", "path"], name="unique_published_site_path"),
+            models.UniqueConstraint(
+                fields=["site", "normalized_path"], name="unique_published_site_normalized_path",
+            ),
         ]
         indexes = [
             models.Index(fields=["site", "-published_at"], name="cms_published_site_time"),
+        ]
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        from .routing import normalize_path
+        try:
+            self.normalized_path = normalize_path(self.path, reserved=False)
+        except ValidationError:
+            self.normalized_path = self.path
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "path" in update_fields:
+            kwargs["update_fields"] = {*update_fields, "normalized_path"}
+        super().save(*args, **kwargs)
+
+
+class PublishedEntryTerm(models.Model):
+    """Indexed category/tag membership of a published entry (filled on publish)."""
+
+    class Kind(models.TextChoices):
+        CATEGORY = "category", "Category"
+        TAG = "tag", "Tag"
+
+    id = models.BigAutoField(primary_key=True)
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name="published_terms")
+    published_entry = models.ForeignKey(PublishedEntry, on_delete=models.CASCADE, related_name="terms")
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    slug = models.CharField(max_length=255)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["published_entry", "kind", "slug"], name="unique_published_entry_term",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["site", "kind", "slug"], name="cms_pubterm_lookup"),
         ]
 
 
@@ -149,3 +220,49 @@ class MenuItem(UUIDTimeStampedModel):
     sort_order=models.PositiveIntegerField(default=0)
     is_external=models.BooleanField(default=False)
     class Meta: ordering=["sort_order","created_at"]
+
+
+class ComponentBindingDraft(UUIDTimeStampedModel):
+    """Site-scoped authoring artifact; never executed directly by a Next.js host."""
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name="cms_component_drafts")
+    host_key = models.SlugField(max_length=80)
+    slots = models.JSONField(default=list)
+    version = models.PositiveIntegerField(default=1)
+    approved_version = models.PositiveIntegerField(null=True, blank=True)
+    approved_checksum = models.CharField(max_length=64, blank=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                    on_delete=models.SET_NULL, related_name="approved_cms_component_bindings")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                  on_delete=models.SET_NULL, related_name="created_cms_component_drafts")
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                  on_delete=models.SET_NULL, related_name="updated_cms_component_drafts")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["site", "host_key"], name="unique_cms_component_site_host")]
+
+
+class ComponentBindingRevision(UUIDTimeStampedModel):
+    draft = models.ForeignKey(ComponentBindingDraft, on_delete=models.CASCADE, related_name="revisions")
+    version = models.PositiveIntegerField()
+    slots = models.JSONField(default=list)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name="cms_component_revisions")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["draft", "version"], name="unique_cms_component_revision")]
+
+
+class ComponentBindingApprovalEvent(UUIDTimeStampedModel):
+    """Append-only record: approval changes are not runtime deployments."""
+    draft = models.ForeignKey(ComponentBindingDraft, on_delete=models.PROTECT, related_name="approval_events")
+    action = models.CharField(max_length=16, choices=[("approve", "Approve"), ("rollback", "Rollback"), ("revoke", "Revoke")])
+    from_version = models.PositiveIntegerField(null=True, blank=True)
+    to_version = models.PositiveIntegerField(null=True, blank=True)
+    checksum = models.CharField(max_length=64, blank=True)
+    reason = models.CharField(max_length=500, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                    on_delete=models.SET_NULL, related_name="cms_component_approval_events")
+
+    class Meta:
+        ordering = ["-created_at"]

@@ -272,7 +272,10 @@ test("standard edits preserve trailing advanced blocks through Standard ↔ Adva
 test("content type builder creates nested groups and bounded media fields without raw JSON editing", async ({ page }) => {
   const state: MockState = {};
   await installMocks(page, state);
+  const ready = page.waitForResponse((response) => response.url().includes("/cms/api-proxy/content/types/?site=site-1") && response.status() === 200);
   await page.goto("/cms/content-types");
+  await ready;
+  await expect(page.locator(".contentTypeList select")).toHaveValue(site.id);
   await expect(page.getByText("Content Type Builder")).toBeVisible();
   const editor = page.locator(".contentTypeEditor");
   await editor.locator(".formGrid input").nth(0).fill("Tour");
@@ -297,6 +300,9 @@ test("content type builder creates nested groups and bounded media fields withou
   await third.locator(".cmsDesignerAdvanced input").fill("page");
 
   await editor.getByRole("button", { name: "ذخیره Content Type" }).click();
+  await expect.poll(() => Boolean(state.createdType), {
+    message: "Content Type POST did not complete; form state: " + await page.locator(".error, .notice").allTextContents(),
+  }).toBe(true);
   await expect(page.getByText("Content Type ذخیره شد")).toBeVisible();
   const payload = state.createdType as { schema?: { fields?: Array<Record<string, any>> } } | undefined;
   expect(payload?.schema?.fields).toHaveLength(3);

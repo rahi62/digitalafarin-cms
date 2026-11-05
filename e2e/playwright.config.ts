@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: ".",
-  testMatch: ["professional-editor.spec.ts"],
+  testMatch: ["professional-editor.spec.ts", "component-registry.spec.ts"],
   timeout: 45_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
@@ -14,6 +14,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
     ...devices["Desktop Chrome"],
+    launchOptions: process.env.CMS_E2E_BROWSER_PATH ? { executablePath: process.env.CMS_E2E_BROWSER_PATH } : {},
   },
   webServer: {
     cwd: process.cwd(),

@@ -150,7 +150,7 @@ def validate_field_values(fields, values, site, depth=0):
                 errors[key] = "Choose a content entry."
             else:
                 if not site or not ContentEntry.objects.filter(
-                    pk=identifier, site_id=site.pk,
+                    pk=identifier, site_id=site.pk, deleted_at__isnull=True,
                     content_type__slug=field["target_content_type"],
                 ).exists():
                     errors[key] = "Related entry must belong to this site and content type."

@@ -5,4 +5,8 @@ BEAT_SCHEDULE = {
         "task": "digitalafarin_cms.apps.content.tasks.publish_due_entries",
         "schedule": 60.0,
     },
+    "digitalafarin-cms-drain-webhooks": {
+        "task": "digitalafarin_cms.apps.integrations.tasks.drain_webhooks",
+        "schedule": 60.0,
+    },
 }

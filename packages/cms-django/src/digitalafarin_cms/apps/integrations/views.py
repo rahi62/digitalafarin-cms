@@ -1,7 +1,7 @@
 from django.utils.dateparse import parse_date
 from rest_framework import status as drf_status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from digitalafarin_cms.permissions import CmsIsAuthenticated as IsAuthenticated
 from rest_framework.response import Response
 
 from digitalafarin_cms.apps.common.tenancy import (

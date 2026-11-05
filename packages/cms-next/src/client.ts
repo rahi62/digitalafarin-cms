@@ -1,18 +1,24 @@
+import { cmsListTag, cmsPathTag, cmsSiteTag } from "./tags.js";
 import type { CmsMenu, CmsSiteContext, ResolvedPage, CmsEntryPage, CmsEntryQuery } from "./types.js";
 
 export type CmsClientOptions = {
   baseUrl: string;
   site: string;
   token?: string;
-  revalidate?: number;
+  /**
+   * Seconds to cache public fetches, `false` to cache until the CMS revalidation webhook
+   * fires (recommended with `createCmsRevalidateHandler`), or `0`/unset for no caching.
+   */
+  revalidate?: number | false;
 };
 
 export type CmsClientEnvOptions = Partial<CmsClientOptions>;
 export type ResolveOptions = { previewToken?: string };
 
 type NextRequestInit = RequestInit & {
-  next?: { revalidate?: number };
+  next?: { revalidate?: number | false; tags?: string[] };
 };
+type CmsFetchInit = NextRequestInit & { cmsTags?: string[] };
 
 export class CmsRequestError extends Error {
   status: number;
@@ -40,20 +46,26 @@ export function createCmsClient(options: CmsClientOptions) {
   const base = normalizeBaseUrl(options.baseUrl);
   if (!options.site) throw new Error("CMS site is required");
 
-  async function request<T = unknown>(path: string, init: NextRequestInit = {}): Promise<T> {
-    const headers = new Headers(init.headers);
+  async function request<T = unknown>(path: string, init: CmsFetchInit = {}): Promise<T> {
+    const { cmsTags, ...fetchInit } = init;
+    const headers = new Headers(fetchInit.headers);
     if (options.token) headers.set("Authorization", `Bearer ${options.token}`);
 
-    const requestInit: NextRequestInit = { ...init, headers };
-    if (init.cache === undefined && (options.revalidate === undefined || options.revalidate === 0)) {
+    const requestInit: NextRequestInit = { ...fetchInit, headers };
+    const isPreview = /[?&]preview=/.test(path);
+    if (fetchInit.cache === undefined && (options.revalidate === undefined || options.revalidate === 0)) {
       requestInit.cache = "no-store";
     }
-    if (
-      typeof options.revalidate === "number" && options.revalidate > 0 &&
-      init.cache !== "no-store" &&
-      typeof init.next?.revalidate !== "number"
-    ) {
-      requestInit.next = { ...(init.next || {}), revalidate: options.revalidate };
+    if (!isPreview && fetchInit.cache !== "no-store" && requestInit.cache !== "no-store") {
+      const tags = [...new Set([...(fetchInit.next?.tags || []), ...(cmsTags || [])])];
+      if (typeof options.revalidate === "number" && options.revalidate > 0 && typeof fetchInit.next?.revalidate !== "number") {
+        requestInit.next = { ...(fetchInit.next || {}), revalidate: options.revalidate, tags };
+      } else if (options.revalidate === false && fetchInit.next?.revalidate === undefined) {
+        requestInit.cache = fetchInit.cache ?? "force-cache";
+        requestInit.next = { ...(fetchInit.next || {}), revalidate: false, tags };
+      } else if (tags.length) {
+        requestInit.next = { ...(fetchInit.next || {}), tags };
+      }
     }
 
     let res: Response;
@@ -76,7 +88,7 @@ export function createCmsClient(options: CmsClientOptions) {
   function getSiteContext(init: NextRequestInit = {}) {
     return request<CmsSiteContext>(
       `/site-context/?site=${encodeURIComponent(options.site)}`,
-      init,
+      { ...init, cmsTags: [cmsSiteTag(options.site)] },
     );
   }
 
@@ -86,7 +98,9 @@ export function createCmsClient(options: CmsClientOptions) {
       if (preview) qs.set("preview", resolveOptions.previewToken!);
       const pageInit: NextRequestInit = preview ? { cache: "no-store" } : {};
       const [page, siteContext] = await Promise.all([
-        request<ResolvedPage>(`/content/resolve/?${qs.toString()}`, pageInit),
+        request<ResolvedPage>(`/content/resolve/?${qs.toString()}`, {
+          ...pageInit, cmsTags: [cmsSiteTag(options.site), cmsPathTag(path)],
+        }),
         getSiteContext(pageInit),
       ]);
       return { ...page, site: { ...page.site, ...siteContext } } as ResolvedPage;
@@ -106,12 +120,16 @@ export function createCmsClient(options: CmsClientOptions) {
       for (const key of ["content_type", "search", "category", "tag", "page", "page_size"] as const) {
         if (params[key] !== undefined) qs.set(key, String(params[key]));
       }
-      return request<CmsEntryPage>(`/content/public-entries/?${qs}`);
+      return request<CmsEntryPage>(`/content/public-entries/?${qs}`, {
+        cmsTags: [cmsSiteTag(options.site), cmsListTag(options.site)],
+      });
     },
     getSiteContext,
     getMenu: (key: string) => {
       const qs = new URLSearchParams({ site: options.site, key });
-      return request<CmsMenu>(`/content/menu-resolve/?${qs.toString()}`);
+      return request<CmsMenu>(`/content/menu-resolve/?${qs.toString()}`, {
+        cmsTags: [cmsSiteTag(options.site), cmsListTag(options.site)],
+      });
     },
     /** @deprecated Authenticated management API. Use listEntries for public websites. */
     getEntries: (params: Record<string, string | number | boolean | null | undefined> = {}) => {
@@ -126,6 +144,7 @@ export function createCmsClient(options: CmsClientOptions) {
     resolveRedirect: (path: string) =>
       request<{ match: boolean; type?: number; destination?: string | null }>(
         `/seo/redirect-resolve/?site=${encodeURIComponent(options.site)}&path=${encodeURIComponent(path)}`,
+        { cmsTags: [cmsSiteTag(options.site), cmsListTag(options.site)] },
       ),
     request,
   };

@@ -1,6 +1,6 @@
 """DigitalAfarin Headless CMS + SEO for Django/DRF."""
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 DJANGO_APPS = (
     "digitalafarin_cms.apps.common",
@@ -15,6 +15,7 @@ DJANGO_APPS = (
 REQUIRED_DJANGO_APPS = (
     "rest_framework",
     "django_filters",
+    "rest_framework_simplejwt.token_blacklist",
 )
 
 ALL_DJANGO_APPS = REQUIRED_DJANGO_APPS + DJANGO_APPS

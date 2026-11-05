@@ -4,7 +4,7 @@ Usage:
     from digitalafarin_cms.settings import apply_defaults
     apply_defaults(globals())
 
-This deliberately avoids replacing host-project settings. It only fills CMS defaults.
+This deliberately avoids replacing host-project settings. It only fills CMS defaults and never edits REST_FRAMEWORK.
 """
 from __future__ import annotations
 
@@ -20,26 +20,14 @@ def apply_defaults(namespace: dict) -> None:
             installed.append(app)
     namespace["INSTALLED_APPS"] = installed
 
-    rest = dict(namespace.get("REST_FRAMEWORK", {}))
-    rest.setdefault(
-        "DEFAULT_AUTHENTICATION_CLASSES",
-        ("rest_framework_simplejwt.authentication.JWTAuthentication",),
-    )
-    rest.setdefault(
-        "DEFAULT_FILTER_BACKENDS",
-        (
-            "django_filters.rest_framework.DjangoFilterBackend",
-            "rest_framework.filters.SearchFilter",
-            "rest_framework.filters.OrderingFilter",
-        ),
-    )
-    rest.setdefault("DEFAULT_PAGINATION_CLASS", "rest_framework.pagination.PageNumberPagination")
-    rest.setdefault("PAGE_SIZE", 50)
-    namespace["REST_FRAMEWORK"] = rest
+    # CMS views set their own authentication, pagination and filter backends
+    # (digitalafarin_cms.api), so the host project's REST_FRAMEWORK is left untouched.
 
     simple_jwt = dict(namespace.get("SIMPLE_JWT", {}))
     simple_jwt.setdefault("ACCESS_TOKEN_LIFETIME", timedelta(minutes=30))
     simple_jwt.setdefault("REFRESH_TOKEN_LIFETIME", timedelta(days=7))
+    simple_jwt.setdefault("ROTATE_REFRESH_TOKENS", True)
+    simple_jwt.setdefault("BLACKLIST_AFTER_ROTATION", True)
     namespace["SIMPLE_JWT"] = simple_jwt
 
     namespace.setdefault("DIGITALAFARIN_CMS_API_PREFIX", "api/cms/v1/")

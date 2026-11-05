@@ -12,6 +12,7 @@ import "../styles/search-performance.css";
 import "../styles/seo-opportunities.css";
 import "../styles/professional-editor.css";
 import "../styles/route-explorer.css";
+import "../styles/component-registry.css";
 import "../styles/content-list.css";
 import "../styles/dashboard.css";
 import "../styles/sites.css";
@@ -19,7 +20,12 @@ import "../styles/reusable-blocks.css";
 import "../styles/editor-navigation.css";
 import "../styles/nested-fields.css";
 import "../styles/team.css";
+import "../styles/trash.css";
+import "../styles/session-security.css";
 import Shell from "@/components/Shell";
+
+// Nonce-bearing HTML must be rendered for each request, never statically cached.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "DigitalAfarin SEO CMS",

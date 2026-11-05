@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(__filename), "..");
@@ -68,6 +69,22 @@ function ensureEnvValue(file, key, value) {
   }
   fs.writeFileSync(file, text);
 }
+function ensureEnvDefault(file, key, value) {
+  const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  if (new RegExp(`^${key}=`, "m").test(text)) return false;
+  fs.writeFileSync(file, `${text && !text.endsWith("\n") ? text + "\n" : text}${key}=${value}\n`);
+  return true;
+}
+function ensureGitignored(frontend, entry) {
+  // Secrets must only ever live in a git-ignored file. Add the entry when the host ignores no .env.local pattern.
+  const file = path.join(frontend, ".gitignore");
+  const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  const ignored = text.split(/\r?\n/).map((line) => line.trim()).some((line) =>
+    line === entry || line === ".env*" || line === ".env*.local" || line === ".env.*" || line === "*.local");
+  if (ignored) return false;
+  fs.writeFileSync(file, `${text && !text.endsWith("\n") ? text + "\n" : text}# DigitalAfarin CMS secrets\n${entry}\n`);
+  return true;
+}
 function importPath(fromFile, targetDirectory) {
   let relative = path.relative(path.dirname(fromFile), targetDirectory).replaceAll(path.sep, "/");
   if (!relative.startsWith(".")) relative = `./${relative}`;
@@ -118,15 +135,40 @@ function embed() {
   const missingDevDependencies = requiredDevDependencies.filter(
     (name) => !pkg.dependencies?.[name] && !pkg.devDependencies?.[name],
   );
-  if (missingDevDependencies.length && !skipInstall) {
-    run("npm", ["install", "--save-dev", ...missingDevDependencies], frontend);
-  }
   const routeSegments = basePath.split("/").filter(Boolean);
   const routeDir = path.join(appDir, ...routeSegments);
   const embeddedRoot = path.join(sourceRoot, "digitalafarin-cms-admin");
 
   if (fs.existsSync(routeDir) && fs.readdirSync(routeDir).length > 0 && !force) {
     throw new Error(`CMS route already exists: ${routeDir}. Use --force only if you intend to refresh generated CMS files.`);
+  }
+
+  if (missingDevDependencies.length && !skipInstall) {
+    const ownPackage = readJson(path.join(packageRoot, "package.json"));
+    // Next 15 uses the JavaScript compiler API, which TypeScript 7 removed.
+    // Provision a supported compiler only when the host has not chosen one.
+    const tooling = missingDevDependencies.map((name) =>
+      `${name}@${name === "typescript" ? "^5.9.3" : ownPackage.devDependencies[name]}`,
+    );
+    run("npm", ["install", "--save-dev", ...tooling], frontend);
+  }
+
+  const tsconfig = path.join(frontend, "tsconfig.json");
+  if (!fs.existsSync(tsconfig)) {
+    // Next 15 otherwise creates a legacy resolver that cannot read Tiptap's
+    // exported subpaths. Initialize only a missing file; never rewrite host JSONC.
+    const config = {
+      ...(fs.existsSync(path.join(frontend, "jsconfig.json")) ? { extends: "./jsconfig.json" } : {}),
+      compilerOptions: {
+        target: "ES2017", lib: ["dom", "dom.iterable", "esnext"], allowJs: true,
+        skipLibCheck: true, noEmit: true, esModuleInterop: true, module: "esnext",
+        moduleResolution: "bundler", resolveJsonModule: true, isolatedModules: true,
+        jsx: "preserve", incremental: true, plugins: [{ name: "next" }],
+      },
+      include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+      exclude: ["node_modules"],
+    };
+    fs.writeFileSync(tsconfig, JSON.stringify(config, null, 2) + "\n");
   }
 
   fs.mkdirSync(routeDir, { recursive: true });
@@ -170,6 +212,7 @@ function embed() {
     "seo-opportunities.css",
     "professional-editor.css",
     "route-explorer.css",
+    "component-registry.css",
     "content-list.css",
     "dashboard.css",
     "sites.css",
@@ -177,11 +220,14 @@ function embed() {
     "editor-navigation.css",
     "nested-fields.css",
     "team.css",
+    "trash.css",
+    "session-security.css",
   ].map((name) => `import "${styleRoot}/${name}";`).join("\n");
 
   fs.writeFileSync(
     layoutFile,
     `${styleImports}
+import { Suspense } from "react";
 import Shell from "${componentRoot}/Shell";
 
 export const metadata = {
@@ -190,7 +236,7 @@ export const metadata = {
 };
 
 export default function DigitalAfarinCmsLayout({ children }: { children: React.ReactNode }) {
-  return <div className="digitalafarinCmsAdmin" lang="fa" dir="rtl"><Shell>{children}</Shell></div>;
+  return <div className="digitalafarinCmsAdmin" lang="fa" dir="rtl"><Suspense fallback={null}><Shell>{children}</Shell></Suspense></div>;
 }
 `,
   );
@@ -199,12 +245,22 @@ export default function DigitalAfarinCmsLayout({ children }: { children: React.R
   ensureEnvValue(envFile, "NEXT_PUBLIC_DIGITALAFARIN_CMS_ADMIN_BASE_PATH", basePath);
   ensureEnvValue(envFile, "NEXT_PUBLIC_API_URL", `${basePath}/api-proxy`);
   ensureEnvValue(envFile, "DIGITALAFARIN_CMS_API_URL", apiUrl);
+  if (!has("--legacy-token-auth")) {
+    // Secure default: httpOnly session cookies via the Next.js BFF, no tokens in browser storage.
+    // Existing values are never overwritten; the secret is generated once per host.
+    ensureEnvDefault(envFile, "NEXT_PUBLIC_DIGITALAFARIN_CMS_AUTH_MODE", "bff");
+    ensureGitignored(frontend, ".env.local");
+    ensureEnvDefault(envFile, "DIGITALAFARIN_CMS_BFF_SECRET", randomBytes(32).toString("hex"));
+  }
 
   console.log("\nDigitalAfarin CMS Admin embedded successfully.");
   console.log(`Frontend: ${frontend}`);
   console.log(`Route: ${basePath}/`);
+  console.log(has("--legacy-token-auth") ? "Auth mode: legacy bearer tokens (browser storage)" : "Auth mode: BFF httpOnly session cookies (set DIGITALAFARIN_CMS_PUBLIC_ORIGIN to your public origin in production)");
   console.log("Runtime: host Next.js application (no separate CMS node_modules)");
-  if (missingDevDependencies.length) console.log(`TypeScript tooling ensured: ${missingDevDependencies.join(", ")}`);
+  if (missingDevDependencies.length) {
+    console.log(`${skipInstall ? "Missing tooling (installation skipped)" : "TypeScript tooling ensured"}: ${missingDevDependencies.join(", ")}`);
+  }
   console.log(`Django upstream: ${apiUrl}`);
 }
 

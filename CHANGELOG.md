@@ -4,6 +4,68 @@ All notable changes to DigitalAfarin CMS are documented here.
 
 The project uses synchronized versions for the Django package, Next.js SDK, Admin and CLI.
 
+## [0.8.0] - 2026-11-05
+
+"Ready for real projects": tenant fail-closed, host-independent API configuration, hardened media, indexed public delivery, correct technical SEO files, signed revalidation webhooks and operational endpoints. Verified by installing the built artifacts into two fresh hosts (see `VALIDATION.md`).
+
+### Security and isolation
+
+- Tenancy fails closed: an instance whose organization cannot be resolved is denied (403); only an explicit non-tenant allowlist (`AUTH_USER_MODEL`, `contenttypes.ContentType`, `DIGITALAFARIN_CMS_NON_TENANT_MODELS`) is exempt.
+- Every CMS view declares its own authentication, pagination and filters (`digitalafarin_cms.api`). `apply_defaults()` no longer edits the host's `REST_FRAMEWORK`; `E002` became warning `W005`.
+- Media uploads: extension allowlist **and** file-signature check, client `Content-Type` ignored, `DIGITALAFARIN_CMS_MEDIA_MAX_BYTES` (10 MB), HTML/JS/SVG rejected (`DIGITALAFARIN_CMS_MEDIA_ALLOW_SVG` opt-in). nginx hardening in `docs/MEDIA_SECURITY.md`.
+- Scoped, configurable throttles for the public endpoints (`DIGITALAFARIN_CMS_THROTTLE_RATES`).
+- Strict managed sessions are the default (`DIGITALAFARIN_CMS_REQUIRE_MANAGED_SESSIONS=True`).
+- Webhooks: private/loopback receivers are blocked unless allowlisted (`DIGITALAFARIN_CMS_WEBHOOK_ALLOWED_HOSTS`); connections are pinned to the validated IP and redirects are never followed.
+- The embedded Admin now defaults to the httpOnly BFF session with a generated, git-ignored secret (`--legacy-token-auth` opts out).
+
+### Performance
+
+- Resolver: one indexed lookup on `PublishedEntry.normalized_path` (unique per site); misses are O(1) instead of scanning every published entry.
+- Category/tag filtering runs in the database (`PublishedEntryTerm`).
+- Public responses carry `Cache-Control: public, max-age=0, s-maxage=N, stale-while-revalidate=M` and a weak ETag (304 support); previews stay `private, no-store` + noindex.
+- Redirect hit counter uses `F("hits") + 1`, can be disabled and never fails a lookup.
+
+### Technical SEO
+
+- Sitemap `lastmod` follows the latest publication (`PublishedEntry.last_published_at`); non-indexable entries and entries canonicalised elsewhere are excluded; sitemap index + child sitemaps above `DIGITALAFARIN_CMS_SITEMAP_PAGE_SIZE` (10,000); percent-encoded absolute URLs from the site's frontend base.
+- `robots.txt` is generated from site settings: `Disallow: /` when `robots_index` is false, always blocks the Admin and preview paths, optional `robots_rules`.
+- SDK/CLI: `createCmsSitemapHandler`, `createCmsSitemapPageHandler`, `createCmsRobotsHandler` and generated routes.
+
+### Revalidation
+
+- Signed webhook dispatcher (`content.published|unpublished|deleted`, `redirect.changed`, `site.settings_changed`): transactional outbox, Celery task or `cms_drain_webhooks`, HMAC-SHA256 + timestamp + unique event id, capped exponential backoff with jitter, delivery log (`WebhookDelivery`).
+- SDK `createCmsRevalidateHandler()` verifies signature, timestamp window and event-id replay; SDK fetches are tagged `cms:site:*`, `cms:path:*`, `cms:list:*`; `revalidate: false` caches until the webhook fires. CLI flag `--with-revalidate`.
+- Next.js 16 `cacheComponents` hosts: `@digitalafarin/cms-next/cache` resolves through `"use cache"` + `cacheTag`.
+
+### Operations and host integration
+
+- `GET /api/cms/v1/health/` (database + CMS migrations, package version only).
+- Scheduled publishing processes each entry under `SELECT ... FOR UPDATE SKIP LOCKED` and is idempotent; `cms_publish_due` for cron-only hosts.
+- Structured loggers `digitalafarin_cms.*` for publish/schedule, auth failures, throttling, webhooks, audit runs and schema changes (no secrets).
+- CLI: `--settings-file`, `--urls-file`, `ROOT_URLCONF` detection through imported base settings; Next 16 `cacheComponents` support (no rejected route segment config).
+
+### Changed (see `docs/UPGRADING.md`)
+
+- `apply_defaults()` does not set `DEFAULT_AUTHENTICATION_CLASSES`, pagination or filter backends any more.
+- `E002` is now warning `W005`.
+- Strict managed sessions by default; embedded Admin defaults to BFF.
+- Sitemap child URLs are `/sitemaps/<n>.xml`.
+
+### Migration
+
+- `digitalafarin_cms_content` 0009-0011: `PublishedEntry.normalized_path` (backfilled, then unique per site), `last_published_at`, `PublishedEntryTerm`. Reversible.
+- `digitalafarin_cms_integrations` 0003: `WebhookDelivery`.
+
+### Experimental
+
+Component registry, visual component binding, binding drafts and approval/rollback remain **experimental** and are not part of the supported 0.8 contract.
+
+### Known limitations
+
+- On `cacheComponents` hosts with Partial Prefetching, Next streams CMS 404s as a noindex page with status 200 and redirects as streamed client-side 308s; real status codes require Proxy (Next.js docs). Classic hosts return real 404/308.
+- Hosts with `trailingSlash: false` serve CMS URLs (which end in `/`) through a 308 from the slash form; set `trailingSlash: true` or accept the extra hop.
+- Webhook replay protection in the SDK is process-local unless you pass a shared `replayStore`.
+
 ## [0.7.0] - 2026-09-28
 
 ### Added
