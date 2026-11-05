@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { inferDjangoFiles } from "./django-files.js";
-import { applySegmentConfig, usesCacheComponents } from "./next-mode.js";
+import { applySegmentConfig, CACHE_COMPONENTS_SEO_WARNING, usesCacheComponents } from "./next-mode.js";
 import { scaffoldIntegration, applyIntegration, frontendDoctor } from "./integration.js";
 import { inventory, mapRoute, validateRoutes, routeMapFile, exportRouteReport } from "./routes.js";
 
@@ -199,6 +199,7 @@ if (["routes", "map-route", "validate-routes"].includes(command)) {
 
 if (command === "doctor") {
   let issues = frontend ? frontendDoctor(frontend, sourceRoot(frontend)) : 0;
+  if (frontend && usesCacheComponents(frontend)) console.log(CACHE_COMPONENTS_SEO_WARNING);
   if (frontend && exists(routeMapFile(frontend))) {
     const report = validateRoutes(frontend, sourceRoot(frontend));
     for (const error of report.errors) { console.log(`Route error: ${error}`); issues++; }
@@ -283,4 +284,5 @@ console.log("\nCMS scaffolding prepared. Review .digitalafarin/integration.json;
 console.log("Backend API default: /api/cms/v1/");
 console.log("Next adapter: lib/digitalafarin-cms.ts (or src/lib/...)");
 if (has("--with-public-route")) console.log("Public CMS route: app/[...cms_path]/page.tsx (or src/app/...). Existing pages retain priority.");
+if (has("--with-public-route") && frontend && usesCacheComponents(frontend)) console.log(CACHE_COMPONENTS_SEO_WARNING);
 if (has("--with-admin") || command === "admin") console.log(`CMS Admin embedded in host Next.js app at: ${arg("--admin-base-path", "/cms")}`);

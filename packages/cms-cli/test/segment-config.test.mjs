@@ -75,3 +75,21 @@ test('admin route handlers carry no segment config that cacheComponents hosts wo
     assert.doesNotMatch(fs.readFileSync(file, 'utf8'), SEGMENT, path.relative(adminApp, file));
   }
 });
+
+test('init and doctor warn that cacheComponents is not recommended for SEO-critical sites', (t) => {
+  const marker = /keep it OFF/;
+  const on = host(t, 'export default { cacheComponents: true };');
+  const initOn = spawnSync(process.execPath, [cli, 'init', '--frontend', on, '--skip-install', '--with-public-route'], { cwd: on, encoding: 'utf8' });
+  assert.equal(initOn.status, 0, initOn.stderr + initOn.stdout);
+  assert.match(initOn.stdout, marker);
+  assert.match(initOn.stdout, /0\.8\.1/);
+  const doctorOn = spawnSync(process.execPath, [cli, 'doctor', '--frontend', on], { cwd: on, encoding: 'utf8' });
+  assert.match(doctorOn.stdout, marker);
+
+  const off = host(t);
+  const initOff = spawnSync(process.execPath, [cli, 'init', '--frontend', off, '--skip-install', '--with-public-route'], { cwd: off, encoding: 'utf8' });
+  assert.equal(initOff.status, 0, initOff.stderr + initOff.stdout);
+  assert.doesNotMatch(initOff.stdout, marker);
+  const doctorOff = spawnSync(process.execPath, [cli, 'doctor', '--frontend', off], { cwd: off, encoding: 'utf8' });
+  assert.doesNotMatch(doctorOff.stdout, marker);
+});

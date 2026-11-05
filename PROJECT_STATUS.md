@@ -24,7 +24,11 @@ Component registry, visual component binding, binding drafts, approvals and roll
 
 - `pip-audit` not executed locally (PyPI unreachable); runs in CI.
 - Admin `localStorage` content not inspected in a real browser.
-- CMS 404/redirect status codes on `cacheComponents` hosts are streamed (see `VALIDATION.md`).
+- CMS 404/redirect status codes on `cacheComponents` hosts are streamed (see `VALIDATION.md`). Keep `cacheComponents` OFF for SEO-critical sites; the CLI warns when it is on.
+
+## Next milestone: 0.8.1
+
+- Real 404/308 status codes on `cacheComponents` hosts through `proxy.ts` (resolve the path before streaming starts).
 - Python 3.11 and 3.13 are covered by CI only; this run used 3.12.
 
 ## Out of scope for 0.8
