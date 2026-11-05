@@ -1,5 +1,14 @@
 # Upgrading DigitalAfarin CMS
 
+## 0.8.0 -> 0.8.1
+
+No migrations, settings or API changes. Update the pins; the only visible difference is a CLI warning when the host enables `cacheComponents` (see the recommendation under 0.8.0, item 9).
+
+```bash
+python -m pip install --upgrade "digitalafarin-cms[all]==0.8.1"
+npm install --save-exact @digitalafarin/cms-next@0.8.1 @digitalafarin/cms-admin@0.8.1
+```
+
 ## 0.7.0 -> 0.8.0
 
 There are no production installations of 0.7.0, so only the database migrations matter for data; the items below are behaviour changes you may need to act on.

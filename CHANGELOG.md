@@ -4,6 +4,19 @@ All notable changes to DigitalAfarin CMS are documented here.
 
 The project uses synchronized versions for the Django package, Next.js SDK, Admin and CLI.
 
+## [0.8.1] - 2026-11-05
+
+Guidance release on top of 0.8.0. No runtime, API, migration or setting changes.
+
+### Changed
+
+- CLI: `init --with-public-route` and `doctor` print a warning when the host's `next.config.*` enables `cacheComponents`. Exit codes are unchanged.
+- Docs: `README.md` and `docs/UPGRADING.md` recommend keeping `cacheComponents` OFF for SEO-critical sites. With it ON, Next.js fixes the HTTP status once streaming starts, so missing CMS pages answer HTTP 200 with a noindex page and CMS redirects are client-side.
+
+### Known limitation (unchanged)
+
+- Real 404/308 status codes on `cacheComponents` hosts (through `proxy.ts`) are not implemented yet; planned for a later release.
+
 ## [0.8.0] - 2026-11-05
 
 "Ready for real projects": tenant fail-closed, host-independent API configuration, hardened media, indexed public delivery, correct technical SEO files, signed revalidation webhooks and operational endpoints. Verified by installing the built artifacts into two fresh hosts (see `VALIDATION.md`).

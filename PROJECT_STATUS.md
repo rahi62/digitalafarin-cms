@@ -1,6 +1,6 @@
-# Project status - v0.8.0 (release candidate)
+# Project status - v0.8.1
 
-Evidence-based: see `VALIDATION.md` for commands, versions and per-host results. Branch `release/v0.8.0`, code verified at `25b211a`.
+Evidence-based: see `VALIDATION.md` for commands, versions and per-host results. That evidence comes from the 0.8.0 release-candidate run (code verified at `25b211a`); 0.8.1 only adds a CLI warning and documentation on top.
 
 ## Supported in 0.8.0
 
